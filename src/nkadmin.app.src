@@ -1,0 +1,9 @@
+{application, nkadmin, [
+    {description, "NkADMIN Package"},
+    {vsn, "develop"},
+    {modules, []},
+    {registered, []},
+    {mod, {nkadmin_app, []}},
+    {applications, [nkservice]},
+    {env, []}
+]}.
