@@ -34,7 +34,7 @@
 
 
 %% ===================================================================
-%% Comamnds
+%% Commands
 %% ===================================================================
 
 
@@ -48,8 +48,8 @@ cmd('', create, Req, State) ->
     #api_req{srv_id=SrvId, data=Data, user_id=User, session_id=SessId} = Req,
     #{domain:=Domain} = Data,
     Config = Data#{
-        srv_id = SrvId,
-        domain = Domain,
+        srv_id => SrvId,
+        domain => Domain,
         user_id => User,
         user_session_id => SessId,
         register => {nkadmin_api, self()}
@@ -82,7 +82,7 @@ cmd('', switch_object, #api_req{data=Data}, State) ->
 
 cmd('', destroy, #api_req{data=Data}, State) ->
     #{admin_session_id:=AdminSessId} = Data,
-    case nkadmin_session:stop(AdminSessId) of
+    case nkadmin_session:stop(AdminSessId, api_stop) of
         ok ->
             {ok, #{}, State};
         {error, Error} ->
