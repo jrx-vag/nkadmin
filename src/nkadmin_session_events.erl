@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(nkadmin_events).
+-module(nkadmin_session_events).
 
 -export([event/3, event_session_down/3]).
 
@@ -35,7 +35,7 @@
     {ok, nkadmin:admin()}.
 
 event(SessId, created, Admin) ->
-    Data = nkadmin_syntax:get_info(Admin),
+    Data = nkadmin_session_syntax:get_info(Admin),
     send_event(SessId, created, Data, Admin);
 
 
@@ -56,7 +56,7 @@ event_session_down(SrvId, SessId, ConnId) ->
     {Code, Txt} = nkservice_util:error_code(SrvId, process_down),
     Fake = #{
         srv_id => SrvId,
-        user_session => ConnId,
+        user_session_id => ConnId,
         session_events => [<<"destroyed">>]
     },
     send_event(SessId, destroyed, #{code=>Code, reason=>Txt}, Fake).
@@ -90,7 +90,7 @@ send_event(SessId, Type, Body, #{srv_id:=SrvId}=Admin) ->
 %% @private
 send_direct_event(#event{type=Type, body=Body}=Event, Admin) ->
     case Admin of
-        #{session_events:=Events, user_session:=ConnId} ->
+        #{session_events:=Events, user_session_id:=ConnId} ->
             case lists:member(Type, Events) of
                 true ->
                     Event2 = case Admin of

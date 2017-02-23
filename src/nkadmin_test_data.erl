@@ -26,21 +26,21 @@
 -spec frame(UserId::binary(), Domain::binary()) ->
     {ok, nkadmin_session:frame()} | {error, term()}.
 
-frame(_UserId, _Domain) ->
-    {ok, #{}}.
+frame(UserId, Domain) ->
+    {ok, #{type=>frame, user=>UserId, domain=>Domain}}.
 
 
 %% @doc Called to get the current tree
 -spec tree(UserId::binary(), Domain::binary()) ->
     {ok, nkadmin_session:tree()} | {error, term()}.
 
-tree(_UserId, _Domain) ->
-    {ok ,#{}}.
+tree(UserId, Domain) ->
+    {ok ,#{type=>tree, user=>UserId, domain=>Domain}}.
 
 
 %% @doc Called to get the current detail
 -spec detail(UserId::binary(), ObjId::binary()) ->
     {ok, nkadmin_session:detail()} | {error, term()}.
 
-detail(_UserId, _ObjId) ->
-    {ok, #{}}.
+detail(UserId, ObjId) ->
+    {ok, #{type=>detail, user=>UserId, obj=>ObjId}}.

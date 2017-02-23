@@ -15,7 +15,7 @@ If the user selects another domain, the `switch_domain` command can be used, and
 
 If the user selects an specific object (or entry in the tree), the command `switch_object` can be used, and a new _detail_ block will be returned.
 
-All commands must use `class: "admin"` and no `subclass`.
+All commands must use `class: "admin"` and `subclass: "session"`.
 
 
 ### Commands
@@ -30,6 +30,7 @@ Example:
 ```javascript
 {
     class: "admin",
+    subclass: "session",
     cmd: "create",
     data: {
         domain: "/",

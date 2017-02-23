@@ -18,10 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 
--module(nkadmin_api).
+-module(nkadmin_session_api).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([cmd/4, api_down/3]).
+-export([cmd/4, api_down/3, session_stopped/3]).
 
 -include_lib("nkservice/include/nkservice.hrl").
 
@@ -44,7 +44,7 @@
 %%   (nkcollab_call_reg_event() -> call_hangup () here)
 %% - if the session is killed, it is detected
 %%   (api_server_reg_down() -> api_call_down() here)
-cmd('', create, Req, State) ->
+cmd(session, create, Req, State) ->
     #api_req{srv_id=SrvId, data=Data, user_id=User, session_id=SessId} = Req,
     #{domain:=Domain} = Data,
     Config = Data#{
@@ -55,34 +55,34 @@ cmd('', create, Req, State) ->
         register => {nkadmin_api, self()}
     },
     case nkadmin_session:start(Config) of
-        {ok, AdminSessId, Data, Pid} ->
-            nkservice_api_server:register(self(), {nkadmin_session, AdminSessId, Pid}),
-            {ok, Data#{session_id=>AdminSessId}, State};
+        {ok, AdminId, Reply, Pid} ->
+            nkservice_api_server:register(self(), {nkadmin_session, AdminId, Pid}),
+            {ok, Reply#{admin_session_id=>AdminId}, State};
         {error, Error} ->
             {error, Error, State}
     end;
 
-cmd('', switch_domain, #api_req{data=Data}, State) ->
-    #{admin_session_id:=AdminSessId, domain:=Domain} = Data,
-    case nkadmin_session:switch_domain(AdminSessId, Domain) of
-        {ok, Data} ->
-            {ok, Data, State};
+cmd(session, switch_domain, #api_req{data=Data}, State) ->
+    #{admin_session_id:=AdminId, domain:=Domain} = Data,
+    case nkadmin_session:switch_domain(AdminId, Domain) of
+        {ok, Reply} ->
+            {ok, Reply, State};
         {error, Error} ->
             {error, Error, State}
     end;
 
-cmd('', switch_object, #api_req{data=Data}, State) ->
-    #{admin_session_id:=AdminSessId, obj_id:=ObjId} = Data,
-    case nkadmin_session:switch_object(AdminSessId, ObjId) of
-        {ok, Data} ->
-            {ok, Data, State};
+cmd(session, switch_object, #api_req{data=Data}, State) ->
+    #{admin_session_id:=AdminId, obj_id:=ObjId} = Data,
+    case nkadmin_session:switch_object(AdminId, ObjId) of
+        {ok, Replay} ->
+            {ok, Replay, State};
         {error, Error} ->
             {error, Error, State}
     end;
 
-cmd('', destroy, #api_req{data=Data}, State) ->
-    #{admin_session_id:=AdminSessId} = Data,
-    case nkadmin_session:stop(AdminSessId, api_stop) of
+cmd(session, destroy, #api_req{data=Data}, State) ->
+    #{admin_session_id:=AdminId} = Data,
+    case nkadmin_session:stop(AdminId, api_stop) of
         ok ->
             {ok, #{}, State};
         {error, Error} ->
@@ -97,14 +97,23 @@ cmd(_Sub, _Cmd, _Req, _State) ->
 %% Public functions
 %% ===================================================================
 
-%% @private Called when API server detects a registered call is down
+%% @private Sent by the admin session when it has been stopped
+%% We sent a message to the API session to remove the admin session before
+%% it receives the DOWN.
+session_stopped(AdminId, ApiPid, _Admin) ->
+    nkservice_api_server:unregister(ApiPid, {nkadmin_session, AdminId, self()}),
+    unsubscribe(AdminId, ApiPid).
+
+
+
+%% @private Called when API server detects a registered admin session is down
 %% Normally it should have been unregistered first
 %% (detected above and sent in the cast after)
 
 api_down(AdminId, Reason, State) ->
     #{srv_id:=SrvId} = State,
     lager:warning("Admin Session ~s is down: ~p", [AdminId, Reason]),
-    nkadmin_events:event_session_down(SrvId, AdminId, self()),
+    nkadmin_session_events:event_session_down(SrvId, AdminId, self()),
     unsubscribe(AdminId, self()).
 
 

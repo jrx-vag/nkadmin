@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(nkadmin_syntax).
+-module(nkadmin_session_syntax).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([syntax/5, get_info/1]).
@@ -28,16 +28,17 @@
 %% Syntax
 %% ===================================================================
 
-syntax('', create, Syntax, Defaults, Mandatory) ->
+syntax(session, create, Syntax, Defaults, Mandatory) ->
     {
         Syntax#{
-            domain => binary
+            domain => binary,
+            session_events => {list, binary}
         },
         Defaults,
         [domain|Mandatory]
     };
 
-syntax('', switch_domain, Syntax, Defaults, Mandatory) ->
+syntax(session, switch_domain, Syntax, Defaults, Mandatory) ->
     {
         Syntax#{
             admin_session_id => binary,
@@ -47,7 +48,7 @@ syntax('', switch_domain, Syntax, Defaults, Mandatory) ->
         [admin_session_id, domain|Mandatory]
     };
 
-syntax('', switch_object, Syntax, Defaults, Mandatory) ->
+syntax(session, switch_object, Syntax, Defaults, Mandatory) ->
     {
         Syntax#{
             admin_session_id => binary,
@@ -57,7 +58,7 @@ syntax('', switch_object, Syntax, Defaults, Mandatory) ->
         [admin_session_id, obj_id|Mandatory]
     };
 
-syntax('', destroy, Syntax, Defaults, Mandatory) ->
+syntax(session, destroy, Syntax, Defaults, Mandatory) ->
     {
         Syntax#{
             admin_session_id => binary

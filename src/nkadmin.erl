@@ -21,7 +21,6 @@
 -module(nkadmin).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([start/1, stop/0, start/0]).
 
 %% ===================================================================
 %% Types
@@ -33,27 +32,3 @@
 %% ===================================================================
 %% Public functions
 %% ===================================================================
-
-%% @doc
-start() ->
-    start("ws:all:10002/dkv, http://all:10002/dkv").
-
-
-%% @doc
-start(Path) ->
-    Spec = #{
-        plugins => [nkadmin],
-        api_server => Path,
-        api_server_timeout => 180,
-        debug => [nkservice_api_server, nkadmin]
-    },
-    nkservice:start(admin, Spec).
-
-
-%% @doc
-stop() ->
-    nkservice:stop(dkv).
-
-
-
-

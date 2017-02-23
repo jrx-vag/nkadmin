@@ -22,7 +22,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 -behaviour(gen_server).
 
--export([start/1, stop/2, switch_object/2, switch_domain/2]).
+-export([start/1, stop/2, switch_object/2, switch_domain/2, get_all/0]).
 -export([find/1, do_call/2, do_cast/2]).
 -export([init/1, terminate/2, code_change/3, handle_call/3,
          handle_cast/2, handle_info/2]).
@@ -101,7 +101,7 @@ start(#{srv_id:=Srv}=Config) ->
             Config2 = Config#{srv_id:=SrvId},
             {AdminId, Config3} = nklib_util:add_id(admin_id, Config2, admin),
             {ok, Pid} = gen_server:start(?MODULE, [Config3], []),
-            case do_call(Pid, get_all) of
+            case do_call(Pid, load) of
                 {ok, Data} ->
                     {ok, AdminId, Data, Pid};
                 {error, Error} ->
@@ -137,6 +137,15 @@ switch_domain(Id, Domain) ->
     do_call(Id, {switch_domain, Domain}).
 
 
+%% @doc
+-spec get_all() ->
+    [{id(), pid()}].
+
+get_all() ->
+    nklib_proc:values(?MODULE).
+
+
+
 
 % ===================================================================
 %% gen_server behaviour
@@ -158,7 +167,7 @@ switch_domain(Id, Domain) ->
 -spec init(term()) ->
     {ok, tuple()}.
 
-init([#{srv_id:=SrvId, admin_id:=AdminId, user:=User, domain:=Domain}=Config]) ->
+init([#{srv_id:=SrvId, admin_id:=AdminId, user_id:=User, domain:=Domain}=Config]) ->
     nklib_proc:put(?MODULE, AdminId),
     nklib_proc:put({?MODULE, AdminId}),
     Admin = Config#{
@@ -169,7 +178,8 @@ init([#{srv_id:=SrvId, admin_id:=AdminId, user:=User, domain:=Domain}=Config]) -
         srv_id = SrvId,
         user_id = User,
         domain = Domain,
-        admin = Admin
+        admin = Admin,
+        links = nklib_links:new()
     },
     set_log(State1),
     nkservice_util:register_for_changes(SrvId),
@@ -291,6 +301,9 @@ handle_info({'DOWN', Ref, process, _Pid, Reason}=Msg, State) ->
 handle_info({nkservice_updated, _SrvId}, State) ->
     {noreply, set_log(State)};
 
+handle_info(destroy, State) ->
+    {stop, normal, State};
+
 handle_info(Msg, #state{}=State) ->
     handle(nkadmin_session_handle_info, [Msg], State).
 
@@ -331,6 +344,7 @@ set_log(#state{srv_id=SrvId}=State) ->
         {true, _} -> true;
         _ -> false
     end,
+    ?LLOG(info, "debug: ~p", [Debug], State),
     put(nkadmin_session_debug, Debug),
     State.
 
