@@ -32,7 +32,7 @@ Example:
     class: "admin",
     cmd: "create",
     data: {
-        domain: "/,
+        domain: "/",
         session_events: ["updated", "destroyed"]
     },
     tid: 1
