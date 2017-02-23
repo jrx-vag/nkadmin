@@ -18,42 +18,69 @@
 %%
 %% -------------------------------------------------------------------
 
--module(nkadmin).
+-module(nkadmin_syntax).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([start/1, stop/0, start/0]).
-
-%% ===================================================================
-%% Types
-%% ===================================================================
-
-
+-export([syntax/5, get_info/1]).
 
 
 %% ===================================================================
-%% Public functions
+%% Syntax
 %% ===================================================================
 
-%% @doc
-start() ->
-    start("ws:all:10002/dkv, http://all:10002/dkv").
+syntax('', create, Syntax, Defaults, Mandatory) ->
+    {
+        Syntax#{
+            domain => binary
+        },
+        Defaults,
+        [domain|Mandatory]
+    };
+
+syntax('', switch_domain, Syntax, Defaults, Mandatory) ->
+    {
+        Syntax#{
+            admin_session_id => binary,
+            domain => binary
+        },
+        Defaults,
+        [admin_session_id, domain|Mandatory]
+    };
+
+syntax('', switch_object, Syntax, Defaults, Mandatory) ->
+    {
+        Syntax#{
+            admin_session_id => binary,
+            obj_id => binary
+        },
+        Defaults,
+        [admin_session_id, obj_id|Mandatory]
+    };
+
+syntax('', destroy, Syntax, Defaults, Mandatory) ->
+    {
+        Syntax#{
+            admin_session_id => binary
+        },
+        Defaults,
+        [admin_session_id|Mandatory]
+    };
+
+syntax(_Sub, _Cmd, Syntax, Defaults, Mandatory) ->
+    {Syntax, Defaults, Mandatory}.
 
 
-%% @doc
-start(Path) ->
-    Spec = #{
-        plugins => [nkadmin],
-        api_server => Path,
-        api_server_timeout => 180,
-        debug => [nkservice_api_server, nkadmin]
-    },
-    nkservice:start(admin, Spec).
+
+%% ===================================================================
+%% Internal
+%% ===================================================================
 
 
-%% @doc
-stop() ->
-    nkservice:stop(dkv).
+-spec get_info(nkadmin:admin()) ->
+     nkadmin:admin().
 
-
+get_info(Admin) ->
+    Fields = [obj_id, frame, tree, detail],
+    maps:with([Fields], Admin).
 
 

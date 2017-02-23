@@ -21,7 +21,8 @@
 -module(nkadmin_callbacks).
 
 -export([plugin_deps/0]).
-
+-export([api_server_cmd/2, api_server_syntax/4]).
+-export([api_server_reg_down/3]).
 -include_lib("nkservice/include/nkservice.hrl").
 
 
@@ -52,3 +53,36 @@ plugin_deps() ->
 %% MM proxy
 %% ===================================================================
 
+%% ===================================================================
+%% API CMD
+%% ===================================================================
+
+%% @private
+api_server_cmd(
+    #api_req{class=admin, subclass=Sub, cmd=Cmd}=Req, State) ->
+    nkadmin_api:cmd(Sub, Cmd, Req, State);
+
+api_server_cmd(_Req, _State) ->
+    continue.
+
+
+%% @privat
+api_server_syntax(#api_req{class=admin, subclass=Sub, cmd=Cmd},
+                  Syntax, Defaults, Mandatory) ->
+    nkadmin_syntax:syntax(Sub, Cmd, Syntax, Defaults, Mandatory);
+
+api_server_syntax(_Req, _Syntax, _Defaults, _Mandatory) ->
+    continue.
+
+
+%% ===================================================================
+%% API Server
+%% ===================================================================
+
+%% @private
+api_server_reg_down({nkadmin_session, AdminId, _Pid}, Reason, State) ->
+    nkadmin_api:api_down(AdminId, Reason, State),
+    continue;
+
+api_server_reg_down(_Link, _Reason, _State) ->
+    continue.

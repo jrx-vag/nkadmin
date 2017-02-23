@@ -18,42 +18,29 @@
 %%
 %% -------------------------------------------------------------------
 
--module(nkadmin).
--author('Carlos Gonzalez <carlosj.gf@gmail.com>').
-
--export([start/1, stop/0, start/0]).
-
-%% ===================================================================
-%% Types
-%% ===================================================================
+-module(nkadmin_test_data).
+-export([frame/2, tree/2, detail/2]).
 
 
+%% @doc Called to get the current frame
+-spec frame(UserId::binary(), Domain::binary()) ->
+    {ok, nkadmin_session:frame()} | {error, term()}.
+
+frame(_UserId, _Domain) ->
+    {ok, #{}}.
 
 
-%% ===================================================================
-%% Public functions
-%% ===================================================================
+%% @doc Called to get the current tree
+-spec tree(UserId::binary(), Domain::binary()) ->
+    {ok, nkadmin_session:tree()} | {error, term()}.
 
-%% @doc
-start() ->
-    start("ws:all:10002/dkv, http://all:10002/dkv").
-
-
-%% @doc
-start(Path) ->
-    Spec = #{
-        plugins => [nkadmin],
-        api_server => Path,
-        api_server_timeout => 180,
-        debug => [nkservice_api_server, nkadmin]
-    },
-    nkservice:start(admin, Spec).
+tree(_UserId, _Domain) ->
+    {ok ,#{}}.
 
 
-%% @doc
-stop() ->
-    nkservice:stop(dkv).
+%% @doc Called to get the current detail
+-spec detail(UserId::binary(), ObjId::binary()) ->
+    {ok, nkadmin_session:detail()} | {error, term()}.
 
-
-
-
+detail(_UserId, _ObjId) ->
+    {ok, #{}}.
