@@ -27,7 +27,9 @@
          nkadmin_session_handle_info/2]).
 -export([api_server_cmd/2, api_server_syntax/4]).
 -export([api_server_reg_down/3]).
+
 -include_lib("nkservice/include/nkservice.hrl").
+-include_lib("nkapi/include/nkapi.hrl").
 
 
 
@@ -140,7 +142,7 @@ nkadmin_session_handle_info(Msg, Admin) ->
 
 %% @private
 api_server_cmd(
-    #api_req{class=admin, subclass=Sub, cmd=Cmd}=Req, State) ->
+    #nkapi_req{class=admin, subclass=Sub, cmd=Cmd}=Req, State) ->
     nkadmin_session_api:cmd(Sub, Cmd, Req, State);
 
 api_server_cmd(_Req, _State) ->
@@ -148,7 +150,7 @@ api_server_cmd(_Req, _State) ->
 
 
 %% @privat
-api_server_syntax(#api_req{class=admin, subclass=Sub, cmd=Cmd},
+api_server_syntax(#nkapi_req{class=admin, subclass=Sub, cmd=Cmd},
                   Syntax, Defaults, Mandatory) ->
     nkadmin_session_syntax:syntax(Sub, Cmd, Syntax, Defaults, Mandatory);
 

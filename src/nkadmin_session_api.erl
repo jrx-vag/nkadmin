@@ -24,6 +24,7 @@
 -export([cmd/4, api_down/3, session_stopped/3]).
 
 -include_lib("nkservice/include/nkservice.hrl").
+-include_lib("nkapi/include/nkapi.hrl").
 
 
 %% ===================================================================
@@ -45,7 +46,7 @@
 %% - if the session is killed, it is detected
 %%   (api_server_reg_down() -> api_call_down() here)
 cmd(session, create, Req, State) ->
-    #api_req{srv_id=SrvId, data=Data, user_id=User, session_id=SessId} = Req,
+    #nkapi_req{srv_id=SrvId, data=Data, user_id=User, session_id=SessId} = Req,
     #{domain:=Domain} = Data,
     Config = Data#{
         srv_id => SrvId,
@@ -62,7 +63,7 @@ cmd(session, create, Req, State) ->
             {error, Error, State}
     end;
 
-cmd(session, switch_domain, #api_req{data=Data}, State) ->
+cmd(session, switch_domain, #nkapi_req{data=Data}, State) ->
     #{admin_session_id:=AdminId, domain:=Domain} = Data,
     case nkadmin_session:switch_domain(AdminId, Domain) of
         {ok, Reply} ->
@@ -71,7 +72,7 @@ cmd(session, switch_domain, #api_req{data=Data}, State) ->
             {error, Error, State}
     end;
 
-cmd(session, switch_object, #api_req{data=Data}, State) ->
+cmd(session, switch_object, #nkapi_req{data=Data}, State) ->
     #{admin_session_id:=AdminId, obj_id:=ObjId} = Data,
     case nkadmin_session:switch_object(AdminId, ObjId) of
         {ok, Replay} ->
@@ -80,7 +81,7 @@ cmd(session, switch_object, #api_req{data=Data}, State) ->
             {error, Error, State}
     end;
 
-cmd(session, destroy, #api_req{data=Data}, State) ->
+cmd(session, destroy, #nkapi_req{data=Data}, State) ->
     #{admin_session_id:=AdminId} = Data,
     case nkadmin_session:stop(AdminId, api_stop) of
         ok ->
