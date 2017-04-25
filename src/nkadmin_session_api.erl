@@ -23,7 +23,7 @@
 
 -export([cmd/4, api_down/3, session_stopped/3]).
 
--include_lib("nkservice/include/nkservice.hrl").
+-include_lib("nkevent/include/nkevent.hrl").
 -include_lib("nkapi/include/nkapi.hrl").
 
 
@@ -126,7 +126,7 @@ api_down(AdminId, Reason, State) ->
 
 %% @private
 unsubscribe(AdminId, ConnId) ->
-    Fun = fun(#event{class=Class, obj_id=ObjId}) ->
+    Fun = fun(#nkevent{class=Class, obj_id=ObjId}) ->
         nklib_util:to_binary(Class) == <<"admin">> andalso ObjId == AdminId
     end,
     nkservice_api_server:unsubscribe_fun(ConnId, Fun).

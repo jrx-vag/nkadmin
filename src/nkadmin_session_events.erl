@@ -22,7 +22,7 @@
 
 -export([event/3, event_session_down/3]).
 
--include_lib("nkservice/include/nkservice.hrl").
+-include_lib("nkevent/include/nkevent.hrl").
 
 
 
@@ -68,13 +68,13 @@ event_session_down(SrvId, SessId, ConnId) ->
 
 
 %% @doc Sends an event
--spec send_event(nkadmin:id(), nkservice_events:type(),
-    nkservice_events:body(), nkadmin:admin()) ->
+-spec send_event(nkadmin:id(), nkevent:type(),
+    nkevent:body(), nkadmin:admin()) ->
     ok.
 
 %% @private
 send_event(SessId, Type, Body, #{srv_id:=SrvId}=Admin) ->
-    Event = #event{
+    Event = #nkevent{
         srv_id = SrvId,
         class = <<"admin">>,
         subclass = <<"session">>,
@@ -83,19 +83,19 @@ send_event(SessId, Type, Body, #{srv_id:=SrvId}=Admin) ->
         body = Body
     },
     send_direct_event(Event, Admin),
-    nkservice_events:send(Event),
+    nkevent:send(Event),
     {ok, Admin}.
 
 
 %% @private
-send_direct_event(#event{type=Type, body=Body}=Event, Admin) ->
+send_direct_event(#nkevent{type=Type, body=Body}=Event, Admin) ->
     case Admin of
         #{session_events:=Events, user_session_id:=ConnId} ->
             case lists:member(Type, Events) of
                 true ->
                     Event2 = case Admin of
                                  #{session_events_body:=Body2} ->
-                                     Event#event{body=maps:merge(Body, Body2)};
+                                     Event#nkevent{body=maps:merge(Body, Body2)};
                                  _ ->
                                      Event
                              end,
