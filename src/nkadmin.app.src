@@ -4,6 +4,6 @@
     {modules, []},
     {registered, []},
     {mod, {nkadmin_app, []}},
-    {applications, [nkservice]},
+    {applications, [nkdomain]},
     {env, []}
 ]}.
