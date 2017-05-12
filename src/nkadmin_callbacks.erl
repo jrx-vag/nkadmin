@@ -144,7 +144,7 @@ frame_user(_SrvId, _) ->
 
 
 %% @private
-frame_user_menu(_SrvId, #{user_menu:=true}) ->
+frame_user_menu(_SrvId, #{user_menu:=true}=Data) ->
     {ok, [
         #{
             id => 'admin.user.menu',
@@ -154,12 +154,12 @@ frame_user_menu(_SrvId, #{user_menu:=true}) ->
                     #{
                         id => 'admin.user.menu.account',
                         class => frameUserMenuItem,
-                        value => <<"My Account">>
+                        value => i18n(admin_my_account, Data)
                     },
                     #{
-                        id => 'admin.user.menu.account',
+                        id => 'admin.user.menu.messages',
                         class => frameUserMenuItem,
-                        value => <<"My Account">>
+                        value => i18n(admin_my_messages, Data)
                     },
                     #{
                         class => frameUserMenuSeparator
@@ -173,12 +173,9 @@ frame_user_menu(_SrvId, _) ->
     {ok, []}.
 
 
-
-
-
-
-
-
+%% @private
+i18n(Key, Data) ->
+    nklib_i18n:get(Key, maps:get(language, Data, <<"en">>)).
 
 
 

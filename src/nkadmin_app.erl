@@ -44,6 +44,7 @@ start(_Type, _Args) ->
     case nklib_config:load_env(?APP, Syntax) of
         {ok, _} ->
             register_types(),
+            register_i18n(),
             {ok, Pid} = nkadmin_sup:start_link(),
             {ok, Vsn} = application:get_key(?APP, vsn),
             lager:info("NkADMIN v~s has started.", [Vsn]),
@@ -63,6 +64,11 @@ stop(_) ->
 %% @private
 register_types() ->
     ok = nkdomain_types:register(nkadmin_session_obj).
+
+
+%% @private
+register_i18n() ->
+    ok = nklib_i18n:load(nkadmin_i18n).
 
 
 %% Config Management

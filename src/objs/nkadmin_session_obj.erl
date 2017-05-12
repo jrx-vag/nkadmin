@@ -23,7 +23,7 @@
 -behavior(nkdomain_obj).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([create/2, find/2, start/5, stop/2]).
+-export([create/2, find/2, start/6, stop/2]).
 -export([switch_domain/3, element_action/5]).
 -export([object_get_info/0, object_mapping/0, object_parse/3,
          object_api_syntax/3, object_api_allow/4, object_api_cmd/4]).
@@ -110,12 +110,12 @@ find(Srv, User) ->
 %% @doc Starts a new session, connected to the Caller
 %% If the caller stops, we will stop the session
 %% TODO: if the session is stopped, a final event should be sent
-start(Srv, Id, DomainId, UserId, CallerPid) ->
+start(Srv, Id, DomainId, UserId, Language, CallerPid) ->
     case nkdomain_obj_lib:load(Srv, Id, #{usage_link=>{CallerPid, ?MODULE}}) of
         #obj_id_ext{pid=Pid} ->
             case nkdomain_obj_lib:load(Srv, DomainId, #{}) of
                 #obj_id_ext{obj_id=DomainObjId, type=?DOMAIN_DOMAIN} ->
-                    nkdomain_obj:sync_op(Pid, {?MODULE, start, DomainObjId, UserId, CallerPid});
+                    nkdomain_obj:sync_op(Pid, {?MODULE, start, DomainObjId, UserId, Language, CallerPid});
                 #obj_id_ext{} ->
                     {error, domain_unknown};
                 {error, object_not_found} ->
@@ -160,6 +160,7 @@ element_action(Srv, Id, ElementId, Action, Value) ->
 
 -record(?MODULE, {
     user_id :: binary(),
+    language :: binary(),
     domain_id :: binary(),
     elements = #{},
     subs = #{},
@@ -223,11 +224,12 @@ object_start(#obj_session{obj=Obj}=Session) ->
 
 
 %% @private
-object_sync_op({?MODULE, start, DomainId, UserId, Pid}, _From, Session) ->
+object_sync_op({?MODULE, start, DomainId, UserId, Language, Pid}, _From, Session) ->
     #obj_session{obj_id=ObjId, data=Data} = Session,
     #?MODULE{api_pids=Pids} = Data,
     Data2 = Data#?MODULE{
         user_id = UserId,
+        language = Language,
         domain_id = DomainId,
         api_pids=[Pid|Pids]
     },
@@ -336,8 +338,9 @@ do_event(_Event, Session) ->
 
 
 %% @private
-do_get_frame(FrameData, #obj_session{srv_id=SrvId}=Session) ->
-    case SrvId:admin_get_frame(SrvId, FrameData) of
+do_get_frame(FrameData, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+    #?MODULE{language=Language} =Data,
+    case SrvId:admin_get_frame(SrvId, FrameData#{language=>Language}) of
         {ok, Frame} ->
             {ok, Frame, Session};
         {error, Error} ->

@@ -26,7 +26,7 @@ session_create(UserId) ->
     cmd(?DOMAIN_ADMIN_SESSION, create, #{user_id=>UserId}).
 
 session_start() ->
-    cmd(?DOMAIN_ADMIN_SESSION, start, #{}).
+    cmd(?DOMAIN_ADMIN_SESSION, start, #{language=>es}).
 
 session_start(SessId) ->
     cmd(?DOMAIN_ADMIN_SESSION, start, #{id=>SessId}).

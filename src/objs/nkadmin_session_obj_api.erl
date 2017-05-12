@@ -71,7 +71,8 @@ cmd('', create, #nkapi_req{data=Data}=Req, #{srv_id:=SrvId}=State) ->
 cmd('', start, #nkapi_req{data=#{id:=Id}=Data}, #{srv_id:=SrvId, user_id:=UserId}=State) ->
     case nkdomain_api_util:get_domain(Data, State) of
         {ok, Domain} ->
-            case nkadmin_session_obj:start(SrvId, Id, Domain, UserId, self()) of
+            Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
+            case nkadmin_session_obj:start(SrvId, Id, Domain, UserId, Language, self()) of
                 {ok, ObjId, Reply} ->
                     State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
                     Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
