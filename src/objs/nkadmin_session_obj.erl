@@ -53,7 +53,7 @@
 
 
 -type event() ::
-    {update_element, frame|tree|detail, ElementId::binary(), Value::binary()|map()}.
+    {frame_updated, list()}.
 
 
 
@@ -263,15 +263,17 @@ object_async_op(_Op, _Session) ->
     continue.
 
 
-%%object_handle_info({nkevent, #nkevent{obj_id=ObjId}=Event}, #obj_session{data=Data}=Session) ->
-%%    case Data of
-%%        #?MODULE{domain_id=ObjId} ->
-%%            do_domain_event(Event, Session);
-%%        #?MODULE{user_id=ObjId} ->
-%%            do_user_event(Event, Session);
-%%        _ ->
-%%            do_event(Event, Session)
-%%    end;
+%% @private
+object_handle_info({nkevent, #nkevent{obj_id=ObjId}=Event}, #obj_session{data=Data}=Session) ->
+    Session2 = case Data of
+        #?MODULE{domain_id=ObjId} ->
+            do_domain_event(Event, Session);
+        #?MODULE{user_id=ObjId} ->
+            do_user_event(Event, Session);
+        _ ->
+            do_event(Event, Session)
+    end,
+    {noreply, Session2};
 
 object_handle_info(_Info, _Session) ->
     continue.
@@ -309,12 +311,27 @@ do_switch_domain(#{domain_id:=DomainId}=FrameData, Session) ->
     end.
 
 
-%%%% @private
-%%do_domain_event(#nkevent{type=Type}, Session)
-%%        when Type == <<"object_updated">> ->
+%% @private
+do_domain_event(#nkevent{type=Type, obj_id=DomainId}, Session)
+        when Type == <<"object_updated">> ->
+    do_update_frame(#{domain_id=>DomainId}, Session);
+
+do_domain_event(_, Session) ->
+    Session.
 
 
+%% @private
+do_user_event(#nkevent{type=Type, obj_id=UserId}, Session)
+    when Type == <<"object_updated">> ->
+    do_update_frame(#{user_id=>UserId}, Session);
 
+do_user_event(_, Session) ->
+    Session.
+
+
+%% @private
+do_event(_Event, Session) ->
+    Session.
 
 
 
@@ -326,6 +343,22 @@ do_get_frame(FrameData, #obj_session{srv_id=SrvId}=Session) ->
         {error, Error} ->
             {error, Error}
     end.
+
+
+%% @private
+do_update_frame(FrameData, Session) ->
+    case do_get_frame(FrameData, Session) of
+        {ok, Frame, Session2} ->
+            send_event({frame_updated, Frame}, Session2);
+        {error, Error} ->
+            ?LLOG(warning, "error calling do_get_frame: ~p (~s)", [Error, FrameData], Session),
+            Session
+    end.
+
+
+%% @private
+send_event(Event, Session) ->
+    nkdomain_obj_util:event(Event, Session).
 
 
 %% @private

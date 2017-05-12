@@ -31,6 +31,7 @@
 
 
 -define(ADMIN_DEF_EVENT_TYPES, [
+    <<"frame_updated">>,
     <<"unloaded">>
 ]).
 

@@ -32,32 +32,8 @@
 
 
 %% @private
-%%event({conversation_added, ConvId}, Session) ->
-%%    {event, conversation_added, #{conversation_id=>ConvId}, Session};
-%%
-%%event({conversation_removed, ConvId}, Session) ->
-%%    {event, conversation_removed, #{conversation_id=>ConvId}, Session};
-%%
-%%event({conversation_activated, ConvId}, Session) ->
-%%    {event, conversation_activated, #{conversation_id=>ConvId}, Session};
-%%
-%%event({member_added, ConvId, true, MemberId}, Session) ->
-%%    {event, member_added, #{conversation_id=>ConvId, member_id=>MemberId}, Session};
-%%
-%%event({member_removed, ConvId, true, MemberId}, Session) ->
-%%    {event, member_removed, #{conversation_id=>ConvId, member_id=>MemberId}, Session};
-%%
-%%event({message_created, ConvId, Msg}, Session) ->
-%%    {event, message_created, #{conversation_id=>ConvId, message=>Msg}, Session};
-%%
-%%event({message_updated, ConvId, Msg}, Session) ->
-%%    {event, message_updated, #{conversation_id=>ConvId, message=>Msg}, Session};
-%%
-%%event({message_deleted, ConvId, MsgId}, Session) ->
-%%    {event, message_deleted, #{conversation_id=>ConvId, message_id=>MsgId}, Session};
-%%
-%%event({unread_counter_updated, ConvId, Counter, Msg}, Session) ->
-%%    {event, unread_counter_updated, #{conversation_id=>ConvId, counter=>Counter, message=>Msg}, Session};
+event({frame_updated, Frame}, Session) ->
+    {event, frame_updated, #{frame=>Frame}, Session};
 
 event(_Event, Session) ->
     {ok, Session}.
