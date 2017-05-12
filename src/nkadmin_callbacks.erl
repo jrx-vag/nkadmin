@@ -21,6 +21,9 @@
 -module(nkadmin_callbacks).
 
 -export([plugin_deps/0]).
+-export([admin_get_frame/2]).
+
+
 -export([nkadmin_session_init/2, nkadmin_session_terminate/2, nkadmin_session_event/3,
          nkadmin_session_reg_event/4, nkadmin_session_stop/2,
          nkadmin_session_handle_call/3, nkadmin_session_handle_cast/2,
@@ -29,8 +32,10 @@
 -export([api_server_reg_down/3]).
 
 -include_lib("nkservice/include/nkservice.hrl").
+-include_lib("nkdomain/include/nkdomain.hrl").
 -include_lib("nkapi/include/nkapi.hrl").
 
+-define(LLOG(Type, Txt, Args), "NkADMIN " ++ Txt, Args).
 
 
 %% ===================================================================
@@ -56,21 +61,135 @@ plugin_deps() ->
 
 
 %% ===================================================================
-%% Admin Adminbacks
+%% Admin Callbacks
 %% ===================================================================
 
 -type admin_id() :: nkadmin_session:id().
 -type admin() :: nkadmin_session:admin().
 
 
-%% @doc Admined when a new call starts
+admin_get_frame(SrvId, Data) ->
+    case frame_domain(SrvId, Data) of
+        {ok, Frame1} ->
+            case frame_user(SrvId, Data) of
+                {ok, Frame2} ->
+                    case frame_user_menu(SrvId, Data) of
+                        {ok, Frame3} ->
+                            {ok, Frame1 ++ Frame2 ++ Frame3};
+                        {error, Error} ->
+                            {error, Error}
+                    end;
+                {error, Error} ->
+                    {error, Error}
+            end;
+        {error, Error} ->
+            {error, Error}
+    end.
+
+
+
+
+
+%% ===================================================================
+%% Util
+%% ===================================================================
+
+
+%% @private
+frame_domain(SrvId, #{domain_id:=DomainId}) ->
+    case nkdomain:get_name(SrvId, DomainId) of
+        {ok, #{name:=DomName, icon_id:=DomIconId}} ->
+            {ok, [
+                #{
+                    id => 'admin.domain.name',
+                    class => frameDomainName,
+                    value => DomName
+                },
+                #{
+                    id => 'admin.domain.icon',
+                    class => frameDomainIcon,
+                    value => DomIconId
+                }
+            ]};
+        {error, Error} ->
+            {error, Error}
+    end;
+
+frame_domain(_SrvId, _) ->
+    {ok, []}.
+
+
+%% @private
+frame_user(SrvId, #{user_id:=UserId}) ->
+    case nkdomain_user_obj:get_name(SrvId, UserId) of
+        {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname, icon_id:=UserIconId}}} ->
+            {ok, [
+                #{
+                    id => 'admin.user.name',
+                    class => userName,
+                    value => <<UserName/binary, " ", UserSurname/binary>>
+                },
+                #{
+                    id => 'admin.user.icon',
+                    class => frameUserIcon,
+                    value => UserIconId
+                }
+            ]};
+        {error, Error} ->
+            {error, Error}
+    end;
+
+frame_user(_SrvId, _) ->
+    {ok, []}.
+
+
+%% @private
+frame_user_menu(_SrvId, #{user_menu:=true}) ->
+    {ok, [
+        #{
+            id => 'admin.user.menu',
+            class => frameUserMenu,
+            value => #{
+                items => [
+                    #{
+                        id => 'admin.user.menu.account',
+                        class => frameUserMenuItem,
+                        value => <<"My Account">>
+                    },
+                    #{
+                        id => 'admin.user.menu.account',
+                        class => frameUserMenuItem,
+                        value => <<"My Account">>
+                    },
+                    #{
+                        class => frameUserMenuSeparator
+                    }
+                ]
+            }
+        }
+    ]};
+
+frame_user_menu(_SrvId, _) ->
+    {ok, []}.
+
+
+
+
+
+
+
+
+
+
+
+%% @doc Called when a new call starts
 -spec nkadmin_session_init(admin_id(), admin()) ->
     {ok, admin()}.
 
 nkadmin_session_init(_Id, Admin) ->
     {ok, Admin}.
 
-%% @doc Admined when the call stops
+%% @doc Called when the call stops
 -spec nkadmin_session_stop(Reason::term(), admin()) ->
     {ok, admin()}.
 
@@ -78,7 +197,7 @@ nkadmin_session_stop(_Reason, Admin) ->
     {ok, Admin}.
 
 
-%% @doc Admined when the call is destroyed
+%% @doc Called when the call is destroyed
 -spec nkadmin_session_terminate(Reason::term(), admin()) ->
     {ok, admin()}.
 
@@ -86,7 +205,7 @@ nkadmin_session_terminate(_Reason, Admin) ->
     {ok, Admin}.
 
 
-%% @doc Admined when the status of the call changes
+%% @doc Called when the status of the call changes
 -spec nkadmin_session_event(admin_id(), nkadmin_session:event(), admin()) ->
     {ok, admin()} | continue().
 
@@ -94,7 +213,7 @@ nkadmin_session_event(AdminId, Event, Admin) ->
     nkadmin_session_events:event(AdminId, Event, Admin).
 
 
-%% @doc Admined when the status of the call changes, for each registered
+%% @doc Called when the status of the call changes, for each registered
 %% process to the session
 -spec nkadmin_session_reg_event(admin_id(), nklib:link(), nkadmin_session:event(), admin()) ->
     {ok, admin()} | continue().
@@ -149,7 +268,7 @@ api_server_cmd(_Req, _State) ->
     continue.
 
 
-%% @privat
+%% @private
 api_server_syntax(#nkapi_req{class=nkadmin, subclass=Sub, cmd=Cmd},
                   Syntax, Defaults, Mandatory) ->
     nkadmin_session_syntax:syntax(Sub, Cmd, Syntax, Defaults, Mandatory);

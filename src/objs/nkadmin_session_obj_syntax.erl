@@ -65,18 +65,13 @@ api('', switch_domain, Syntax) ->
         '__mandatory' => [domain_id]
     };
 
-api('', start_detail, Syntax) ->
+api('', element_action, Syntax) ->
     Syntax#{
         id => binary,
-        detail_id => binary,
-        '__mandatory' => [detail_id]
-    };
-
-api('', stop_detail, Syntax) ->
-    Syntax#{
-        id => binary,
-        detail_id => binary,
-        '__mandatory' => [detail_id]
+        action => {atom, [selected]},
+        element_id => binary,
+        value => any,
+        '__mandatory' => [element_id, action]
     };
 
 api(Sub, Cmd, Syntax) ->

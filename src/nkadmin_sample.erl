@@ -43,12 +43,6 @@ session_stop() ->
 session_switch_domain(Domain) ->
     cmd(?DOMAIN_ADMIN_SESSION, switch_domain, #{domain_id=>Domain}).
 
-session_start_detail(ObjId) ->
-    cmd(?DOMAIN_ADMIN_SESSION, start_detail, #{detail_id=>ObjId}).
-
-session_stop_detail(ObjId) ->
-    cmd(?DOMAIN_ADMIN_SESSION, stop_detail, #{detail_id=>ObjId}).
-
 
 %% ===================================================================
 %% Client fun

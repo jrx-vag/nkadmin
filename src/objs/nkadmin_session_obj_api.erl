@@ -67,10 +67,10 @@ cmd('', create, #nkapi_req{data=Data}=Req, #{srv_id:=SrvId}=State) ->
             Error
     end;
 
-cmd('', start, #nkapi_req{data=#{id:=Id}=Data}, #{srv_id:=SrvId}=State) ->
+cmd('', start, #nkapi_req{data=#{id:=Id}=Data}, #{srv_id:=SrvId, user_id:=UserId}=State) ->
     case nkdomain_api_util:get_domain(Data, State) of
         {ok, Domain} ->
-            case nkadmin_session_obj:start(SrvId, Id, Domain, self()) of
+            case nkadmin_session_obj:start(SrvId, Id, Domain, UserId, self()) of
                 {ok, ObjId, Reply} ->
                     State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
                     Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
@@ -140,23 +140,12 @@ cmd('', switch_domain, #nkapi_req{data=#{domain_id:=DomId}=Data}, #{srv_id:=SrvI
             Error
     end;
 
-cmd('', start_detail, #nkapi_req{data=#{detail_id:=ObjId}=Data}, #{srv_id:=SrvId}=State) ->
+cmd('', element_action, #nkapi_req{data=Data}, #{srv_id:=SrvId}=State) ->
+    #{element_id:=ElementId, action:=Action} = Data,
+    Value = maps:get(value, Data, <<>>),
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, State) of
         {ok, Id} ->
-            case nkadmin_session_obj:start_detail(SrvId, Id, ObjId) of
-                {ok, Reply} ->
-                    {ok, Reply, State};
-                {error, Error} ->
-                    {error, Error, State}
-            end;
-        Error ->
-            Error
-    end;
-
-cmd('', stop_detail, #nkapi_req{data=#{detail_id:=ObjId}=Data}, #{srv_id:=SrvId}=State) ->
-    case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, State) of
-        {ok, Id} ->
-            case nkadmin_session_obj:stop_detail(SrvId, Id, ObjId) of
+            case nkadmin_session_obj:element_action(SrvId, Id, ElementId, Action, Value) of
                 {ok, Reply} ->
                     {ok, Reply, State};
                 {error, Error} ->
