@@ -236,8 +236,7 @@ object_sync_op({?MODULE, start, DomainId, UserId, Language, Pid}, _From, Session
     },
     Session2 = Session#obj_session{data=Data2},
     Session3 = subscribe(?DOMAIN_USER, UserId, Session2),
-    FrameData = #{domain_id=>DomainId, user_id=>UserId, user_menu=>true},
-    case do_switch_domain(FrameData, Session3) of
+    case do_switch_domain(DomainId, Session3) of
         {ok, Reply, Session4} ->
             {reply, {ok, ObjId, Reply}, Session4};
         {error, Error} ->
@@ -246,7 +245,7 @@ object_sync_op({?MODULE, start, DomainId, UserId, Language, Pid}, _From, Session
     end;
 
 object_sync_op({?MODULE, switch_domain, DomainId}, _From, Session) ->
-    case do_switch_domain(#{domain_id=>DomainId}, Session) of
+    case do_switch_domain(DomainId, Session) of
         {ok, Reply, Session2} ->
             {reply, {ok, Reply}, Session2};
         {error, Error} ->
@@ -305,17 +304,32 @@ sync_op(Srv, Id, Op) ->
 
 
 %% @private
-do_switch_domain(#{domain_id:=DomainId}=FrameData, Session) ->
+do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+    #?MODULE{user_id=UserId, language=Language} = Data,
+    FrameData = #{
+        srv_id => SrvId,
+        domain_id => DomainId,
+        user_id => UserId,
+        language => Language,
+        user_menu => true
+    },
     case do_get_frame(FrameData, Session) of
         {ok, Frame, Session2} ->
-            #obj_session{data=#?MODULE{domain_id=OldDomainId}=Data} = Session2,
-            Data2 = Data#?MODULE{domain_id=DomainId},
-            Session3 = unsubscribe(OldDomainId, Session#obj_session{data=Data2}),
-            Session4 = subscribe(?DOMAIN_DOMAIN, DomainId, Session3),
-            Reply = #{
-                frame => Frame
-            },
-            {ok, Reply, Session4};
+            case nkadmin_menu:get_menu(FrameData) of
+                {ok, Tree} ->
+                    #obj_session{data=#?MODULE{domain_id=OldDomainId}=Data} = Session2,
+                    Data2 = Data#?MODULE{domain_id=DomainId},
+                    Session3 = unsubscribe(OldDomainId, Session#obj_session{data=Data2}),
+                    Session4 = subscribe(?DOMAIN_DOMAIN, DomainId, Session3),
+                    Reply = #{
+                        frame => Frame,
+                        tree => Tree
+                    },
+                    {ok, Reply, Session4};
+                {error, Error} ->
+                    ?LLOG(warning, "error loading tree: ~p", [Error], Session),
+                    {error, internal_error}
+            end;
         {error, Error} ->
             ?LLOG(warning, "error loading frame: ~p", [Error], Session),
             {error, internal_error}
