@@ -21,16 +21,57 @@
 -module(nkadmin_i18n).
 -behavior(nklib_i18n).
 
--export([i18n/0]).
+-export([i18n/0, reload/0]).
+
 
 i18n() -> #{
     en => #{
-        admin_my_account => <<"My account">>,
-        admin_my_messages => <<"My messages">>
+        frame_user_menu_account => "My account",
+        frame_user_menu_messages => "My messages",
+
+        menu_overview => "Overview",
+        menu_overview_dashboard => "Dashboard",
+
+        menu_resources => "Resources",
+        menu_resources_users => "Users",
+        menu_resources_configs => "Configurations",
+        menu_resources_chat_messages => "Chat Messages",
+        menu_resources_chat_conversations => "Conversations",
+
+        menu_sessions => "Sessions",
+        menu_sessions_login => <<"Login">>,
+        menu_sessions_tokens => <<"Tokens">>,
+        menu_sessions_chat_sessions => <<"Chat">>,
+        menu_sessions_admin => "Admin",
+
+        menu_networks => "Networs",
+        menu_services => "Services"
     },
     es => #{
-        admin_my_account => <<"Mi cuenta">>,
-        admin_my_messages => <<"Mis mensajes">>
+        frame_user_menu_account => "Mi cuenta",
+        frame_user_menu_messages => "Mis mensajes",
+
+        menu_overview => "General",
+        menu_overview_dashboard => <<"Información"/utf8>>,
+
+        menu_resources => "Recursos",
+        menu_resources_users => "Usuarios",
+        menu_resources_configs => "Configuraciones",
+        menu_resources_chat_messages => "Messages de chat",
+        menu_resources_chat_conversations => "Conversaciones",
+
+        menu_sessions => "Sesiones",
+        menu_sessions_login => <<"Login">>,
+        menu_sessions_tokens => <<"Tokens">>,
+        menu_sessions_chat_sessions => <<"Chat">>,
+        menu_sessions_admin => "Admin",
+
+        menu_networks => "Redes",
+        menu_services => "Servicios"
+
     }
 }.
 
+
+reload() ->
+    ok = nklib_i18n:load(?MODULE).

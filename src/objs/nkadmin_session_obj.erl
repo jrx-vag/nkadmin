@@ -29,6 +29,7 @@
          object_api_syntax/3, object_api_allow/4, object_api_cmd/4]).
 -export([object_init/1, object_start/1, object_send_event/2,
          object_sync_op/3, object_async_op/2, object_handle_info/2]).
+-export([object_admin_tree/4]).
 -export_type([meta/0, event/0]).
 
 -include("nkadmin.hrl").
@@ -281,6 +282,14 @@ object_handle_info(_Info, _Session) ->
     continue.
 
 
+%% @doc
+object_admin_tree(sessions, Num, Data, Acc) ->
+    nkadmin_menu:add_tree_entry(menu_sessions_admin, {menuBadge, Num}, Data, Acc);
+
+object_admin_tree(_Category, _Num, _Data, Acc) ->
+    Acc.
+
+
 %% ===================================================================
 %% Internal
 %% ===================================================================
@@ -340,7 +349,7 @@ do_event(_Event, Session) ->
 %% @private
 do_get_frame(FrameData, #obj_session{srv_id=SrvId, data=Data}=Session) ->
     #?MODULE{language=Language} =Data,
-    case SrvId:admin_get_frame(SrvId, FrameData#{language=>Language}) of
+    case SrvId:admin_get_frame(FrameData#{srv_id=>SrvId, language=>Language}) of
         {ok, Frame} ->
             {ok, Frame, Session};
         {error, Error} ->
