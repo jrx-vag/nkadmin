@@ -57,7 +57,7 @@ i18n() -> #{
         menu_resources => "Recursos",
         menu_resources_users => "Usuarios",
         menu_resources_configs => "Configuraciones",
-        menu_resources_chat_messages => "Messages de chat",
+        menu_resources_chat_messages => "Mensajes de chat",
         menu_resources_chat_conversations => "Conversaciones",
 
         menu_sessions => "Sesiones",
