@@ -42,6 +42,7 @@ api('', create, Syntax) ->
     Syntax#{
         user_id => binary,
         domain_id => binary,
+        language => {atom, [en, es]},
         events => {list, binary}
     };
 
