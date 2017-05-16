@@ -60,7 +60,8 @@ cmd('', create, #nkapi_req{data=Data}=Req, #{srv_id:=SrvId}=State) ->
         {ok, UserId} ->
             case nkadmin_session_obj:create(SrvId, UserId) of
                 {ok, #{obj_id:=ObjId}, _Pid} ->
-                    cmd('', start, Req#nkapi_req{data=Data#{id=>ObjId}}, State);
+                    Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
+                    cmd('', start, Req#nkapi_req{data=Data#{id=>ObjId, language=>Language}}, State);
                 {error, Error} ->
                     {error, Error, State}
             end;
