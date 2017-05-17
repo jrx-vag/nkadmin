@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(nkadmin_menu).
+-module(nkadmin_tree).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -compile(export_all).
@@ -34,10 +34,10 @@
 %% Public functions
 %% ===================================================================
 
-get_menu() ->
-    get_menu(#{srv_id=>root, domain_id=>root, language=>es}).
+get_tree() ->
+    get_tree(#{srv_id=>root, domain_id=>root, language=>es}).
 
-get_menu(#{srv_id:=SrvId, domain_id:=DomainId}=Data) ->
+get_tree(#{srv_id:=SrvId, domain_id:=DomainId}=Data) ->
     Categories1 = SrvId:admin_get_menu_categories(SrvId, #{}),
     Categories2 = [{Weight, Key} || {Key, Weight} <- maps:to_list(Categories1)],
     Categories3 = [Key || {_Weight, Key} <- lists:sort(Categories2)],

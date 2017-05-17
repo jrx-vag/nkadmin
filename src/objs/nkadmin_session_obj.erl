@@ -116,7 +116,8 @@ start(Srv, Id, DomainId, UserId, Language, CallerPid) ->
         #obj_id_ext{pid=Pid} ->
             case nkdomain_obj_lib:load(Srv, DomainId, #{}) of
                 #obj_id_ext{obj_id=DomainObjId, type=?DOMAIN_DOMAIN} ->
-                    nkdomain_obj:sync_op(Pid, {?MODULE, start, DomainObjId, UserId, Language, CallerPid});
+                    State = #{user_id=>UserId, language=>Language},
+                    nkdomain_obj:sync_op(Pid, {?MODULE, start, DomainObjId, State, CallerPid});
                 #obj_id_ext{} ->
                     {error, domain_unknown};
                 {error, object_not_found} ->
@@ -160,9 +161,9 @@ element_action(Srv, Id, ElementId, Action, Value) ->
 
 
 -record(?MODULE, {
-    user_id :: binary(),
-    language :: binary(),
-    domain_id :: binary(),
+    state :: map(),
+
+
     elements = #{},
     subs = #{},
     api_pids = [] :: [pid()],
@@ -225,23 +226,20 @@ object_start(#obj_session{obj=Obj}=Session) ->
 
 
 %% @private
-object_sync_op({?MODULE, start, DomainId, UserId, Language, Pid}, _From, Session) ->
-    #obj_session{obj_id=ObjId, data=Data} = Session,
+object_sync_op({?MODULE, start, DomainId, State, Pid}, _From, Session) ->
+    #obj_session{obj_id=ObjId, srv_id=SrvId, data=Data} = Session,
     #?MODULE{api_pids=Pids} = Data,
     Data2 = Data#?MODULE{
-        user_id = UserId,
-        language = Language,
-        domain_id = DomainId,
-        api_pids=[Pid|Pids]
+        state = State#{srv_id=>SrvId},
+        api_pids = [Pid|Pids]
     },
     Session2 = Session#obj_session{data=Data2},
-    Session3 = subscribe(?DOMAIN_USER, UserId, Session2),
-    case do_switch_domain(DomainId, Session3) of
-        {ok, Reply, Session4} ->
-            {reply, {ok, ObjId, Reply}, Session4};
+    case do_switch_domain(DomainId, Session2) of
+        {ok, Reply, Session3} ->
+            {reply, {ok, ObjId, Reply}, Session3};
         {error, Error} ->
             nkdomain_obj:unload(self(), internal_error),
-            {reply, {error, Error}, Session3}
+            {reply, {error, Error}, Session2}
     end;
 
 object_sync_op({?MODULE, switch_domain, DomainId}, _From, Session) ->
@@ -266,16 +264,9 @@ object_async_op(_Op, _Session) ->
 
 
 %% @private
-object_handle_info({nkevent, #nkevent{obj_id=ObjId}=Event}, #obj_session{data=Data}=Session) ->
-    Session2 = case Data of
-        #?MODULE{domain_id=ObjId} ->
-            do_domain_event(Event, Session);
-        #?MODULE{user_id=ObjId} ->
-            do_user_event(Event, Session);
-        _ ->
-            do_event(Event, Session)
-    end,
-    {noreply, Session2};
+object_handle_info({nkevent, #nkevent{}=Event}, Session) ->
+    lager:error("NKLOG EV ~p", [Event]),
+    {noreply, Session};
 
 object_handle_info(_Info, _Session) ->
     continue.
@@ -283,7 +274,7 @@ object_handle_info(_Info, _Session) ->
 
 %% @doc
 object_admin_tree(sessions, Num, Data, Acc) ->
-    nkadmin_menu:add_tree_entry(menu_sessions_admin, {menuBadge, Num}, Data, Acc);
+    nkadmin_tree:add_tree_entry(menu_sessions_admin, {menuBadge, Num}, Data, Acc);
 
 object_admin_tree(_Category, _Num, _Data, Acc) ->
     Acc.
@@ -305,114 +296,138 @@ sync_op(Srv, Id, Op) ->
 
 %% @private
 do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
-    #?MODULE{user_id=UserId, language=Language} = Data,
-    FrameData = #{
-        srv_id => SrvId,
-        domain_id => DomainId,
-        user_id => UserId,
-        language => Language,
-        user_menu => true
-    },
-    case do_get_frame(FrameData, Session) of
-        {ok, Frame, Session2} ->
-            case nkadmin_menu:get_menu(FrameData) of
-                {ok, Tree} ->
-                    #obj_session{data=#?MODULE{domain_id=OldDomainId}=Data} = Session2,
-                    Data2 = Data#?MODULE{domain_id=DomainId},
-                    Session3 = unsubscribe(OldDomainId, Session#obj_session{data=Data2}),
-                    Session4 = subscribe(?DOMAIN_DOMAIN, DomainId, Session3),
-                    Reply = #{
-                        frame => Frame,
-                        tree => Tree
-                    },
-                    {ok, Reply, Session4};
-                {error, Error} ->
-                    ?LLOG(warning, "error loading tree: ~p", [Error], Session),
-                    {error, internal_error}
-            end;
-        {error, Error} ->
-            ?LLOG(warning, "error loading frame: ~p", [Error], Session),
-            {error, internal_error}
+    case nkdomain_obj_lib:load(SrvId, DomainId, #{}) of
+        #obj_id_ext{obj_id=DomainObjId, path=Path, type= ?DOMAIN_DOMAIN} ->
+            unsubscribe_domain(Session),
+            #?MODULE{state=State1} = Data,
+            State2 = State1#{domain_id=>DomainObjId, domain_path=>Path},
+            subscribe_domain(Path, Session),
+            {ok, Frame, State3} = do_get_frame(State2, Session),
+            {ok, Tree, State4} = do_get_tree(State3, Session),
+            {ok, Detail, State5} = do_get_detail(State4, Session),
+            Data5 = Data#?MODULE{state=State5},
+            Session5 = Session#obj_session{data=Data5},
+            Reply = #{
+                frame => Frame,
+                tree => Tree,
+                detail => Detail
+            },
+            {ok, Reply, Session5};
+        not_found ->
+            {error, unknown_domain}
     end.
 
 
-%% @private
-do_domain_event(#nkevent{type=Type, obj_id=DomainId}, Session)
-        when Type == <<"object_updated">> ->
-    do_update_frame(#{domain_id=>DomainId}, Session);
+%%%% @private
+%%do_domain_event(#nkevent{type=Type, obj_id=DomainId}, Session)
+%%        when Type == <<"object_updated">> ->
+%%    do_update_frame(#{domain_id=>DomainId}, Session);
+%%
+%%do_domain_event(_, Session) ->
+%%    Session.
+%%
+%%
+%%%% @private
+%%do_user_event(#nkevent{type=Type, obj_id=UserId}, Session)
+%%    when Type == <<"object_updated">> ->
+%%    do_update_frame(#{user_id=>UserId}, Session);
+%%
+%%do_user_event(_, Session) ->
+%%    Session.
+%%
+%%
+%%%% @private
+%%do_event(_Event, Session) ->
+%%    Session.
 
-do_domain_event(_, Session) ->
-    Session.
-
-
-%% @private
-do_user_event(#nkevent{type=Type, obj_id=UserId}, Session)
-    when Type == <<"object_updated">> ->
-    do_update_frame(#{user_id=>UserId}, Session);
-
-do_user_event(_, Session) ->
-    Session.
-
-
-%% @private
-do_event(_Event, Session) ->
-    Session.
-
-
-
-%% @private
-do_get_frame(FrameData, #obj_session{srv_id=SrvId, data=Data}=Session) ->
-    #?MODULE{language=Language} =Data,
-    case SrvId:admin_get_frame(FrameData#{srv_id=>SrvId, language=>Language}) of
-        {ok, Frame} ->
-            {ok, Frame, Session};
-        {error, Error} ->
-            {error, Error}
-    end.
 
 
 %% @private
-do_update_frame(FrameData, Session) ->
-    case do_get_frame(FrameData, Session) of
-        {ok, Frame, Session2} ->
-            send_event({frame_updated, Frame}, Session2);
-        {error, Error} ->
-            ?LLOG(warning, "error calling do_get_frame: ~p (~s)", [Error, FrameData], Session),
-            Session
-    end.
+do_get_frame(State, #obj_session{srv_id=SrvId}) ->
+    {ok, Frame} = SrvId:admin_get_frame(State),
+    {ok, Frame, State}.
 
 
 %% @private
-send_event(Event, Session) ->
-    nkdomain_obj_util:event(Event, Session).
+do_get_tree(State, #obj_session{srv_id=SrvId}) ->
+    {ok, Tree} = SrvId:admin_get_tree(State),
+    {ok, Tree, State}.
 
 
 %% @private
-subscribe(Type, ObjId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+do_get_detail(State, #obj_session{srv_id=SrvId}) ->
+    {ok, Detail} = SrvId:admin_get_detail(State),
+    {ok, Detail, State}.
+
+
+%%%% @private
+%%do_update_frame(FrameData, Session) ->
+%%    case do_get_frame(FrameData, Session) of
+%%        {ok, Frame, Session2} ->
+%%            send_event({frame_updated, Frame}, Session2);
+%%        {error, Error} ->
+%%            ?LLOG(warning, "error calling do_get_frame: ~p (~s)", [Error, FrameData], Session),
+%%            Session
+%%    end.
+
+
+%%%% @private
+%%send_event(Event, Session) ->
+%%    nkdomain_obj_util:event(Event, Session).
+
+
+%% @private
+subscribe_domain(Path, #obj_session{srv_id=SrvId}=Session) ->
     Reg = #{
         srv_id => SrvId,
         class => ?DOMAIN_EVENT_CLASS,
-        subclass => Type,
-        obj_id => ObjId
+        domain => Path
     },
-    {ok, [_Pid]} = nkevent:reg(Reg),
-    #?MODULE{subs=Subs1} = Data,
-    Subs2 = Subs1#{ObjId => Reg},
-    Data2 = Data#?MODULE{subs=Subs2},
-    Session#obj_session{data=Data2}.
+    nkevent:reg(Reg),
+    Session.
 
 
 %% @private
-unsubscribe(ObjId, #obj_session{data=Data}=Session) ->
-    #?MODULE{subs=Subs1} = Data,
-    case maps:find(ObjId, Subs1) of
-        {ok, Reg} ->
-            nkevent:unreg(Reg),
-            Subs2 = maps:remove(ObjId, Subs1),
-            Data2 = Data#?MODULE{subs=Subs2},
-            Session#obj_session{data=Data2};
-        error ->
-        Session
+unsubscribe_domain(#obj_session{srv_id=SrvId, data=#?MODULE{state=State}}) ->
+    case State of
+        #{domain_path:=DomainPath} ->
+            Reg = #{
+                srv_id => SrvId,
+                class => ?DOMAIN_EVENT_CLASS,
+                domain => DomainPath
+            },
+            nkevent:unreg(Reg);
+        _ ->
+            ok
     end.
+
+
+%%%% @private
+%%subscribe(Type, ObjId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+%%    Reg = #{
+%%        srv_id => SrvId,
+%%        class => ?DOMAIN_EVENT_CLASS,
+%%        subclass => Type,
+%%        obj_id => ObjId
+%%    },
+%%    {ok, [_Pid]} = nkevent:reg(Reg),
+%%    #?MODULE{subs=Subs1} = Data,
+%%    Subs2 = Subs1#{ObjId => Reg},
+%%    Data2 = Data#?MODULE{subs=Subs2},
+%%    Session#obj_session{data=Data2}.
+%%
+%%
+%%%% @private
+%%unsubscribe(ObjId, #obj_session{data=Data}=Session) ->
+%%    #?MODULE{subs=Subs1} = Data,
+%%    case maps:find(ObjId, Subs1) of
+%%        {ok, Reg} ->
+%%            nkevent:unreg(Reg),
+%%            Subs2 = maps:remove(ObjId, Subs1),
+%%            Data2 = Data#?MODULE{subs=Subs2},
+%%            Session#obj_session{data=Data2};
+%%        error ->
+%%        Session
+%%    end.
 
 
