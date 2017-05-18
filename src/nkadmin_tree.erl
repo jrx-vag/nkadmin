@@ -22,7 +22,6 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([get_tree/0, get_tree/1, event/2]).
--export([add_tree_entry/4]).
 
 -include_lib("nkevent/include/nkevent.hrl").
 
@@ -45,11 +44,7 @@ get_tree() ->
 %% @doc
 get_tree(State) ->
     {ok, Categories, State2} = get_categories(State),
-    Now = nklib_util:l_timestamp(),
-    R = load_categories(lists:reverse(Categories), [], State2),
-    Time = nklib_util:l_timestamp() - Now,
-    lager:error("NKLOG Time ~p", [Time / 1000]),
-    R.
+    load_categories(lists:reverse(Categories), [], State2).
 
 
 %% @doc
@@ -64,9 +59,9 @@ event(#nkevent{}, State) ->
 
 %% @private
 get_categories(#{srv_id:=SrvId}=State) ->
-    {ok, Categories1, State2} = SrvId:admin_get_menu_categories(#{}, State),
+    {ok, Categories1, State2} = SrvId:admin_tree_categories(#{}, State),
     Categories2 = [{Weight, Key} || {Key, Weight} <- maps:to_list(Categories1)],
-    {ok, [Key || {_Weight, Key} <- lists:sort(Categories2)], State}.
+    {ok, [Key || {_Weight, Key} <- lists:sort(Categories2)], State2}.
 
 
 %% @private
@@ -75,40 +70,12 @@ load_categories([], Acc, State) ->
     {ok, Acc, State};
 
 load_categories([Category|Rest], Acc, #{srv_id:=SrvId}=State) ->
-    case SrvId:admin_menu_fill_category(Category, #{}, State) of
+    case SrvId:admin_tree_get_category(Category, State) of
         {ok, Map, State2} when map_size(Map)==0 ->
             load_categories(Rest, Acc, State2);
-        {ok, Map, State2} ->
+        {ok, Map, State2} when is_map(Map) ->
             load_categories(Rest, [Map|Acc], State2)
     end.
 
 
 
-add_tree_entry(Id, Class, Data, Acc) ->
-    Entries = [
-        case Class of
-            menuSimple ->
-                #{
-                    id => Id,
-                    class => menuSimple,
-                    value => #{label=>i18n(Id, Data)}
-                };
-            {menuBadge, Num} ->
-                #{
-                    id => Id,
-                    class => menuBadge,
-                    value => #{
-                        label => i18n(Id, Data),
-                        badge => Num
-                    }
-                }
-        end
-        |
-        maps:get(entries, Acc, [])
-    ],
-    Acc#{entries=>Entries}.
-
-
-%% @private
-i18n(Key, Data) ->
-    nkadmin_util:i18n(Key, Data).

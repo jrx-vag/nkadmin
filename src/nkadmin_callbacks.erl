@@ -22,11 +22,8 @@
 
 -export([plugin_deps/0]).
 -export([admin_get_frame/1, admin_get_tree/1, admin_get_detail/1, admin_event/3]).
--export([admin_get_menu_categories/2, admin_menu_fill_category/3]).
--export([api_server_cmd/2, api_server_syntax/4]).
--export([api_server_reg_down/3]).
+-export([admin_tree_categories/2, admin_tree_get_category/2]).
 
--include_lib("nkapi/include/nkapi.hrl").
 -include_lib("nkevent/include/nkevent.hrl").
 
 -define(LLOG(Type, Txt, Args), "NkADMIN " ++ Txt, Args).
@@ -100,99 +97,15 @@ admin_event(Event, UpdBase, State) ->
 
 
 %% @doc Must add desired categories as a map with the position (lower first)
--spec admin_get_menu_categories(map(), state()) ->
+-spec admin_tree_categories(map(), state()) ->
     {ok, map(), state()}.
 
-admin_get_menu_categories(Map, State) ->
-    Data = #{
-        overview => 1000,
-        resources => 1100,
-        sessions => 1200,
-        networks => 1300,
-        services => 1400
-    },
-    {ok, maps:merge(Data, Map), State}.
+admin_tree_categories(Map, State) ->
+    {ok, Map, State}.
 
 
 %% @doc
-admin_menu_fill_category(overview, Acc, State) ->
-    AdminData = #{
-        id => menu_overview,
-        class => menuCategory,
-        value => #{label=>i18n(menu_overview, State)},
-        entries => [
-            #{
-                id => menu_overview_dashboard,
-                class => menuSimple,
-                value => #{label=> i18n(menu_overview_dashboard, State)}
-            }
-        ]
-    },
-    {ok, nklib_util:map_merge(Acc, AdminData), State};
-
-admin_menu_fill_category(Category, Acc, State)
-        when Category==resources; Category==sessions; Category==networks; Category==services ->
-    case map_size(Acc) of
-        0 ->
-            {ok, #{}, State};
-        _ ->
-            Id = case Category of
-                resources -> menu_resources;
-                sessions -> menu_sessions;
-                networks -> menu_networks;
-                services -> menu_services
-            end,
-            AdminData = #{
-                id => Id,
-                class => menuCategory,
-                value => #{value => i18n(Id, State)}
-            },
-            {ok, maps:merge(AdminData, Acc), State}
-    end;
-
-admin_menu_fill_category(_, Acc, State) ->
-    {ok, Acc, State}.
+admin_tree_get_category(_Category, State) ->
+    {ok, #{}, State}.
 
 
-%% ===================================================================
-%% Util
-%% ===================================================================
-
-%% @private
-i18n(Key, Data) ->
-    nkadmin_util:i18n(Key, Data).
-
-
-%% ===================================================================
-%% API CMD
-%% ===================================================================
-
-%% @private
-api_server_cmd(
-    #nkapi_req{class=nkadmin, subclass=Sub, cmd=Cmd}=Req, State) ->
-    nkadmin_session_api:cmd(Sub, Cmd, Req, State);
-
-api_server_cmd(_Req, _State) ->
-    continue.
-
-
-%% @private
-api_server_syntax(#nkapi_req{class=nkadmin, subclass=Sub, cmd=Cmd},
-                  Syntax, Defaults, Mandatory) ->
-    nkadmin_session_syntax:syntax(Sub, Cmd, Syntax, Defaults, Mandatory);
-
-api_server_syntax(_Req, _Syntax, _Defaults, _Mandatory) ->
-    continue.
-
-
-%% ===================================================================
-%% API Server
-%% ===================================================================
-
-%% @private
-api_server_reg_down({nkadmin_session, AdminId, _Pid}, Reason, State) ->
-    nkadmin_session_api:api_down(AdminId, Reason, State),
-    continue;
-
-api_server_reg_down(_Link, _Reason, _State) ->
-    continue.

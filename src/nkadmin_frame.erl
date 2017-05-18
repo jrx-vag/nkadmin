@@ -23,12 +23,6 @@
 
 -include_lib("nkevent/include/nkevent.hrl").
 
-
-%%-include_lib("nkservice/include/nkservice.hrl").
-%%-include_lib("nkdomain/include/nkdomain.hrl").
-%%-include_lib("nkapi/include/nkapi.hrl").
-%%-include("nkadmin.hrl").
-%%
 -define(LLOG(Type, Txt, Args), "NkADMIN " ++ Txt, Args).
 
 
@@ -43,12 +37,7 @@ get_frame(State) ->
         {ok, Frame1} ->
             case frame_user(State) of
                 {ok, Frame2} ->
-                    case frame_user_menu(State) of
-                        {ok, Frame3} ->
-                            {ok, Frame1 ++ Frame2 ++ Frame3, State};
-                        {error, Error} ->
-                            {error, Error}
-                    end;
+                    {ok, Frame1 ++ Frame2, State};
                 {error, Error} ->
                     {error, Error}
             end;
@@ -64,9 +53,8 @@ event(#nkevent{obj_id=ObjId}, State) ->
             {ok, Updates} = frame_domain(State),
             {ok, Updates, State};
         #{user_id:=ObjId} ->
-            {ok, Updates1} = frame_user(State),
-            {ok, Updates2} = frame_user_menu(State),
-            {ok, Updates1++Updates2, State};
+            {ok, Updates} = frame_user(State),
+            {ok, Updates, State};
         _ ->
             {ok, [], State}
     end.
@@ -84,12 +72,12 @@ frame_domain( #{srv_id:=SrvId, domain_id:=DomainId}) ->
         {ok, #{name:=DomName, icon_id:=_DomIconId}} ->
             {ok, [
                 #{
-                    id => frame_domain_name,
+                    id => admin_frame_domain_name,
                     class => frameDomainName,
                     value => #{label => DomName}
                 },
                 #{
-                    id => frame_domain_icon,
+                    id => admin_frame_domain_icon,
                     class => frameDomainIcon,
                     value => #{icon => <<>>}
                 }
@@ -103,19 +91,30 @@ frame_domain(_) ->
 
 
 %% @private
-frame_user(#{srv_id:=SrvId, user_id:=UserId}) ->
+frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
     case nkdomain_user_obj:get_name(SrvId, UserId) of
         {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname, icon_id:=_UserIconId}}} ->
             {ok, [
                 #{
-                    id => frame_user_name,
-                    class => userName,
+                    id => admin_frame_user_name,
+                    class => frameUserName,
                     value => #{label => <<UserName/binary, " ", UserSurname/binary>>}
                 },
                 #{
-                    id => frame_user_icon,
+                    id => admin_frame_user_icon,
                     class => frameUserIcon,
                     value => #{icon => <<>>}
+                },
+                #{
+                    id => frame_user_menu,
+                    class => frameUserMenu,
+                    value => #{
+                        items => [
+                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuSimple, State),
+                            #{class => frameUserMenuSeparator},
+                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuSimple, State)
+                        ]
+                    }
                 }
             ]};
         {error, Error} ->
@@ -124,39 +123,4 @@ frame_user(#{srv_id:=SrvId, user_id:=UserId}) ->
 
 frame_user(_) ->
     {ok, []}.
-
-
-%% @private
-frame_user_menu(#{user_menu:=true}=Data) ->
-    {ok, [
-        #{
-            id => frame_user_menu,
-            class => frameUserMenu,
-            value => #{
-                items => [
-                    #{
-                        id => frame_user_menu_account,
-                        class => frameUserMenuItem,
-                        value => #{label=>i18n(frame_user_menu_account, Data)}
-                    },
-                    #{
-                        id => frame_user_menu_messages,
-                        class => frameUserMenuItem,
-                        value => #{label=>i18n(frame_user_menu_messages, Data)}
-                    },
-                    #{
-                        class => frameUserMenuSeparator
-                    }
-                ]
-            }
-        }
-    ]};
-
-frame_user_menu(_) ->
-    {ok, []}.
-
-
-%% @private
-i18n(Key, Data) ->
-    nkadmin_util:i18n(Key, Data).
 

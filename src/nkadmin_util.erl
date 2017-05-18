@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_util).
--export([i18n/2]).
+-export([i18n/2, menu_item/3]).
 
 
 
@@ -33,3 +33,30 @@ i18n(Key, Data) ->
     nklib_i18n:get(Key, maps:get(language, Data, <<"en">>)).
 
 
+%% @doc
+menu_item(Id, {menuCategory, Entries}, State) ->
+    #{
+        id => Id,
+        class => menuCategory,
+        value => #{
+            label => nkadmin_util:i18n(Id, State),
+            entries => Entries
+        }
+    };
+
+menu_item(Id, menuSimple, State) ->
+    #{
+        id => Id,
+        class => menuSimple,
+        value => #{label => nkadmin_util:i18n(Id, State)}
+    };
+
+menu_item(Id, {menuBadge, Num}, State) ->
+    #{
+        id => Id,
+        class => menuBadge,
+        value => #{
+            label => nkadmin_util:i18n(Id, State),
+            badge => Num
+        }
+    }.
