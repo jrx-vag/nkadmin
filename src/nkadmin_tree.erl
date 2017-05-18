@@ -21,8 +21,12 @@
 -module(nkadmin_tree).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--compile(export_all).
+-export([get_tree/0, get_tree/1, event/2]).
 -export([add_tree_entry/4]).
+
+-include_lib("nkevent/include/nkevent.hrl").
+
+
 
 %% ===================================================================
 %% Types
@@ -37,41 +41,48 @@
 get_tree() ->
     get_tree(#{srv_id=>root, domain_id=>root, language=>es}).
 
-get_tree(#{srv_id:=SrvId, domain_id:=DomainId}=Data) ->
-    Categories1 = SrvId:admin_get_menu_categories(SrvId, #{}),
-    Categories2 = [{Weight, Key} || {Key, Weight} <- maps:to_list(Categories1)],
-    Categories3 = [Key || {_Weight, Key} <- lists:sort(Categories2)],
-    case nkdomain_domain_obj:find_all_types(SrvId, DomainId, #{}) of
-        {ok, _, TypeList} ->
-            Data2 = Data#{types=>maps:from_list(TypeList)},
-            Now = nklib_util:l_timestamp(),
-            R = load_categories(lists:reverse(Categories3), Data2, []),
-            Time = nklib_util:l_timestamp() - Now,
-            lager:error("NKLOG Time ~p", [Time / 1000]),
-            R;
 
-        {error, Error} ->
-            {error, Error}
+%% @doc
+get_tree(State) ->
+    {ok, Categories, State2} = get_categories(State),
+    Now = nklib_util:l_timestamp(),
+    R = load_categories(lists:reverse(Categories), [], State2),
+    Time = nklib_util:l_timestamp() - Now,
+    lager:error("NKLOG Time ~p", [Time / 1000]),
+    R.
+
+
+%% @doc
+event(#nkevent{}, State) ->
+    {ok, [], State}.
+
+
+
+%% ===================================================================
+%% Internal
+%% ===================================================================
+
+%% @private
+get_categories(#{srv_id:=SrvId}=State) ->
+    {ok, Categories1, State2} = SrvId:admin_get_menu_categories(#{}, State),
+    Categories2 = [{Weight, Key} || {Key, Weight} <- maps:to_list(Categories1)],
+    {ok, [Key || {_Weight, Key} <- lists:sort(Categories2)], State}.
+
+
+%% @private
+load_categories([], Acc, State) ->
+    io:format("NKLOG ~s\n", [nklib_json:encode_pretty(Acc)]),
+    {ok, Acc, State};
+
+load_categories([Category|Rest], Acc, #{srv_id:=SrvId}=State) ->
+    case SrvId:admin_menu_fill_category(Category, #{}, State) of
+        {ok, Map, State2} when map_size(Map)==0 ->
+            load_categories(Rest, Acc, State2);
+        {ok, Map, State2} ->
+            load_categories(Rest, [Map|Acc], State2)
     end.
 
 
-load_categories([], _Data, Acc) ->
-    io:format("NKLOG ~s\n", [nklib_json:encode_pretty(Acc)]),
-    {ok, Acc};
-
-load_categories([Category|Rest], #{srv_id:=SrvId}=Data, Acc) ->
-    Acc2 = case SrvId:admin_menu_fill_category(Category, Data, #{}) of
-        Map when map_size(Map)==0 ->
-            Acc;
-        Map ->
-            [Map|Acc]
-    end,
-    load_categories(Rest, Data, Acc2).
-
-
-%% ===================================================================
-%% Public functions
-%% ===================================================================
 
 add_tree_entry(Id, Class, Data, Acc) ->
     Entries = [
@@ -80,7 +91,7 @@ add_tree_entry(Id, Class, Data, Acc) ->
                 #{
                     id => Id,
                     class => menuSimple,
-                    value => i18n(Id, Data)
+                    value => #{label=>i18n(Id, Data)}
                 };
             {menuBadge, Num} ->
                 #{

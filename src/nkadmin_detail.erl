@@ -19,7 +19,9 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_detail).
--export([get_detail/1]).
+-export([get_detail/1, event/2]).
+
+-include_lib("nkevent/include/nkevent.hrl").
 
 
 %%-include_lib("nkservice/include/nkservice.hrl").
@@ -36,5 +38,10 @@
 %% ===================================================================
 
 %% @doc
-get_detail(_State) ->
-    {ok, #{}}.
+get_detail(State) ->
+    {ok, #{}, State}.
+
+
+%% @doc
+event(#nkevent{}, State) ->
+    {ok, [], State}.

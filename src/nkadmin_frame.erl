@@ -19,7 +19,9 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_frame).
--export([get_frame/1]).
+-export([get_frame/1, event/2]).
+
+-include_lib("nkevent/include/nkevent.hrl").
 
 
 %%-include_lib("nkservice/include/nkservice.hrl").
@@ -43,7 +45,7 @@ get_frame(State) ->
                 {ok, Frame2} ->
                     case frame_user_menu(State) of
                         {ok, Frame3} ->
-                            {ok, Frame1 ++ Frame2 ++ Frame3};
+                            {ok, Frame1 ++ Frame2 ++ Frame3, State};
                         {error, Error} ->
                             {error, Error}
                     end;
@@ -55,20 +57,41 @@ get_frame(State) ->
     end.
 
 
+%% @doc
+event(#nkevent{obj_id=ObjId}, State) ->
+    case State of
+        #{domain_id:=ObjId} ->
+            {ok, Updates} = frame_domain(State),
+            {ok, Updates, State};
+        #{user_id:=ObjId} ->
+            {ok, Updates1} = frame_user(State),
+            {ok, Updates2} = frame_user_menu(State),
+            {ok, Updates1++Updates2, State};
+        _ ->
+            {ok, [], State}
+    end.
+
+
+%% ===================================================================
+%% Internal
+%% ===================================================================
+
+
+
 %% @private
 frame_domain( #{srv_id:=SrvId, domain_id:=DomainId}) ->
     case nkdomain:get_name(SrvId, DomainId) of
-        {ok, #{name:=DomName, icon_id:=DomIconId}} ->
+        {ok, #{name:=DomName, icon_id:=_DomIconId}} ->
             {ok, [
                 #{
                     id => frame_domain_name,
                     class => frameDomainName,
-                    value => DomName
+                    value => #{label => DomName}
                 },
                 #{
                     id => frame_domain_icon,
                     class => frameDomainIcon,
-                    value => DomIconId
+                    value => #{icon => <<>>}
                 }
             ]};
         {error, Error} ->
@@ -82,17 +105,17 @@ frame_domain(_) ->
 %% @private
 frame_user(#{srv_id:=SrvId, user_id:=UserId}) ->
     case nkdomain_user_obj:get_name(SrvId, UserId) of
-        {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname, icon_id:=UserIconId}}} ->
+        {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname, icon_id:=_UserIconId}}} ->
             {ok, [
                 #{
                     id => frame_user_name,
                     class => userName,
-                    value => <<UserName/binary, " ", UserSurname/binary>>
+                    value => #{label => <<UserName/binary, " ", UserSurname/binary>>}
                 },
                 #{
                     id => frame_user_icon,
                     class => frameUserIcon,
-                    value => UserIconId
+                    value => #{icon => <<>>}
                 }
             ]};
         {error, Error} ->
@@ -114,12 +137,12 @@ frame_user_menu(#{user_menu:=true}=Data) ->
                     #{
                         id => frame_user_menu_account,
                         class => frameUserMenuItem,
-                        value => i18n(frame_user_menu_account, Data)
+                        value => #{label=>i18n(frame_user_menu_account, Data)}
                     },
                     #{
                         id => frame_user_menu_messages,
                         class => frameUserMenuItem,
-                        value => i18n(frame_user_menu_messages, Data)
+                        value => #{label=>i18n(frame_user_menu_messages, Data)}
                     },
                     #{
                         class => frameUserMenuSeparator

@@ -54,8 +54,7 @@
 
 
 -type event() ::
-    {frame_updated, list()}.
-
+    {update_elements, list()}.
 
 
 %% ===================================================================
@@ -161,7 +160,7 @@ element_action(Srv, Id, ElementId, Action, Value) ->
 
 
 -record(?MODULE, {
-    state :: map(),
+    state :: nkadmin_callbacks:state(),
 
 
     elements = #{},
@@ -264,9 +263,13 @@ object_async_op(_Op, _Session) ->
 
 
 %% @private
-object_handle_info({nkevent, #nkevent{}=Event}, Session) ->
-    lager:error("NKLOG EV ~p", [Event]),
-    {noreply, Session};
+object_handle_info({nkevent, #nkevent{type=Type}=Event}, Session) ->
+    case lists:member(Type, [<<"created">>, <<"updated">>, <<"deleted">>]) of
+        true ->
+            {noreply, do_event(Event, Session)};
+        false ->
+            {noreply, Session}
+    end;
 
 object_handle_info(_Info, _Session) ->
     continue.
@@ -299,81 +302,70 @@ do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
     case nkdomain_obj_lib:load(SrvId, DomainId, #{}) of
         #obj_id_ext{obj_id=DomainObjId, path=Path, type= ?DOMAIN_DOMAIN} ->
             unsubscribe_domain(Session),
-            #?MODULE{state=State1} = Data,
-            State2 = State1#{domain_id=>DomainObjId, domain_path=>Path},
-            subscribe_domain(Path, Session),
-            {ok, Frame, State3} = do_get_frame(State2, Session),
-            {ok, Tree, State4} = do_get_tree(State3, Session),
-            {ok, Detail, State5} = do_get_detail(State4, Session),
-            Data5 = Data#?MODULE{state=State5},
-            Session5 = Session#obj_session{data=Data5},
-            Reply = #{
-                frame => Frame,
-                tree => Tree,
-                detail => Detail
-            },
-            {ok, Reply, Session5};
+            case nkdomain_domain_obj:find_all_types(SrvId, DomainId, #{}) of
+                {ok, _, TypeList} ->
+                    #?MODULE{state=State1} = Data,
+                    State2 = State1#{
+                        domain_id => DomainObjId,
+                        domain_path => Path,
+                        types => maps:from_list(TypeList)
+                    },
+                    subscribe_domain(Path, Session),
+                    {ok, Frame, State3} = do_get_frame(State2, Session),
+                    {ok, Tree, State4} = do_get_tree(State3, Session),
+                    {ok, Detail, State5} = do_get_detail(State4, Session),
+                    Data5 = Data#?MODULE{state=State5},
+                    Session5 = Session#obj_session{data=Data5},
+                    Reply = #{
+                        frame => Frame,
+                        tree => Tree,
+                        detail => Detail
+                    },
+                    {ok, Reply, Session5};
+                {error, Error} ->
+                    {error, Error}
+            end;
         not_found ->
             {error, unknown_domain}
     end.
 
 
-%%%% @private
-%%do_domain_event(#nkevent{type=Type, obj_id=DomainId}, Session)
-%%        when Type == <<"object_updated">> ->
-%%    do_update_frame(#{domain_id=>DomainId}, Session);
-%%
-%%do_domain_event(_, Session) ->
-%%    Session.
-%%
-%%
-%%%% @private
-%%do_user_event(#nkevent{type=Type, obj_id=UserId}, Session)
-%%    when Type == <<"object_updated">> ->
-%%    do_update_frame(#{user_id=>UserId}, Session);
-%%
-%%do_user_event(_, Session) ->
-%%    Session.
-%%
-%%
-%%%% @private
-%%do_event(_Event, Session) ->
-%%    Session.
-
+%% @private
+do_event(Event, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+    #?MODULE{state=State1} = Data,
+    {ok, UpdList, State2} = SrvId:admin_event(Event, [], State1),
+    Data2 = Data#?MODULE{state=State2},
+    Session2 = Session#obj_session{data=Data2},
+    lager:error("NKLOG UPD ~p", [UpdList]),
+    case UpdList of
+        [] ->
+            Session2;
+        _ ->
+            send_event({update_elements, UpdList}, Session2)
+    end.
 
 
 %% @private
 do_get_frame(State, #obj_session{srv_id=SrvId}) ->
-    {ok, Frame} = SrvId:admin_get_frame(State),
-    {ok, Frame, State}.
+    {ok, Frame, State2} = SrvId:admin_get_frame(State),
+    {ok, Frame, State2}.
 
 
 %% @private
 do_get_tree(State, #obj_session{srv_id=SrvId}) ->
-    {ok, Tree} = SrvId:admin_get_tree(State),
-    {ok, Tree, State}.
+    {ok, Tree, State2} = SrvId:admin_get_tree(State),
+    {ok, Tree, State2}.
 
 
 %% @private
 do_get_detail(State, #obj_session{srv_id=SrvId}) ->
-    {ok, Detail} = SrvId:admin_get_detail(State),
-    {ok, Detail, State}.
+    {ok, Detail, State2} = SrvId:admin_get_detail(State),
+    {ok, Detail, State2}.
 
 
-%%%% @private
-%%do_update_frame(FrameData, Session) ->
-%%    case do_get_frame(FrameData, Session) of
-%%        {ok, Frame, Session2} ->
-%%            send_event({frame_updated, Frame}, Session2);
-%%        {error, Error} ->
-%%            ?LLOG(warning, "error calling do_get_frame: ~p (~s)", [Error, FrameData], Session),
-%%            Session
-%%    end.
-
-
-%%%% @private
-%%send_event(Event, Session) ->
-%%    nkdomain_obj_util:event(Event, Session).
+%% @private
+send_event(Event, Session) ->
+    nkdomain_obj_util:event(Event, Session).
 
 
 %% @private

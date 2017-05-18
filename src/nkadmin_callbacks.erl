@@ -21,15 +21,13 @@
 -module(nkadmin_callbacks).
 
 -export([plugin_deps/0]).
--export([admin_get_frame/1, admin_get_tree/1, admin_get_detail/1]).
+-export([admin_get_frame/1, admin_get_tree/1, admin_get_detail/1, admin_event/3]).
 -export([admin_get_menu_categories/2, admin_menu_fill_category/3]).
 -export([api_server_cmd/2, api_server_syntax/4]).
 -export([api_server_reg_down/3]).
 
-%%-include_lib("nkservice/include/nkservice.hrl").
-%%-include_lib("nkdomain/include/nkdomain.hrl").
 -include_lib("nkapi/include/nkapi.hrl").
-%%-include("nkadmin.hrl").
+-include_lib("nkevent/include/nkevent.hrl").
 
 -define(LLOG(Type, Txt, Args), "NkADMIN " ++ Txt, Args).
 
@@ -49,7 +47,14 @@ plugin_deps() ->
 %% Types
 %% ===================================================================
 
-% -type state() :: term().
+-type state() :: #{
+    srv_id => nkservice:id(),
+    domain_id => nkdomain:obj_id(),
+    user_id => nkdomain:obj_id(),
+    language => binary(),
+    types => #{nkdomain:type() => integer()}
+}.
+
 %%-type continue() :: continue | {continue, list()}.
 
 
@@ -58,24 +63,47 @@ plugin_deps() ->
 %% Admin Callbacks
 %% ===================================================================
 
-%% @doc
+%% @doc Must return the frame elements
+-spec admin_get_frame(state()) ->
+    {ok, map(), state()} | {error, term(), state()}.
+
 admin_get_frame(State) ->
     nkadmin_frame:get_frame(State).
 
 
-%% @doc
+%% @doc Must return the tree elements
+-spec admin_get_tree(state()) ->
+    {ok, map(), state()} | {error, term(), state()}.
+
 admin_get_tree(State) ->
     nkadmin_tree:get_tree(State).
 
 
-%% @doc
+%% @doc Must return the detail elements
+-spec admin_get_detail(state()) ->
+    {ok, map(), state()} | {error, term(), state()}.
+
 admin_get_detail(State) ->
     nkadmin_detail:get_detail(State).
 
 
+%% @doc Called when a registered event is received
+%% Must reply with updates for the client
+-spec admin_event(#nkevent{}, list(), state()) ->
+    {ok, list(), state()} | {error, term(), state()}.
 
-%% @doc
-admin_get_menu_categories(_SrvId, Map) ->
+admin_event(Event, UpdBase, State) ->
+    {ok, Upd1, State2} = nkadmin_frame:event(Event, State),
+    {ok, Upd2, State3} = nkadmin_tree:event(Event, State2),
+    {ok, Upd3, State4} = nkadmin_detail:event(Event, State3),
+    {ok, UpdBase++Upd1++Upd2++Upd3, State4}.
+
+
+%% @doc Must add desired categories as a map with the position (lower first)
+-spec admin_get_menu_categories(map(), state()) ->
+    {ok, map(), state()}.
+
+admin_get_menu_categories(Map, State) ->
     Data = #{
         overview => 1000,
         resources => 1100,
@@ -83,30 +111,30 @@ admin_get_menu_categories(_SrvId, Map) ->
         networks => 1300,
         services => 1400
     },
-    maps:merge(Data, Map).
+    {ok, maps:merge(Data, Map), State}.
 
 
 %% @doc
-admin_menu_fill_category(overview, Data, Acc) ->
+admin_menu_fill_category(overview, Acc, State) ->
     AdminData = #{
         id => menu_overview,
         class => menuCategory,
-        value => i18n(menu_overview, Data),
+        value => #{label=>i18n(menu_overview, State)},
         entries => [
             #{
                 id => menu_overview_dashboard,
                 class => menuSimple,
-                value =>  i18n(menu_overview_dashboard, Data)
+                value => #{label=> i18n(menu_overview_dashboard, State)}
             }
         ]
     },
-    nklib_util:map_merge(Acc, AdminData);
+    {ok, nklib_util:map_merge(Acc, AdminData), State};
 
-admin_menu_fill_category(Category, Data, Acc)
+admin_menu_fill_category(Category, Acc, State)
         when Category==resources; Category==sessions; Category==networks; Category==services ->
     case map_size(Acc) of
         0 ->
-            #{};
+            {ok, #{}, State};
         _ ->
             Id = case Category of
                 resources -> menu_resources;
@@ -117,13 +145,13 @@ admin_menu_fill_category(Category, Data, Acc)
             AdminData = #{
                 id => Id,
                 class => menuCategory,
-                value => i18n(Id, Data)
+                value => #{value => i18n(Id, State)}
             },
-            maps:merge(AdminData, Acc)
+            {ok, maps:merge(AdminData, Acc), State}
     end;
 
-admin_menu_fill_category(_, _Data, Acc) ->
-    Acc.
+admin_menu_fill_category(_, Acc, State) ->
+    {ok, Acc, State}.
 
 
 %% ===================================================================
