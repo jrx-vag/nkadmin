@@ -21,7 +21,8 @@
 -module(nkadmin_callbacks).
 
 -export([plugin_deps/0]).
--export([admin_get_frame/1, admin_get_tree/1, admin_get_detail/1, admin_event/3]).
+-export([api_error/1]).
+-export([admin_get_frame/1, admin_get_tree/1, admin_get_detail/1, admin_event/3, admin_element_action/4]).
 -export([admin_tree_categories/2, admin_tree_get_category/2]).
 
 -include_lib("nkevent/include/nkevent.hrl").
@@ -49,10 +50,21 @@ plugin_deps() ->
     domain_id => nkdomain:obj_id(),
     user_id => nkdomain:obj_id(),
     language => binary(),
-    types => #{nkdomain:type() => integer()}
+    types => #{nkdomain:type() => integer()},
+    elements => #{binary() => term()}
 }.
 
 %%-type continue() :: continue | {continue, list()}.
+
+
+
+%% ===================================================================
+%% Errors
+%% ===================================================================
+
+%% @doc
+api_error(unrecognized_element)      -> "Element not recognized";
+api_error(_)   		                 -> continue.
 
 
 
@@ -86,14 +98,12 @@ admin_get_detail(State) ->
 
 %% @doc Called when a registered event is received
 %% Must reply with updates for the client
+%% Domain and other will add reply before reaching here
 -spec admin_event(#nkevent{}, list(), state()) ->
     {ok, list(), state()} | {error, term(), state()}.
 
-admin_event(Event, UpdBase, State) ->
-    {ok, Upd1, State2} = nkadmin_frame:event(Event, State),
-    {ok, Upd2, State3} = nkadmin_tree:event(Event, State2),
-    {ok, Upd3, State4} = nkadmin_detail:event(Event, State3),
-    {ok, UpdBase++Upd1++Upd2++Upd3, State4}.
+admin_event(Event, Updates, State) ->
+    nkadmin_frame:event(Event, Updates, State).
 
 
 %% @doc Must add desired categories as a map with the position (lower first)
@@ -109,3 +119,6 @@ admin_tree_get_category(_Category, State) ->
     {ok, #{}, State}.
 
 
+%% @doc
+admin_element_action(_ElementId, _Action, _Value, _State) ->
+    {error, unrecognized_element}.

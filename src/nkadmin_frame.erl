@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_frame).
--export([get_frame/1, event/2]).
+-export([get_frame/1, event/3]).
 
 -include_lib("nkevent/include/nkevent.hrl").
 
@@ -47,16 +47,16 @@ get_frame(State) ->
 
 
 %% @doc
-event(#nkevent{obj_id=ObjId}, State) ->
+event(#nkevent{obj_id=ObjId}, Updates, State) ->
     case State of
         #{domain_id:=ObjId} ->
-            {ok, Updates} = frame_domain(State),
-            {ok, Updates, State};
+            {ok, Updates2} = frame_domain(State),
+            {ok, Updates2++Updates, State};
         #{user_id:=ObjId} ->
-            {ok, Updates} = frame_user(State),
-            {ok, Updates, State};
+            {ok, Updates2} = frame_user(State),
+            {ok, Updates2++Updates, State};
         _ ->
-            {ok, [], State}
+            {ok, Updates, State}
     end.
 
 

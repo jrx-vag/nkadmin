@@ -161,9 +161,6 @@ element_action(Srv, Id, ElementId, Action, Value) ->
 
 -record(?MODULE, {
     state :: nkadmin_callbacks:state(),
-
-
-    elements = #{},
     subs = #{},
     api_pids = [] :: [pid()],
     user_config = #{} :: map(),
@@ -249,9 +246,13 @@ object_sync_op({?MODULE, switch_domain, DomainId}, _From, Session) ->
             {reply, {error, Error}, Session}
     end;
 
-object_sync_op({?MODULE, element_action, _ElementId, _Action, _Value}, _From, #obj_session{data=Data}=Session) ->
-    #?MODULE{elements=_Elements} = Data,
-    {reply, {ok, #{}}, Session};
+object_sync_op({?MODULE, element_action, ElementId, Action, Value}, _From, Session) ->
+    case do_element_action(ElementId, Action, Value, Session) of
+        {ok, Reply, Session2} ->
+            {reply, {ok, Reply}, Session2};
+        {error, Error} ->
+            {reply, {error, Error}, Session}
+    end;
 
 object_sync_op(_Op, _From, _Session) ->
     continue.
@@ -279,7 +280,7 @@ object_handle_info(_Info, _Session) ->
 object_admin_tree(sessions, List, #{types:=Types}=State) ->
     Num = maps:get(?DOMAIN_ADMIN_SESSION, Types),
     Item = nkadmin_util:menu_item(domain_tree_sessions_admin, {menuBadge, Num}, State),
-    {ok, [Item|List]};
+    {ok, [{Item, 10000}|List]};
 
 object_admin_tree(_Category, _Data, _State) ->
     ok.
@@ -310,7 +311,8 @@ do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
                     State2 = State1#{
                         domain_id => DomainObjId,
                         domain_path => Path,
-                        types => maps:from_list(TypeList)
+                        types => maps:from_list(TypeList),
+                        elements => #{}
                     },
                     subscribe_domain(Path, Session),
                     {ok, Frame, State3} = do_get_frame(State2, Session),
@@ -338,7 +340,7 @@ do_event(Event, #obj_session{srv_id=SrvId, data=Data}=Session) ->
     {ok, UpdList, State2} = SrvId:admin_event(Event, [], State1),
     Data2 = Data#?MODULE{state=State2},
     Session2 = Session#obj_session{data=Data2},
-    lager:error("NKLOG UPD ~p", [UpdList]),
+    % lager:error("NKLOG UPD ~p", [UpdList]),
     case UpdList of
         [] ->
             Session2;
@@ -368,6 +370,18 @@ do_get_detail(State, #obj_session{srv_id=SrvId}) ->
 %% @private
 send_event(Event, Session) ->
     nkdomain_obj_util:event(Event, Session).
+
+
+%% @private
+do_element_action(ElementId, Action, Value, Session) ->
+    #obj_session{srv_id=SrvId, data=#?MODULE{state=State}=Data} = Session,
+    case SrvId:admin_element_action(ElementId, Action, Value, State) of
+        {ok, Reply, State2} ->
+            Data2 = Data#?MODULE{state=State2},
+            {ok, Reply, Session#obj_session{data=Data2}};
+        {error, Error} ->
+            {error, Error}
+    end.
 
 
 %% @private

@@ -20,8 +20,7 @@
 
 -module(nkadmin_util).
 -export([i18n/2, menu_item/3]).
-
-
+-export([get_group/2, set_group/3, remove_group/2, get_element/3, get_element/4, add_element/4, remove_element/3]).
 
 %% ===================================================================
 %% Public
@@ -44,11 +43,31 @@ menu_item(Id, {menuCategory, Entries}, State) ->
         }
     };
 
+menu_item(Id, {menuGroup, Entries}, State) ->
+    #{
+        id => Id,
+        class => menuGroup,
+        value => #{
+            label => nkadmin_util:i18n(Id, State),
+            entries => Entries
+        }
+    };
+
 menu_item(Id, menuSimple, State) ->
     #{
         id => Id,
         class => menuSimple,
         value => #{label => nkadmin_util:i18n(Id, State)}
+    };
+
+menu_item(Id, {menuSimple, Label, Tip}, _State) ->
+    #{
+        id => Id,
+        class => menuSimple,
+        value => #{
+            label => Label,
+            tooltip => Tip
+        }
     };
 
 menu_item(Id, {menuBadge, Num}, State) ->
@@ -60,3 +79,58 @@ menu_item(Id, {menuBadge, Num}, State) ->
             badge => Num
         }
     }.
+
+
+%% @doc
+get_group(Id, #{elements:=Elements}) ->
+    maps:get(to_bin(Id), Elements, #{}).
+
+
+%% @doc
+set_group(Id, Data, #{elements:=Elements}=State) ->
+    Elements2 = Elements#{to_bin(Id) => Data},
+    State#{elements:=Elements2}.
+
+
+%% @doc
+remove_group(Id, #{elements:=Elements}=State) ->
+    Elements2 = maps:remove(to_bin(Id), Elements),
+    State#{elements:=Elements2}.
+
+
+%% @doc
+get_element(GroupId, Id, State) ->
+    get_element(GroupId, Id, undefined, State).
+
+
+%% @doc
+get_element(GroupId, Id, Default, State) ->
+    Group = get_group(GroupId, State),
+    maps:get(to_bin(Id), Group, Default).
+
+
+
+%% @doc
+add_element(GroupId, Id, Value, #{elements:=Elements}=State) ->
+    GroupId2 = to_bin(GroupId),
+    Group1 = maps:get(GroupId2, Elements, #{}),
+    Group2 = Group1#{to_bin(Id) => Value},
+    Elements2 = Elements#{GroupId2 => Group2},
+    State#{elements:=Elements2}.
+
+
+%% @doc
+remove_element(GroupId, Id, #{elements:=Elements}=State) ->
+    GroupId2 = to_bin(GroupId),
+    Group1 = maps:get(GroupId2, Elements, #{}),
+    Group2 = maps:remove(to_bin(Id), Group1),
+    Elements2 = case map_size(Group2) of
+        0 -> maps:remove(GroupId2, Elements);
+        _ -> Elements#{GroupId2 => Group2}
+    end,
+    State#{elements:=Elements2}.
+
+
+%% @private
+to_bin(Term) when is_binary(Term)-> Term;
+to_bin(Term) -> nklib_util:to_binary(Term).

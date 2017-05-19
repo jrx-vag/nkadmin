@@ -43,6 +43,9 @@ session_stop() ->
 session_switch_domain(Domain) ->
     cmd(?DOMAIN_ADMIN_SESSION, switch_domain, #{domain_id=>Domain}).
 
+session_action(ElementId) ->
+    cmd(?DOMAIN_ADMIN_SESSION, element_action, #{element_id=>ElementId, action=>selected}).
+
 
 %% ===================================================================
 %% Client fun

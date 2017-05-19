@@ -21,7 +21,7 @@
 -module(nkadmin_tree).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([get_tree/0, get_tree/1, event/2]).
+-export([get_tree/0, get_tree/1]).
 
 -include_lib("nkevent/include/nkevent.hrl").
 
@@ -47,11 +47,6 @@ get_tree(State) ->
     load_categories(lists:reverse(Categories), [], State2).
 
 
-%% @doc
-event(#nkevent{}, State) ->
-    {ok, [], State}.
-
-
 
 %% ===================================================================
 %% Internal
@@ -66,7 +61,7 @@ get_categories(#{srv_id:=SrvId}=State) ->
 
 %% @private
 load_categories([], Acc, State) ->
-    io:format("NKLOG ~s\n", [nklib_json:encode_pretty(Acc)]),
+    %% io:format("NKLOG ~s\n", [nklib_json:encode_pretty(Acc)]),
     {ok, Acc, State};
 
 load_categories([Category|Rest], Acc, #{srv_id:=SrvId}=State) ->
