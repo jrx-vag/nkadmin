@@ -50,7 +50,7 @@ plugin_deps() ->
     domain_id => nkdomain:obj_id(),
     user_id => nkdomain:obj_id(),
     language => binary(),
-    types => #{nkdomain:type() => integer()},
+    types => [nkdomain:type()],
     elements => #{binary() => term()}
 }.
 
