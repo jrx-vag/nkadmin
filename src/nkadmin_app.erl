@@ -63,7 +63,7 @@ stop(_) ->
 
 %% @private
 register_types() ->
-    ok = nkdomain_types:register(nkadmin_session_obj).
+    ok = nkdomain_all_types:register(nkadmin_session_obj).
 
 
 %% Config Management
