@@ -265,7 +265,7 @@ object_async_op(_Op, _Session) ->
 
 %% @private
 object_handle_info({nkevent, #nkevent{type=Type}=Event}, Session) ->
-    case lists:member(Type, [<<"created">>, <<"updated">>, <<"deleted">>]) of
+    case lists:member(Type, [<<"created">>, <<"updated">>, <<"deleted">>, <<"counter_updated">>]) of
         true ->
             {noreply, do_event(Event, Session)};
         false ->
@@ -277,13 +277,9 @@ object_handle_info(_Info, _Session) ->
 
 
 %% @doc
-object_admin_tree(sessions, List, #{types:=Types}=State) ->
-    Num = maps:get(?DOMAIN_ADMIN_SESSION, Types),
-    Item = nkadmin_util:menu_item(domain_tree_sessions_admin, {menuBadge, Num}, State),
-    {ok, [{Item, 10000}|List]};
-
-object_admin_tree(_Category, _Data, _State) ->
-    ok.
+object_admin_tree(Category, List, State) ->
+    nkdomain_admin:add_tree_session(Category, ?DOMAIN_ADMIN_SESSION, ?MODULE,
+                                    domain_tree_sessions_admin, 4000, List, State).
 
 
 %% ===================================================================
@@ -312,6 +308,7 @@ do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
                         domain_id => DomainObjId,
                         domain_path => Path,
                         types => maps:from_list(TypeList),
+                        session_types => #{},
                         elements => #{}
                     },
                     subscribe_domain(Path, Session),
@@ -340,7 +337,6 @@ do_event(Event, #obj_session{srv_id=SrvId, data=Data}=Session) ->
     {ok, UpdList, State2} = SrvId:admin_event(Event, [], State1),
     Data2 = Data#?MODULE{state=State2},
     Session2 = Session#obj_session{data=Data2},
-    % lager:error("NKLOG UPD ~p", [UpdList]),
     case UpdList of
         [] ->
             Session2;

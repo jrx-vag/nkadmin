@@ -51,6 +51,7 @@ plugin_deps() ->
     user_id => nkdomain:obj_id(),
     language => binary(),
     types => [nkdomain:type()],
+    session_types => #{nkdomain:type() => integer()},
     elements => #{binary() => term()}
 }.
 
