@@ -22,7 +22,8 @@
 
 -export([plugin_deps/0]).
 -export([api_error/1]).
--export([admin_get_frame/1, admin_get_tree/1, admin_get_detail/1, admin_event/3, admin_element_action/4]).
+-export([admin_get_frame/1, admin_get_tree/1, admin_get_url/1, admin_get_detail/1]).
+-export([admin_event/3, admin_element_action/5]).
 -export([admin_tree_categories/2, admin_tree_get_category/2]).
 
 -include_lib("nkevent/include/nkevent.hrl").
@@ -80,6 +81,24 @@ admin_get_tree(State) ->
     nkadmin_tree:get_tree(State).
 
 
+%% @doc
+-spec admin_get_url(state()) ->
+    {ok, binary(), list(), state()} | {error, term(), state()}.
+
+admin_get_url(#{detail_path:=Path}=State) ->
+    Url = #{
+        class => url,
+        id => url,
+        value => #{label => Path}
+    },
+    BreadCrumbs = #{
+        class => breadcrumbs,
+        id => breadcrumbs,
+        value => #{items => nkadmin_util:get_parts(Path)}
+    },
+    {ok, Url, BreadCrumbs, State}.
+
+
 %% @doc Must return the detail elements
 -spec admin_get_detail(state()) ->
     {ok, map(), state()} | {error, term(), state()}.
@@ -98,6 +117,11 @@ admin_event(Event, Updates, State) ->
     nkadmin_frame:event(Event, Updates, State).
 
 
+%% @doc
+admin_element_action(ElementId, Action, Value, Updates, State) ->
+    nkadmin_frame:element_action(ElementId, Action, Value, Updates, State).
+
+
 %% @doc Must add desired categories as a map with the position (lower first)
 -spec admin_tree_categories(map(), state()) ->
     {ok, map(), state()}.
@@ -111,6 +135,3 @@ admin_tree_get_category(_Category, State) ->
     {ok, #{}, State}.
 
 
-%% @doc
-admin_element_action(_ElementId, _Action, _Value, _State) ->
-    {error, unrecognized_element}.

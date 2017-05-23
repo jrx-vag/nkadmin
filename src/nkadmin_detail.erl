@@ -39,5 +39,5 @@
 
 %% @doc
 get_detail(State) ->
-    {ok, #{}, State}.
+    {ok, #{class=>detail, id=>detail}, State}.
 

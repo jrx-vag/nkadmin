@@ -19,8 +19,23 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_util).
--export([i18n/2, menu_item/3]).
+-export([i18n/2, menu_item/4, get_parts/1, append_type/2]).
 -export([get_group/2, set_group/3, remove_group/2, get_element/3, get_element/4, add_element/4, remove_element/3]).
+
+
+%% ===================================================================
+%% Types
+%% ===================================================================
+
+-type menu_type() ::  menuCategory | menuGroup | menuEntry.
+
+-type menu_value() :: #{
+    label => binary(),
+    icon => atom() | binary(),
+    tooltip => binary(),
+    items => list()
+}.
+
 
 %% ===================================================================
 %% Public
@@ -33,48 +48,28 @@ i18n(Key, Data) ->
 
 
 %% @doc
-menu_item(Id, {menuCategory, Entries}, State) ->
+-spec menu_item(atom()|binary(), menu_type(), menu_value(), nkadmin_session_obj:state()) ->
+    map().
+
+menu_item(Id, menuCategory, #{items:=_}=Value, State) ->
     #{
         id => Id,
         class => menuCategory,
-        value => #{
-            label => nkadmin_util:i18n(Id, State),
-            items => Entries
-        }
+        value => add_label(Id, Value, State)
     };
 
-menu_item(Id, {menuGroup, Entries}, State) ->
+menu_item(Id, menuGroup, #{items:=_}=Value, State) ->
     #{
         id => Id,
         class => menuGroup,
-        value => #{
-            label => nkadmin_util:i18n(Id, State),
-            items => Entries
-        }
+        value => add_label(Id, Value, State)
     };
 
-menu_item(Id, menuSimple, State) ->
+menu_item(Id, menuEntry, Value, State) ->
     #{
         id => Id,
-        class => menuSimple,
-        value => #{label => nkadmin_util:i18n(Id, State)}
-    };
-
-menu_item(Id, {menuSimple, Value}, _State) when is_map(Value) ->
-    #{
-        id => Id,
-        class => menuSimple,
-        value => Value
-    };
-
-menu_item(Id, {menuBadge, Num}, State) ->
-    #{
-        id => Id,
-        class => menuBadge,
-        value => #{
-            label => nkadmin_util:i18n(Id, State),
-            badge => Num
-        }
+        class => menuEntry,
+        value => add_label(Id, Value, State)
     }.
 
 
@@ -126,6 +121,32 @@ remove_element(GroupId, Id, #{elements:=Elements}=State) ->
         _ -> Elements#{GroupId2 => Group2}
     end,
     State#{elements:=Elements2}.
+
+
+%% @doc
+get_parts(Path) ->
+    case binary:split(Path, <<"/">>, [global]) of
+        [<<>>, <<>>] -> [<<"/">>];
+        [<<>>|Rest] -> [<<"/">>|Rest]
+    end.
+
+
+%% @doc
+append_type(<<"/">>, Type) -> <<$/, (to_bin(Type))/binary>>;
+append_type(Path, Type) -> <<Path/binary, $/, (to_bin(Type))/binary>>.
+
+
+
+%% ===================================================================
+%% Internal
+%% ===================================================================
+
+%% @private
+add_label(Id, Value, State) ->
+    case maps:is_key(label, Value) of
+        true -> Value;
+        false -> Value#{label=>nkadmin_util:i18n(Id, State)}
+    end.
 
 
 %% @private

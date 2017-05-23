@@ -44,8 +44,8 @@ get_tree() ->
 %% @doc
 get_tree(State) ->
     {ok, Categories, State2} = get_categories(State),
-    load_categories(lists:reverse(Categories), [], State2).
-
+    {ok, List, State3} = load_categories(lists:reverse(Categories), [], State2),
+    {ok, #{class=>tree, value=>#{items=>List}}, State3}.
 
 
 %% ===================================================================
@@ -61,7 +61,6 @@ get_categories(#{srv_id:=SrvId}=State) ->
 
 %% @private
 load_categories([], Acc, State) ->
-    %% io:format("NKLOG ~s\n", [nklib_json:encode_pretty(Acc)]),
     {ok, Acc, State};
 
 load_categories([Category|Rest], Acc, #{srv_id:=SrvId}=State) ->

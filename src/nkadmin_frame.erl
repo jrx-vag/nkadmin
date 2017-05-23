@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_frame).
--export([get_frame/1, event/3]).
+-export([get_frame/1, event/3, element_action/5]).
 
 -include_lib("nkevent/include/nkevent.hrl").
 
@@ -37,7 +37,11 @@ get_frame(State) ->
         {ok, Frame1} ->
             case frame_user(State) of
                 {ok, Frame2} ->
-                    {ok, Frame1 ++ Frame2, State};
+                    Value = #{
+                        class => frame,
+                        value => #{items => Frame1 ++ Frame2}
+                    },
+                    {ok, Value, State};
                 {error, Error} ->
                     {error, Error}
             end;
@@ -58,6 +62,11 @@ event(#nkevent{obj_id=ObjId}, Updates, State) ->
         _ ->
             {ok, Updates, State}
     end.
+
+
+%% @doc
+element_action(_ElementId, _Id, _Value, Updates, State) ->
+    {ok, Updates, State}.
 
 
 %% ===================================================================
@@ -109,10 +118,12 @@ frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
                     id => admin_frame_user_menu,
                     class => frameUserMenu,
                     value => #{
+                        icon => user,
                         items => [
-                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuSimple, State),
+                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuEntry, #{icon=>gear}, State),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuSimple, State)
+                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuEntry, #{icon=>comments}, State),
+                            nkadmin_util:menu_item(logout, menuEntry, #{icon=>'sign-out'}, State)
                         ]
                     }
                 }

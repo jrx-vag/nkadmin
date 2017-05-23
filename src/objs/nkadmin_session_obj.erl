@@ -317,29 +317,53 @@ do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
                     State2 = State1#{
                         domain_id => DomainObjId,
                         domain_path => Path,
+                        detail_path => Path,
                         types => [Type || {Type, _Counter} <- TypeList],
                         session_types => #{},
                         detail => #{},
                         elements => #{}
                     },
                     subscribe_domain(Path, Session),
-                    {ok, Frame, State3} = do_get_frame(State2, Session),
-                    {ok, Tree, State4} = do_get_tree(State3, Session),
-                    {ok, Detail, State5} = do_get_detail(State4, Session),
-                    Data5 = Data#?MODULE{state=State5},
-                    Session5 = Session#obj_session{data=Data5},
-                    Reply = #{
-                        frame => Frame,
-                        tree => Tree,
-                        detail => Detail
-                    },
-                    {ok, Reply, Session5};
+                    {ok, Updates, State3} = do_get_domain_reply(SrvId, State2),
+                    Data3 = Data#?MODULE{state=State3},
+                    Session3 = Session#obj_session{data=Data3},
+                    {ok, #{elements=>lists:reverse(Updates)}, Session3};
                 {error, Error} ->
                     {error, Error}
             end;
         not_found ->
             {error, unknown_domain}
     end.
+
+
+%% @private
+do_get_domain_reply(SrvId, State) ->
+    do_get_domain_frame(SrvId, [], State).
+
+
+%% @private
+do_get_domain_frame(SrvId, Updates, State) ->
+    {ok, Frame, State2} = SrvId:admin_get_frame(State),
+    do_get_domain_tree(SrvId, [Frame|Updates], State2).
+
+
+%% @private
+do_get_domain_tree(SrvId, Updates, State) ->
+    {ok, Tree, State2} = SrvId:admin_get_tree(State),
+    do_get_domain_url(SrvId, [Tree|Updates], State2).
+
+
+%% @private
+do_get_domain_url(SrvId, Updates, State) ->
+    {ok, Url, BreadCrumb, State2} = SrvId:admin_get_url(State),
+    do_get_domain_detail(SrvId, [Url, BreadCrumb|Updates], State2).
+
+
+%% @private
+do_get_domain_detail(SrvId, Updates, State) ->
+    {ok, Detail, State2} = SrvId:admin_get_detail(State),
+    {ok, [Detail|Updates], State2}.
+
 
 
 %% @private
@@ -357,24 +381,6 @@ do_event(Event, #obj_session{srv_id=SrvId, data=Data}=Session) ->
 
 
 %% @private
-do_get_frame(State, #obj_session{srv_id=SrvId}) ->
-    {ok, Frame, State2} = SrvId:admin_get_frame(State),
-    {ok, Frame, State2}.
-
-
-%% @private
-do_get_tree(State, #obj_session{srv_id=SrvId}) ->
-    {ok, Tree, State2} = SrvId:admin_get_tree(State),
-    {ok, Tree, State2}.
-
-
-%% @private
-do_get_detail(State, #obj_session{srv_id=SrvId}) ->
-    {ok, Detail, State2} = SrvId:admin_get_detail(State),
-    {ok, Detail, State2}.
-
-
-%% @private
 send_event(Event, Session) ->
     nkdomain_obj_util:event(Event, Session).
 
@@ -382,12 +388,20 @@ send_event(Event, Session) ->
 %% @private
 do_element_action(ElementId, Action, Value, Session) ->
     #obj_session{srv_id=SrvId, data=#?MODULE{state=State}=Data} = Session,
-    case SrvId:admin_element_action(ElementId, Action, Value, State) of
-        {ok, Reply, State2} ->
+    case SrvId:admin_element_action(ElementId, Action, Value, [], State) of
+        {ok, UpdList, State2} ->
             Data2 = Data#?MODULE{state=State2},
-            {ok, Reply, Session#obj_session{data=Data2}};
-        {error, Error} ->
-            {error, Error}
+            Session2 = Session#obj_session{data=Data2},
+            case UpdList of
+                [] ->
+                    {ok, #{}, Session2};
+                _ ->
+                    {ok, #{elements=>UpdList}, Session2}
+            end;
+        {error, Error, State2} ->
+            Data2 = Data#?MODULE{state=State2},
+            Session2 = Session#obj_session{data=Data2},
+            {reply, {error, Error}, Session2}
     end.
 
 
