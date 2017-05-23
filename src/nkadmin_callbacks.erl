@@ -45,18 +45,9 @@ plugin_deps() ->
 %% Types
 %% ===================================================================
 
--type state() :: #{
-    srv_id => nkservice:id(),
-    domain_id => nkdomain:obj_id(),
-    user_id => nkdomain:obj_id(),
-    language => binary(),
-    types => [nkdomain:type()],
-    session_types => #{nkdomain:type() => integer()},
-    elements => #{binary() => term()}
-}.
 
 %%-type continue() :: continue | {continue, list()}.
-
+-type state() :: nkadmin_session_obj:state().
 
 
 %% ===================================================================

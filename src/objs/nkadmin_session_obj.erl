@@ -47,6 +47,19 @@
 %% ===================================================================
 
 
+-type state() :: #{
+    srv_id => nkservice:id(),
+    domain_id => nkdomain:obj_id(),
+    domain_path => nkdomain:path(),
+    user_id => nkdomain:obj_id(),
+    language => binary(),
+    types => [nkdomain:type()],
+    session_types => #{nkdomain:type() => integer()},
+    detail => map(),
+    elements => #{Group::binary() => #{Id::binary() => term()}}
+}.
+
+
 -type meta() ::
     #{
         user_id => nkdomain:obj_id()
@@ -160,10 +173,10 @@ element_action(Srv, Id, ElementId, Action, Value) ->
 
 
 -record(?MODULE, {
-    state :: nkadmin_callbacks:state(),
-    subs = #{},
+    state :: state(),
     api_pids = [] :: [pid()],
-    user_config = #{} :: map(),
+    %subs = #{},
+    %user_config = #{} :: map(),
     meta = #{} :: map()
 }).
 
@@ -214,11 +227,8 @@ object_init(Session) ->
 
 %% @private When the object is loaded, we make our cache
 object_start(#obj_session{obj=Obj}=Session) ->
-    #{?DOMAIN_ADMIN_SESSION := UserData} = Obj,
-    Data = #?MODULE{
-        user_config = UserData
-    },
-    {ok, Session#obj_session{data=Data}}.
+    #{?DOMAIN_ADMIN_SESSION := _UserData} = Obj,
+    {ok, Session}.
 
 
 %% @private
@@ -307,8 +317,9 @@ do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
                     State2 = State1#{
                         domain_id => DomainObjId,
                         domain_path => Path,
-                        types => maps:from_list(TypeList),
+                        types => [Type || {Type, _Counter} <- TypeList],
                         session_types => #{},
+                        detail => #{},
                         elements => #{}
                     },
                     subscribe_domain(Path, Session),
