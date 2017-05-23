@@ -106,7 +106,7 @@ frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
                     value => #{icon => <<>>}
                 },
                 #{
-                    id => frame_user_menu,
+                    id => admin_frame_user_menu,
                     class => frameUserMenu,
                     value => #{
                         items => [

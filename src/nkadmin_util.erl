@@ -60,14 +60,11 @@ menu_item(Id, menuSimple, State) ->
         value => #{label => nkadmin_util:i18n(Id, State)}
     };
 
-menu_item(Id, {menuSimple, Label, Tip}, _State) ->
+menu_item(Id, {menuSimple, Value}, _State) when is_map(Value) ->
     #{
         id => Id,
         class => menuSimple,
-        value => #{
-            label => Label,
-            tooltip => Tip
-        }
+        value => Value
     };
 
 menu_item(Id, {menuBadge, Num}, State) ->
