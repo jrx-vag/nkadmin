@@ -39,7 +39,7 @@ menu_item(Id, {menuCategory, Entries}, State) ->
         class => menuCategory,
         value => #{
             label => nkadmin_util:i18n(Id, State),
-            entries => Entries
+            items => Entries
         }
     };
 
@@ -49,7 +49,7 @@ menu_item(Id, {menuGroup, Entries}, State) ->
         class => menuGroup,
         value => #{
             label => nkadmin_util:i18n(Id, State),
-            entries => Entries
+            items => Entries
         }
     };
 
