@@ -123,6 +123,7 @@ frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
                             nkadmin_util:menu_item(admin_frame_user_menu_account, menuEntry, #{icon=>gear}, State),
                             #{class => frameUserMenuSeparator},
                             nkadmin_util:menu_item(admin_frame_user_menu_messages, menuEntry, #{icon=>comments}, State),
+                            #{class => frameUserMenuSeparator},
                             nkadmin_util:menu_item(logout, menuEntry, #{icon=>'sign-out'}, State)
                         ]
                     }
