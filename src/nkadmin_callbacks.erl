@@ -21,7 +21,7 @@
 -module(nkadmin_callbacks).
 
 -export([plugin_deps/0]).
--export([api_error/1]).
+-export([error/1]).
 -export([admin_get_frame/1, admin_get_tree/1, admin_get_url/1, admin_get_detail/1]).
 -export([admin_event/3, admin_element_action/5]).
 -export([admin_tree_categories/2, admin_tree_get_category/2]).
@@ -56,8 +56,8 @@ plugin_deps() ->
 %% ===================================================================
 
 %% @doc
-api_error(unrecognized_element)      -> "Element not recognized";
-api_error(_)   		                 -> continue.
+error(unrecognized_element)      -> "Element not recognized";
+error(_)   		                 -> continue.
 
 
 
