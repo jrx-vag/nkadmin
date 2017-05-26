@@ -22,12 +22,12 @@
 -module(nkadmin_session_obj_api).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([cmd/4]).
+-export([cmd/3]).
 
 -include("nkadmin.hrl").
 -include_lib("nkdomain/include/nkdomain.hrl").
 -include_lib("nkevent/include/nkevent.hrl").
--include_lib("nkapi/include/nkapi.hrl").
+-include_lib("nkservice/include/nkservice.hrl").
 
 
 -define(ADMIN_DEF_EVENT_TYPES, [
@@ -42,8 +42,8 @@
 
 
 %% @doc
-cmd('', find, #nkapi_req{data=Data}, #{srv_id:=SrvId}=State) ->
-    case get_user_id(Data, State) of
+cmd(<<"find">>, #nkreq{data=Data, srv_id=SrvId}=Req, State) ->
+    case get_user_id(Data, Req, State) of
         {ok, UserId} ->
             case nkadmin_session_obj:find(SrvId, UserId) of
                 {ok, List} ->
@@ -55,13 +55,13 @@ cmd('', find, #nkapi_req{data=Data}, #{srv_id:=SrvId}=State) ->
             Error
     end;
 
-cmd('', create, #nkapi_req{data=Data}=Req, #{srv_id:=SrvId}=State) ->
-    case get_user_id(Data, State) of
+cmd(<<"create">>, #nkreq{data=Data, srv_id=SrvId}=Req, State) ->
+    case get_user_id(Data, Req, State) of
         {ok, UserId} ->
             case nkadmin_session_obj:create(SrvId, UserId) of
                 {ok, #{obj_id:=ObjId}, _Pid} ->
                     Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
-                    cmd('', start, Req#nkapi_req{data=Data#{id=>ObjId, language=>Language}}, State);
+                    cmd(<<"start">>, Req#nkreq{data=Data#{id=>ObjId, language=>Language}}, State);
                 {error, Error} ->
                     {error, Error, State}
             end;
@@ -69,41 +69,38 @@ cmd('', create, #nkapi_req{data=Data}=Req, #{srv_id:=SrvId}=State) ->
             Error
     end;
 
-cmd('', start, #nkapi_req{data=#{id:=Id}=Data}, #{srv_id:=SrvId, user_id:=UserId}=State) ->
-    case nkdomain_api_util:get_domain(Data, State) of
-        {ok, Domain} ->
-            Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
-            case nkadmin_session_obj:start(SrvId, Id, Domain, UserId, Language, self()) of
-                {ok, ObjId, Reply} ->
-                    State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
-                    Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
-                    Subs = #{
-                        srv_id => SrvId,
-                        class => ?DOMAIN_EVENT_CLASS,
-                        subclass => ?DOMAIN_ADMIN_SESSION,
-                        type => Types,
-                        obj_id => ObjId
-                    },
-                    ok = nkapi_server:subscribe(self(), Subs),
-                    {ok, Reply#{obj_id=>ObjId}, State2#{nkadmin_session_types=>Types}};
-                {error, Error} ->
-                    {error, Error, State}
-            end;
-        Error ->
-            Error
+cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}, State) ->
+    Domain = nkdomain_api_util:get_domain(Data, State),
+    Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
+    case nkadmin_session_obj:start(SrvId, Id, Domain, UserId, Language, self()) of
+        {ok, ObjId, Reply} ->
+            State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
+            Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
+            Subs = #{
+                srv_id => SrvId,
+                class => ?DOMAIN_EVENT_CLASS,
+                subclass => ?DOMAIN_ADMIN_SESSION,
+                type => Types,
+                obj_id => ObjId
+            },
+            ok = nkapi_server:subscribe(self(), Subs),
+            State3 = State2#{nkadmin_session_types=>Types},
+            {ok, Reply#{obj_id=>ObjId}, State3};
+        {error, Error} ->
+            {error, Error, State}
     end;
 
-cmd('', start, #nkapi_req{data=Data}=Req, State) ->
-    case cmd('', find, Req, State) of
+cmd(<<"start">>, #nkreq{data=Data}=Req, State) ->
+    case cmd(<<"find">>, Req, State) of
         {ok, #{sessions:=[#{<<"obj_id">>:=SessId}|_]}, State2} ->
-            cmd('', start, Req#nkapi_req{data=Data#{id=>SessId}}, State2);
+            cmd(<<"start">>, Req#nkreq{data=Data#{id=>SessId}}, State2);
         {ok, #{sessions:=[]}, State2} ->
             {error, session_not_found, State2};
         {error, Error, State2} ->
-            {error, Error, State2 }
+            {error, Error, State2}
     end;
 
-cmd('', stop, #nkapi_req{data=Data}, #{srv_id:=SrvId}=State) ->
+cmd(<<"stop">>, #nkreq{data=Data, srv_id=SrvId}, State) ->
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, State) of
         {ok, Id} ->
             State2 = case State of
@@ -130,7 +127,7 @@ cmd('', stop, #nkapi_req{data=Data}, #{srv_id:=SrvId}=State) ->
             Error
     end;
 
-cmd('', switch_domain, #nkapi_req{data=#{domain_id:=DomId}=Data}, #{srv_id:=SrvId}=State) ->
+cmd(<<"switch_domain">>, #nkreq{data=#{domain_id:=DomId}=Data, srv_id=SrvId}, State) ->
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, State) of
         {ok, Id} ->
             case nkadmin_session_obj:switch_domain(SrvId, Id, DomId) of
@@ -143,7 +140,7 @@ cmd('', switch_domain, #nkapi_req{data=#{domain_id:=DomId}=Data}, #{srv_id:=SrvI
             Error
     end;
 
-cmd('', element_action, #nkapi_req{data=Data}, #{srv_id:=SrvId}=State) ->
+cmd(<<"element_action">>, #nkreq{data=Data, srv_id=SrvId}, State) ->
     #{element_id:=ElementId, action:=Action} = Data,
     Value = maps:get(value, Data, <<>>),
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, State) of
@@ -158,8 +155,8 @@ cmd('', element_action, #nkapi_req{data=Data}, #{srv_id:=SrvId}=State) ->
             Error
     end;
 
-cmd(Sub, Cmd, Req, State) ->
-    nkdomain_obj_api:api(Sub, Cmd, Req, ?DOMAIN_ADMIN_SESSION, State).
+cmd(Cmd, Req, State) ->
+    nkdomain_obj_api:api(Cmd, ?DOMAIN_ADMIN_SESSION, Req, State).
 
 
 
@@ -168,9 +165,9 @@ cmd(Sub, Cmd, Req, State) ->
 %% ===================================================================
 
 %% @private
-get_user_id(#{user_id:=UserId}, _State) ->
+get_user_id(#{user_id:=UserId}, _Req, _State) ->
     {ok, UserId};
-get_user_id(_, #{user_id:=UserId}) when UserId /= <<>> ->
+get_user_id(_, #nkreq{user_id=UserId}, _State) when UserId /= <<>> ->
     {ok, UserId};
-get_user_id(_Data, State) ->
-    {error, missing_user_id, State}.
+get_user_id(_Data, Req, State) ->
+    {error, missing_user_id, Req, State}.

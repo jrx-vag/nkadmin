@@ -22,7 +22,7 @@
 -module(nkadmin_session_obj_syntax).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([api/3]).
+-export([api/2]).
 
 -include("nkadmin.hrl").
 
@@ -33,12 +33,12 @@
 
 
 %% @doc
-api('', find, Syntax) ->
+api(<<"find">>, Syntax) ->
     Syntax#{
         user_id => binary
     };
 
-api('', create, Syntax) ->
+api(<<"create">>, Syntax) ->
     Syntax#{
         user_id => binary,
         domain_id => binary,
@@ -46,7 +46,7 @@ api('', create, Syntax) ->
         events => {list, binary}
     };
 
-api('', start, Syntax) ->
+api(<<"start">>, Syntax) ->
     Syntax#{
         id => binary,
         domain_id => binary,
@@ -54,20 +54,20 @@ api('', start, Syntax) ->
         events => {list, binary}
     };
 
-api('', stop, Syntax) ->
+api(<<"stop">>, Syntax) ->
     Syntax#{
         id => binary,
         reason => binary
     };
 
-api('', switch_domain, Syntax) ->
+api(<<"switch_domain">>, Syntax) ->
     Syntax#{
         id => binary,
         domain_id => binary,
         '__mandatory' => [domain_id]
     };
 
-api('', element_action, Syntax) ->
+api(<<"element_action">>, Syntax) ->
     Syntax#{
         id => binary,
         action => {atom, [selected]},
@@ -76,5 +76,5 @@ api('', element_action, Syntax) ->
         '__mandatory' => [element_id, action]
     };
 
-api(Sub, Cmd, Syntax) ->
-    nkdomain_obj_syntax:syntax(Sub, Cmd, ?DOMAIN_ADMIN_SESSION, Syntax).
+api(Cmd, Syntax) ->
+    nkdomain_obj_syntax:syntax(Cmd, ?DOMAIN_ADMIN_SESSION, Syntax).
