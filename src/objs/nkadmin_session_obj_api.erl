@@ -69,10 +69,10 @@ cmd(<<"create">>, #nkreq{data=Data, srv_id=SrvId}=Req, State) ->
             Error
     end;
 
-cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}, State) ->
-    Domain = nkdomain_api_util:get_domain(Data, State),
+cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}=Req, State) ->
+    {ok, DomainId} = nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, State),
     Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
-    case nkadmin_session_obj:start(SrvId, Id, Domain, UserId, Language, self()) of
+    case nkadmin_session_obj:start(SrvId, Id, DomainId, UserId, Language, self()) of
         {ok, ObjId, Reply} ->
             State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
             Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),

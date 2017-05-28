@@ -14,37 +14,37 @@ login() ->
 
 
 session_find() ->
-    cmd(?DOMAIN_ADMIN_SESSION, find, #{}).
+    cmd(<<"objects/admin.session/find">>, #{}).
 
 session_find(UserId) ->
-    cmd(?DOMAIN_ADMIN_SESSION, find, #{user_id=>UserId}).
+    cmd(<<"objects/admin.session/find">>, #{user_id=>UserId}).
 
 session_create() ->
-    cmd(?DOMAIN_ADMIN_SESSION, create, #{}).
+    cmd(<<"objects/admin.session/create">>, #{}).
 
 session_create(UserId) ->
-    cmd(?DOMAIN_ADMIN_SESSION, create, #{user_id=>UserId}).
+    cmd(<<"objects/admin.session/create">>, #{user_id=>UserId}).
 
 session_start() ->
-    cmd(?DOMAIN_ADMIN_SESSION, start, #{language=>en}).
+    cmd(<<"objects/admin.session/start">>, #{language=>en}).
 
 session_start(SessId) ->
-    cmd(?DOMAIN_ADMIN_SESSION, start, #{id=>SessId}).
+    cmd(<<"objects/admin.session/start">>, #{id=>SessId}).
 
 session_get() ->
-    cmd(?DOMAIN_ADMIN_SESSION, get, #{}).
+    cmd(<<"objects/admin.session/get">>, #{}).
 
 session_get(SessId) ->
-    cmd(?DOMAIN_ADMIN_SESSION, get, #{id=>SessId}).
+    cmd(<<"objects/admin.session/get">>, #{id=>SessId}).
 
 session_stop() ->
-    cmd(?DOMAIN_ADMIN_SESSION, stop, #{}).
+    cmd(<<"objects/admin.session/stop">>, #{}).
 
 session_switch_domain(Domain) ->
-    cmd(?DOMAIN_ADMIN_SESSION, switch_domain, #{domain_id=>Domain}).
+    cmd(<<"objects/admin.session/switch_domain">>, #{domain_id=>Domain}).
 
 session_action(ElementId) ->
-    cmd(?DOMAIN_ADMIN_SESSION, element_action, #{element_id=>ElementId, action=>selected}).
+    cmd(<<"objects/admin.session/element_action">>, #{element_id=>ElementId, action=>selected}).
 
 
 %% ===================================================================
@@ -54,10 +54,10 @@ session_action(ElementId) ->
 
 
 %% Test calling with class=test, cmd=op1, op2, data=#{nim=>1}
-cmd(Class, Cmd, Data) ->
+cmd(Cmd, Data) ->
     Pid = nkdomain_sample:get_client(),
-    cmd(Pid, Class, Cmd, Data).
+    cmd(Pid, Cmd, Data).
 
-cmd(Pid, Class, Cmd, Data) ->
-    nkapi_client:cmd(Pid, Class, <<>>, Cmd, Data).
+cmd(Pid, Cmd, Data) ->
+    nkapi_client:cmd(Pid, Cmd, Data).
 
