@@ -1,0 +1,75 @@
+<!DOCTYPE HTML>
+<html lang="en-US">
+<head>
+    <script type="text/javascript">
+        //document.write("<base target='_blank' href='" + window.location.origin + "' />");
+        document.write("<base target='_blank' href='http://localhost:8001/' />");
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>NkAdmin</title>
+    <link rel="icon" type="image/vnd.microsoft.icon" href="img/favicon.ico">
+
+    <link rel="stylesheet" type="text/css" href="webix/skins/material.css" media="all" />
+    <link rel="stylesheet" type="text/css" href="app/css/admin.css" media="all" />
+    <script type="text/javascript" src="app/js/main.js"></script>
+    <script type="text/javascript" src="app/js/NcClient.js"></script>
+    <script type="text/javascript" src="webix/webix.js"></script>
+</head>
+
+<body>
+    <script type="text/javascript" charset="utf-8">
+        console.log("Index.html loading...");
+        console.log(window.location.pathname);
+        var profilePopup = logic.createProfilePopup();
+        var loginPopup = logic.createLoginPopup();
+
+        webix.ui(profilePopup);
+        webix.ui(loginPopup);
+
+        webix.message.position = "bottom";
+
+        // TODO: Use a specific domain instead of the URL path
+        logic.init(window.location.pathname);
+
+        function getRandomInt(min, max) {
+           return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        // Update the dashboard periodically:
+        window.setInterval(() => {
+            let nodes = $$("nodesWidget");
+            let users = $$("usersWidget");
+            let sessions = $$("sessionsWidget");
+            let domains = $$("domainsWidget");
+            
+            if (nodes) {
+                nodes.setValues({nodes: (nodes.getValues().nodes + getRandomInt(-1, 1))});
+            }
+
+            if (users) {
+                users.setValues({
+                    users: (users.getValues().users + getRandomInt(0, 1)),
+                    online: (users.getValues().online + getRandomInt(-10, 10))
+                });
+            }
+
+            if (sessions) {
+                sessions.setValues({
+                    sessions: (sessions.getValues().sessions + getRandomInt(-100, 100)),
+                    pushes: (sessions.getValues().pushes + getRandomInt(0, 5)),
+                    files: (sessions.getValues().files + getRandomInt(-10, 10))
+                });
+            }
+
+            if (domains) {
+                domains.setValues({
+                    domains: (domains.getValues().domains + getRandomInt(0, 1))
+                });
+            }
+
+        }, 1000);
+
+    </script>
+</body>
+
+</html>
