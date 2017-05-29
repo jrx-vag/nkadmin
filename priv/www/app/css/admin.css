@@ -1,0 +1,617 @@
+/************** WEBIX OVERRIDE ***************/
+.webix_invalid .webix_custom_radio,
+.webix_invalid .webix_el_box .webix_inp_static,
+.webix_invalid .webix_el_box input,
+.webix_invalid .webix_el_box select,
+.webix_invalid .webix_el_box textarea,
+input.webix_invalid,
+select.webix_invalid,
+textarea.webix_invalid {
+    border-bottom: 1px solid #ff0000;
+}
+
+.webix_tree_item.webix_selected {
+    background: #e3e3e4;
+}
+
+.webix_ss_sort_asc,
+.webix_ss_sort_desc {
+	left: 5px;
+}
+
+.fa-2x{font-size:2em}
+.fa-3x{font-size:3em}
+.fa-4x{font-size:4em}
+.fa-5x{font-size:5em}
+
+/************************************************/
+
+/***************** MATERIAL COLORS **************/
+
+.color_accent {
+	color: #fdbf0f !important;
+}
+
+.color_transparent {
+	color: transparent !important;
+}
+
+.background_accent {
+	background: #fdbf0f !important;
+}
+
+.background_primary {
+	background: #3498db !important;
+}
+
+.background_secondary {
+	background: #8bc4ea !important;
+}
+
+.background_transparent {
+	background: transparent;
+}
+
+/**************************************/
+
+/************** FONTS *****************/
+
+.font16 {
+	font-size: 16px;
+}
+
+.white_text {
+	color: #ffffff;
+}
+
+/**************************************/
+
+/*************** LAYOUTS **************/
+
+.flex {
+	display: flex;
+}
+
+.center {
+	text-align: center;
+}
+
+.align-center {
+	align-self: center;
+}
+
+.relative {
+	position: relative;
+}
+
+.no_padding {
+    padding: 0px;
+}
+
+.no_padding .webix_template {
+    padding: 0px;
+}
+
+.no_margin {
+    margin: 0px;
+}
+
+
+/*****************************************/
+
+/*************** BUTTONS *****************/
+
+.hover_button:hover {
+    background-color: rgba(33, 125, 187, 0.2) !important;
+}
+
+
+.back-button button {
+	padding: 0px;
+}
+
+.back-button span {
+	padding-right: 0px;
+}
+
+.btn-highlight {
+	color: red;
+}
+
+.custom-ban {
+	font-size:1.4em;
+	line-height:130%;
+	-webkit-transform:scale(1.4, 1);
+	-moz-transform:scale(1.4, 1);
+	-ms-transform:scale(1.4, 1);
+	-o-transform:scale(1.4, 1);
+	transform:scale(1.4, 1);
+}
+
+.custom-ban:before {
+	color: red;
+	content: "/";
+}
+
+/*****************************************/
+
+/************** FAB BUTTON ***************/
+
+.fab-button {
+	position: relative;
+    border-radius: 50%;
+    width: 64px !important;
+    height: 64px;
+    z-index: 10;
+    overflow: hidden;
+    -webkit-box-shadow: 0px 3px 5px 1px rgba(0,0,0,0.32);
+	-moz-box-shadow: 0px 3px 5px 1px rgba(0,0,0,0.32);
+	box-shadow: 0px 3px 5px 1px rgba(0,0,0,0.32);
+}
+
+.fab-button button,
+.fab-button button:hover,
+.fab-button button:active {
+	color: #ffffff;
+    font-size: 28px;
+    background-color: inherit;
+    text-align: center;
+    vertical-align: top;
+    line-height: 60px;
+    font-weight: 100;
+}
+
+.fab-button .webix_el_button .webix_img_btn,
+.fab-button .webix_el_toggle .webix_img_btn,
+.fab-button .webix_el_button .webix_img_btn_top,
+.fab-button .webix_el_toggle .webix_img_btn_top,
+.fab-button .webix_icon_btn {
+	color: #ffffff !important;
+    font-size: 24px;
+    background-color: inherit;
+    padding-right: 0px;
+    vertical-align: top;
+    line-height: 60px;
+}
+
+.fab-primary-action {
+	top: -32px !important;
+	left: 32px !important;
+}
+
+.fab-bottom-right {
+	position: absolute;
+	bottom: 16px !important;
+	right: 16px !important;
+}
+
+/**************************************/
+
+/************** TOOLBARS **************/
+.nopadding > .webix_template {
+	padding: 0px;
+}
+
+/* 3ca2e0 #d6e8f4; */
+.breadcrumb {
+	list-style: none;
+	margin: 5px;
+	padding: 0px;
+	font-size: 1em;
+	color: #3498DB;
+/*	background: rgba(0, 0, 0, 0.2); */
+	display: inline-block;
+	border-radius: 6px;
+}
+
+.breadcrumb > li {
+	display: inline-block;
+	padding: 0 20px;
+	line-height: 20px;
+	background: #F7F7F7;
+	position: relative;
+	border: 0 #F7F7F7;
+	-moz-transition: background 0.25s, border-color 0.25s, margin 0.125s;
+	-o-transition: background 0.25s, border-color 0.25s, margin 0.125s;
+	-webkit-transition: background 0.25s, border-color 0.25s, margin 0.125s;
+	transition: background 0.25s, border-color 0.25s, margin 0.125s;
+	cursor: pointer;
+}
+
+.breadcrumb > li + li {
+	margin-left: 15px;
+}
+
+.breadcrumb > li:hover {
+	background: rgba(52, 152, 219, 0.2);
+	border-color: rgba(52, 152, 219, 0.2);
+	margin-left: 20px;
+	margin-right: 5px;
+}
+
+.breadcrumb > li:before,
+.breadcrumb > li:after {
+	content: '';
+	position: absolute;
+	border: 10px solid transparent;
+	border-right: 0;
+	top: 0;
+}
+
+.breadcrumb > li:before {
+	right: 100%;
+	border-top-color: inherit;
+	border-bottom-color: inherit;
+}
+
+.breadcrumb > li:after {
+	left: 100%;
+	border-left-color: inherit;
+}
+
+.breadcrumb > li:first-child {
+	border-radius: 2px 0 0 2px;
+	padding-left: 30px;
+	margin-left: 0;
+}
+
+.breadcrumb > li:first-child:before {
+	content: none;
+}
+
+.breadcrumb > li:last-child {
+ 	border-radius: 0 2px 2px 0;
+	padding-right: 30px;
+	margin-right: 0;
+}
+
+.breadcrumb > li:last-child:after {
+	content: none;
+}
+
+.breadcrumb > li:only-child {
+	border-radius: 2px 2px 2px 2px;
+}
+
+.webix_toolbar {
+	margin-bottom: 1px;
+}
+
+.toolbar-title {
+	font-weight: 500;
+	font-size: 20px;
+	cursor: pointer;
+}
+
+.toolbar-section {
+	color: white;
+	font-size: 28px;
+	padding-left: 32px;
+	display: flex;
+	align-items: center;
+}
+
+.toolbar-section div {
+	padding: 0px;
+	height: auto;
+}
+
+.toolbar-col-section {
+	color: white;
+	font-size: 28px;
+	display: flex !important;
+	align-items: center;
+}
+
+.toolbar-col-section div,
+.toolbar-section div {
+	height: auto;
+}
+
+.toolbar_button .webix_icon_btn {
+	color: #ffffff !important;
+	font-size: 2em;
+}
+
+/**************************************/
+
+/************* DATATABLES *************/
+
+.webix_ss_header tr:last-child td,
+.webix_ss_header tr td[rowspan] {
+	border-bottom: 1px solid #e3e3e4;
+}
+
+.custom_datatable {
+	font-size: 16px;
+	font-weight: 500;
+	color: rgba(0, 0, 0, 0.56);
+}
+
+.custom_datatable .webix_icon,
+.custom_datatable .webix_input_icon {
+	font-size: 24px;
+	font-weight: 500;
+	color: rgba(0, 0, 0, 0.56);
+}
+
+.custom_datatable .custom_datatable_hover {
+    background: rgba(0, 0, 0, 0.13);
+    cursor: pointer;
+}
+
+/* Row Actions */
+.custom_datatable .action_icon {
+    display: none;
+}
+
+.custom_datatable .custom_datatable_hover .action_icon {
+    display: inline-block;
+}
+
+
+
+/**************************************/
+
+/*************** INPUTS ***************/
+
+.material_inputs {
+	margin-right: 16px;
+}
+
+/**************************************/
+
+/*********** SIDEBAR MENU *************/
+
+.sidebar > .webix_scroll_cont {
+	border-bottom: 1px solid #edf2f1;
+}
+
+.menu {
+	border-top: 0px solid transparent;
+	border-right: 1px solid #edf2f1;
+	margin-right: 1px;
+}
+
+.menu .webix_tree_item {
+	height: 40px;
+	line-height: 40px;
+  	color: #454545;
+  	font-weight: 600;
+  	font-size: 16px;
+}
+
+.menu .webix_tree_item:hover {
+    background-color: #f2f2f2;
+    cursor: pointer;
+}
+
+.webix_tree .webix_scroll_cont > .webix_tree_leaves {
+	padding: 0;
+}
+
+.menu .webix_tree_item.webix_selected,
+.menu .webix_tree_item.webix_selected span{
+	background-color: @menuHoverBgColor;
+	padding-right: 0px;
+	padding-left: 0px;
+}
+
+.menu .webix_tree_branch_1:first-child>.webix_tree_item:first-child {
+	border-top: 0px;
+}
+
+.menu .webix_tree_branch_1:last-child>.webix_tree_leaves:last-child {
+	margin-bottom: 0px;
+}
+
+.menu .webix_tree_item[aria-expanded="true"] {
+	border-top: 1px solid #edf2f1;
+}
+
+.menu .webix_scroll_cont .webix_tree_leaves:first-child {
+	border-bottom: none;
+	margin-bottom: 0px;
+}
+
+.menu .webix_tree_leaves {
+	border-bottom: 1px solid #edf2f1;
+	margin-bottom: -1px;
+}
+
+.menu .webix_tree_item {
+	padding-left: 0px;
+}
+
+.webix_tree_none {
+	width: 30px;
+}
+
+.menu .webix_icon {
+	width: 25px;
+	/*padding-left: 12px !important;*/
+	text-align: center;
+}
+
+.menu .webix_tree_leaves {
+	margin-left: 0px;
+	padding-left: 0px;
+}
+
+.menu .webix_tree_leaves .webix_tree_branch_2 .webix_tree_item {
+	margin-left: 0px;
+	padding-left: 10px;
+}
+
+.menu .webix_tree_item .webix_selected {
+    background: #e3e3e4;
+}
+
+.menu .webix_tree_item .webix_selected .webix_icon {
+    background: transparent;
+}
+
+/******************************************/
+
+/**************** POPUP *******************/
+.popup_right_arrow {
+	padding-left: 1px !important;
+}
+
+/******************************************/
+
+
+
+
+.section_title {
+	font-size: 18px;
+    font-weight: 500;
+}
+
+.profile-container {
+	position: absolute;
+    right: 0;
+}
+
+.profile-container .webix_template {
+	display: flex;
+}
+
+.profile-layout {
+	font-size: 18px;
+	width: 100%;
+	font-weight: 600;
+    padding: 0px 0px 0px 16px;
+}
+
+.profile-layout:hover {
+    background-color: #f2f2f2;
+    cursor: pointer;
+}
+
+.profile-name {
+	display: inline-block;
+	min-width: 100px;
+	max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: auto 8px;
+}
+
+.no_results_layout {
+    display: flex;
+    align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      vertical-align: middle;
+    height: 100%;
+}
+
+.no_results_layout div {
+    font-size: 24px;
+    margin-bottom: 16px;
+}
+
+.dash-item {
+	border-radius: 2px;
+    position: relative;
+    min-width: 150px;
+    height: 105px;
+    padding-top: 10px;
+    margin: 11px 5.5px 0 5.5px;
+    color: #fff;
+    -ms-box-flex: 1;
+    -webkit-box-flex: 1;
+    -moz-box-flex: 1;
+    -ms-flex: 1;
+    -webkit-flex: 1;
+    flex: 1;
+    box-shadow: 0 0 8px rgba(0,0,0,0.2);
+}
+
+.flex-tmp {
+	display: -webkit-box;
+    display: -moz-box;
+    display: -ms-flexbox;
+    display: -webkit-flex;
+    display: flex;
+    flex-flow: row wrap;
+    -webkit-flex-flow: row wrap;
+    justify-content: space-around;
+}
+
+.dash-item .icon {
+    padding-left: 10px;
+    height: 73px;
+    padding-top: 7px;
+    display: block;
+    width: 30%;
+    font-size: 77px;
+    color: rgba(255,255,255,0.17);
+}
+
+.dash-item .fa, .dash-item .webix_icon, .dash-item .webix_icon_btn, .dash-item .webix_input_icon {
+    display: inline-block;
+    font-family: FontAwesome;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transform: translate(0,0);
+}
+
+.dash-item .text {
+	width: 100%;
+    font-size: 18px;
+    text-align: right;
+}
+
+.dash-item .subtext {
+	width: 100%;
+    font-size: 14px;
+	line-height: 30px;
+    text-align: right;
+}
+
+.dash-item .value {
+	font-size: 50px;
+    text-align: right;
+}
+
+.dash-item .details {
+	position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 150px;
+}
+.dash-item .footer {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 25px;
+    text-align: center;
+    line-height: 25px;
+    font-size: 13px;
+	cursor: pointer;
+    background: rgba(0,0,0,0.05);
+}
+
+.nodes {
+	background-color: #a693eb;
+}
+
+.users {
+	background-color: #63b4ea;
+}
+
+.sessions {
+	background-color: #f19b60;
+}
+
+.domains {
+	background-color: #49cd81;
+}
+
