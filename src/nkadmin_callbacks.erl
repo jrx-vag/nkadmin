@@ -48,7 +48,7 @@ plugin_syntax() ->
 
 
 plugin_listen(Config, #{id:=SrvId}) ->
-    {parsed_url, WebSrv} = maps:get(admin_url, Config, {parsed_url, []}),
+    {parsed_urls, WebSrv} = maps:get(admin_url, Config, {parsed_urls, []}),
     Priv = list_to_binary(code:priv_dir(nkadmin)),
     Path = <<Priv/binary, "/www">>,
     nkservice_webserver_util:get_web_servers(SrvId, WebSrv, Path, Config).
