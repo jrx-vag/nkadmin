@@ -40,6 +40,10 @@ start() ->
 %% @private OTP standard start callback
 start(_Type, _Args) ->
 	Syntax = #{
+        admin_url => binary,
+        '__defaults' => #{
+            admin_url => "http://127.0.0.1:9103/admin"
+        }
     },
     case nklib_config:load_env(?APP, Syntax) of
         {ok, _} ->
