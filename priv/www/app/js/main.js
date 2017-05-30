@@ -443,8 +443,8 @@
 
         function treeRecursiveUpdate(tree, item) {
             var state = tree.getState();
-            if (!tree.isSelected(item.id)) {
-                addBadgeSpan(item, 'new!');
+            if (tree.isBranch(item.id) && !tree.isBranchOpen(item.id)) {
+                item.style = 'font-weight: bolder';
             }
             treeRecursiveUpdate2(tree, item, tree.getParentId(item.id), 0);
             tree.setState(state);
@@ -585,7 +585,7 @@
                         "height": (numElems * 40) + "px",
                         "type": "menuTree2",
                         "css": "menu",
-                        "template": "{common.icon()}<i class='webix_icon fa fa-#icon# #rotate#' aria-hidden='true'></i> #value##badge#",
+                        "template": "{common.icon()}<i class='webix_icon fa fa-#icon# #rotate#' aria-hidden='true'></i><span class='webix_tree_item_span' style='#style#'>#value#</span>#badge#",
                         "activeTitle": true, // Sets if the tree should open/close a branch when clicked
                         "select": true,
                         "type": {
@@ -691,6 +691,10 @@
             element.badge = "";
         }
 
+        function clearStyle(element) {
+            element.style = "";
+        }
+
 /* Detail function parsing example:
             if (detail !== "undefined") {
                 //replaceBody(detail);
@@ -751,7 +755,7 @@
             // clear badge
             var tree = $$(treeId);
             var item = tree.getItem(menuId);
-            clearBadge(item);
+            clearStyle(item);
             tree.updateItem(menuId, item);
             // unselect all elements from all trees
             unselectAll();
