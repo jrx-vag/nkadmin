@@ -3,6 +3,7 @@
 	logic = (function(){
         var host = "ovh.jaraxa.com";
 	    var port = 443;
+        var pathname = '/admin';
         var path = 'api/ws';
         var useWss = true;
         var defaultDomain = "/";
@@ -43,28 +44,30 @@
             // Initialize an empty workspace
             webix.ui(createEmptyWorkspace());
 
-            if (localStorage.getItem('nc-admin-host') === 'localhost') {
-    			// Use a local NetComposer instance
-    			hostname = 'localhost';
-    			host = hostname;
+            // Use current location to set the ws connection
+            hostname = window.location.hostname;
+            // 'localhost', 'v1.netc.io', 'ovh.jaraxa.net', ...
+            host = hostname;
+            // 9202, 443, 80, ...
+            port = window.location.port;
+            // https: -> wss:, http: -> ws:
+            useWss = window.location.protocol === 'https:';
+            // '/admin/', '/netcomp/v01/admin/', ...
+            pathname = window.location.pathname;
+            if (pathname.length > 1 && pathname.charAt(pathname.length-1) === '/') {
+                // '/admin', '/netcomp/v01/admin', ...
+                pathname = pathname.substring(0, pathname.length-1);
+            }
+            // '/', '/netcomp/v01/', ...
+            var parentPath = window.location.pathname.split('admin')[0];
+            // 'api/ws', 'netcomp/v01/api/ws', ...
+            path = pathname.substring(1,parentPath.length) + 'api/ws';
+            console.log('Connecting to: ', hostname, host, port, useWss, path, parentPath, pathname);
+
+            if (host === 'localhost' && port === '8001') {
+                // If it's a local test environment, use the default port instead
                 port = '9202';
-    			path = 'api/ws';
-    			useWss = false; // This argument is optional and its default value is set to true
-    		} else if (document.location.hostname == "ovh.jaraxa.com") {
-			    // Use a remote NetComposer instance
-			    hostname = 'ovh.jaraxa.com';
-                host = hostname;
-			    port = '443';
-			    path = 'api/ws';
-			    useWss = true; // This argument is optional and its default value is set to true
-		    } else if (document.location.hostname == "v1.netc.io") {
-			    // Use a remote NetComposer instance
-			    hostname = 'v1.netc.io';
-                host = hostname;
-			    port = '443';
-			    path = 'netcomp/v01/api/ws';
-			    useWss = true; // This argument is optional and its default value is set to true
-		    }
+            }
 
             var href = window.location.href.split("/");
             var relativePath = href[0] + "//" + href[2];
@@ -1186,12 +1189,12 @@
 
         function setPath(newPath, newPathIds) {
             if (window.location.pathname !== newPath) {
-                console.log("Setting new State: " + newPath);
+                console.log("Setting new Path: " + newPath);
                 history.pushState({path: newPath, pathIds: newPathIds}, "NewPath", newPath); // Creates a new state, in Firefox it asks if it should save the user/password
                 //history.replaceState({}, "NewPath", newPath); // Replaces the state, this method doen't make Firefox to ask for user/password saving but there won't be back/forth navigation
-                console.log("State changed!");
+                console.log("Path changed!");
             } else {
-                console.log("State not changed (same path)");
+                console.log("Path not changed (same path)");
             }
             replaceComponent("toolbar-path", createBreadcrumbs(newPath, newPathIds));
             currentPath = newPath;
@@ -1203,15 +1206,18 @@
         }
 
         function setURL(newURL) {
-            if (window.location.pathname !== newURL) {
-                console.log("Setting new State: " + newURL);
+            // '/admin' + '/chattest', '/netcomp/v01/admin' + '/chattest', ...
+            console.log("pathname: ", pathname, "newURL: ", newURL);
+            var newPath = (pathname !== '/')? pathname + newURL : newURL;
+            if (window.location.pathname !== newPath) {
+                console.log("Setting new URL: " + newPath);
                 // Creates a new state, in Firefox it asks if it should save the user/password
-                pushState(newURL);
+                pushState(newPath);
                 // Replaces the state, this method doen't make Firefox to ask for user/password saving but there won't be back/forth navigation
                 //replaceState(newURL);
-                console.log("State changed!");
+                console.log("URL changed!");
             } else {
-                console.log("State not changed (same URL)");
+                console.log("URL not changed (same URL)");
             }
             currentURL = newURL;
         }
