@@ -34,19 +34,19 @@
 %% @doc
 get_frame(State) ->
     case frame_domain(State) of
-        {ok, Frame1} ->
-            case frame_user(State) of
-                {ok, Frame2} ->
+        {ok, Frame1, State2} ->
+            case frame_user(State2) of
+                {ok, Frame2, State3} ->
                     Value = #{
                         class => frame,
                         value => #{items => Frame1 ++ Frame2}
                     },
-                    {ok, Value, State};
+                    {ok, Value, State3};
                 {error, Error} ->
                     {error, Error}
             end;
         {error, Error} ->
-            {error, Error}
+            {error, Error, State}
     end.
 
 
@@ -76,10 +76,10 @@ element_action(_ElementId, _Id, _Value, Updates, State) ->
 
 
 %% @private
-frame_domain( #{srv_id:=SrvId, domain_id:=DomainId}) ->
+frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=State) ->
     case nkdomain:get_name(SrvId, DomainId) of
         {ok, #{name:=DomName, icon_id:=_DomIconId}} ->
-            {ok, [
+            Items = [
                 #{
                     id => admin_frame_domain_name,
                     class => frameDomainName,
@@ -90,20 +90,19 @@ frame_domain( #{srv_id:=SrvId, domain_id:=DomainId}) ->
                     class => frameDomainIcon,
                     value => #{icon => <<>>}
                 }
-            ]};
+            ],
+            State2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, State),
+            {ok, Items, State2};
         {error, Error} ->
             {error, Error}
-    end;
-
-frame_domain(_) ->
-    {ok, []}.
+    end.
 
 
 %% @private
 frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
     case nkdomain_user_obj:get_name(SrvId, UserId) of
         {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname, icon_id:=_UserIconId}}} ->
-            {ok, [
+            Items = [
                 #{
                     id => admin_frame_user_name,
                     class => frameUserName,
@@ -128,11 +127,10 @@ frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
                         ]
                     }
                 }
-            ]};
+            ],
+            State2 = nkadmin_util:add_object_tag(UserId, nkadmin_frame_user, State),
+            {ok, Items, State2};
         {error, Error} ->
             {error, Error}
-    end;
-
-frame_user(_) ->
-    {ok, []}.
+    end.
 
