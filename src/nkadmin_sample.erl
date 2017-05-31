@@ -41,7 +41,10 @@ session_stop() ->
     cmd(<<"objects/admin.session/stop">>, #{}).
 
 session_switch_domain(Domain) ->
-    cmd(<<"objects/admin.session/switch_domain">>, #{domain_id=>Domain}).
+    {ok, D} = cmd(<<"objects/admin.session/switch_domain">>, #{domain_id=>Domain}),
+    Str = nklib_json:encode_pretty(D),
+    io:format("~s\n", [Str]),
+    ok.
 
 session_action(ElementId) ->
     cmd(<<"objects/admin.session/element_action">>, #{element_id=>ElementId, action=>selected}).
