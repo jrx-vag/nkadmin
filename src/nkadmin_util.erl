@@ -20,7 +20,8 @@
 
 -module(nkadmin_util).
 -export([i18n/2, menu_item/4, get_parts/1, append_type/2]).
--export([get_group/2, set_group/3, remove_group/2, get_element/3, get_element/4, add_element/4, remove_element/3]).
+-export([get_key/2, add_key/3, remove_key/2]).
+-export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
 
 
 %% ===================================================================
@@ -74,53 +75,57 @@ menu_item(Id, menuEntry, Value, State) ->
 
 
 %% @doc
-get_group(Id, #{elements:=Elements}) ->
-    maps:get(to_bin(Id), Elements, #{}).
+get_key(Key, #{keys:=Keys}) ->
+    maps:get(to_bin(Key), Keys, undefined).
 
 
 %% @doc
-set_group(Id, Data, #{elements:=Elements}=State) ->
-    Elements2 = Elements#{to_bin(Id) => Data},
-    State#{elements:=Elements2}.
+add_key(Key, Value, #{keys:=Keys}=State) ->
+    Keys2 = Keys#{to_bin(Key) => Value},
+    State#{keys:=Keys2}.
 
 
 %% @doc
-remove_group(Id, #{elements:=Elements}=State) ->
-    Elements2 = maps:remove(to_bin(Id), Elements),
-    State#{elements:=Elements2}.
-
-
-%% @doc
-get_element(GroupId, Id, State) ->
-    get_element(GroupId, Id, undefined, State).
-
-
-%% @doc
-get_element(GroupId, Id, Default, State) ->
-    Group = get_group(GroupId, State),
-    maps:get(to_bin(Id), Group, Default).
+remove_key(Key, #{keys:=Keys}=State) ->
+    Keys2 = maps:remove(to_bin(Key), Keys),
+    State#{keys:=Keys2}.
 
 
 
 %% @doc
-add_element(GroupId, Id, Value, #{elements:=Elements}=State) ->
-    GroupId2 = to_bin(GroupId),
-    Group1 = maps:get(GroupId2, Elements, #{}),
-    Group2 = Group1#{to_bin(Id) => Value},
-    Elements2 = Elements#{GroupId2 => Group2},
-    State#{elements:=Elements2}.
+get_object_tags(ObjId, #{objects:=Objects}) ->
+    maps:get(ObjId, Objects, []).
 
 
 %% @doc
-remove_element(GroupId, Id, #{elements:=Elements}=State) ->
-    GroupId2 = to_bin(GroupId),
-    Group1 = maps:get(GroupId2, Elements, #{}),
-    Group2 = maps:remove(to_bin(Id), Group1),
-    Elements2 = case map_size(Group2) of
-        0 -> maps:remove(GroupId2, Elements);
-        _ -> Elements#{GroupId2 => Group2}
-    end,
-    State#{elements:=Elements2}.
+add_object_tag(ObjId, Tag, #{objects:=Objects}=State) ->
+    Tags = maps:get(ObjId, Objects, []),
+    case lists:member(Tag, Tags) of
+        true ->
+            State;
+        false ->
+            Objects2 = Objects#{ObjId => [Tag|Tags]},
+            State#{objects:=Objects2}
+    end.
+
+
+%% @doc
+remove_object_tag(ObjId, Tag, #{objects:=Objects}=State) ->
+    Tags = maps:get(ObjId, Objects, []),
+    case lists:member(Tag, Tags) of
+        true ->
+            Objects2 = case Tags -- [Tag] of
+                [] ->
+                    maps:remove(ObjId, Objects);
+                Tags2 ->
+                    Objects#{ObjId => Tags2}
+            end,
+            State#{objects:=Objects2};
+        false ->
+            State
+    end.
+
+
 
 
 %% @doc

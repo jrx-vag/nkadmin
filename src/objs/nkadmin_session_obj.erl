@@ -29,7 +29,7 @@
          object_api_syntax/2, object_api_allow/3, object_api_cmd/3]).
 -export([object_init/1, object_start/1, object_send_event/2,
          object_sync_op/3, object_async_op/2, object_handle_info/2]).
--export([object_admin_tree/3]).
+-export([object_admin_info/0]).
 -export_type([meta/0, event/0]).
 
 -include("nkadmin.hrl").
@@ -51,12 +51,15 @@
     srv_id => nkservice:id(),
     domain_id => nkdomain:obj_id(),
     domain_path => nkdomain:path(),
+    detail_path => nkdomain:path(),
     user_id => nkdomain:obj_id(),
     language => binary(),
     types => [nkdomain:type()],
-    session_types => #{nkdomain:type() => integer()},
+    resources => [nkdomain:type()],
+    sessions => #{nkdomain:type() => integer()},
     detail => map(),
-    elements => #{Group::binary() => #{Id::binary() => term()}}
+    objects => #{ObjId::nkdomain:obj_id() => [Tag::term]},
+    keys => #{Key::binary() => term()}
 }.
 
 
@@ -189,6 +192,15 @@ object_get_info() ->
     }.
 
 
+%% @doc
+object_admin_info() ->
+    #{
+        class => session,
+        weight => 4000,
+        tree_id => <<"domain_tree_sessions_admin">>
+    }.
+
+
 %% @private
 object_mapping() ->
     #{}.
@@ -242,9 +254,9 @@ object_sync_op({?MODULE, start, DomainId, State, Pid}, _From, Session) ->
     case do_switch_domain(DomainId, Session2) of
         {ok, Reply, Session3} ->
             {reply, {ok, ObjId, Reply}, Session3};
-        {error, Error} ->
+        {error, Error, Session3} ->
             nkdomain_obj:unload(self(), internal_error),
-            {reply, {error, Error}, Session2}
+            {reply, {error, Error}, Session3}
     end;
 
 object_sync_op({?MODULE, switch_domain, DomainId}, _From, Session) ->
@@ -285,10 +297,6 @@ object_handle_info(_Info, _Session) ->
     continue.
 
 
-%% @doc
-object_admin_tree(Category, List, State) ->
-    nkdomain_admin:add_tree_session(Category, ?DOMAIN_ADMIN_SESSION, ?MODULE,
-                                    domain_tree_sessions_admin, 4000, List, State).
 
 
 %% ===================================================================
@@ -309,29 +317,38 @@ sync_op(Srv, Id, Op) ->
 do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
     case nkdomain_obj_lib:load(SrvId, DomainId, #{}) of
         #obj_id_ext{obj_id=DomainObjId, path=Path, type= ?DOMAIN_DOMAIN} ->
-            unsubscribe_domain(Session),
             case nkdomain_domain_obj:find_all_types(SrvId, DomainId, #{}) of
                 {ok, _, TypeList} ->
+                    Types = [Type || {Type, _Counter} <- TypeList],
                     #?MODULE{state=State1} = Data,
                     State2 = State1#{
                         domain_id => DomainObjId,
                         domain_path => Path,
                         detail_path => Path,
-                        types => [Type || {Type, _Counter} <- TypeList],
-                        session_types => #{},
+                        types => Types,
+                        resources => [],
+                        sessions => #{},
                         detail => #{},
-                        elements => #{}
+                        objects => #{},
+                        keys => #{}
                     },
-                    subscribe_domain(Path, Session),
-                    {ok, Updates, State3} = do_get_domain_reply(SrvId, State2),
-                    Data3 = Data#?MODULE{state=State3},
-                    Session3 = Session#obj_session{data=Data3},
-                    {ok, #{elements=>lists:reverse(Updates)}, Session3};
+                    case do_get_domain_reply(SrvId, State2) of
+                        {ok, Updates, State3} ->
+                            unsubscribe_domain(Session),
+                            subscribe_domain(Path, Session),
+                            Data3 = Data#?MODULE{state=State3},
+                            Session3 = Session#obj_session{data=Data3},
+                            {ok, #{elements=>lists:reverse(Updates)}, Session3};
+                        {error, Error, State3} ->
+                            Data3 = Data#?MODULE{state=State3},
+                            Session3 = Session#obj_session{data=Data3},
+                            {error, Error, Session3}
+                    end;
                 {error, Error} ->
-                    {error, Error}
+                    {error, Error, Session}
             end;
         not_found ->
-            {error, unknown_domain}
+            {error, unknown_domain, Session}
     end.
 
 
@@ -342,26 +359,42 @@ do_get_domain_reply(SrvId, State) ->
 
 %% @private
 do_get_domain_frame(SrvId, Updates, State) ->
-    {ok, Frame, State2} = SrvId:admin_get_frame(State),
-    do_get_domain_tree(SrvId, [Frame|Updates], State2).
+    case SrvId:admin_get_frame(State) of
+        {ok, Frame, State2} ->
+            do_get_domain_tree(SrvId, [Frame|Updates], State2);
+        {error, Error, State2} ->
+            {error, Error, State2}
+    end.
 
 
 %% @private
 do_get_domain_tree(SrvId, Updates, State) ->
-    {ok, Tree, State2} = SrvId:admin_get_tree(State),
-    do_get_domain_url(SrvId, [Tree|Updates], State2).
+    case SrvId:admin_get_tree(State) of
+        {ok, Tree, State2} ->
+            do_get_domain_url(SrvId, [Tree|Updates], State2);
+        {error, Error, State2} ->
+            {error, Error, State2}
+    end.
 
 
 %% @private
 do_get_domain_url(SrvId, Updates, State) ->
-    {ok, Url, BreadCrumb, State2} = SrvId:admin_get_url(State),
-    do_get_domain_detail(SrvId, [Url, BreadCrumb|Updates], State2).
+    case SrvId:admin_get_url(State) of
+        {ok, Url, BreadCrumb, State2} ->
+            do_get_domain_detail(SrvId, [Url, BreadCrumb|Updates], State2);
+        {error, Error, State2} ->
+            {error, Error, State2}
+    end.
 
 
 %% @private
 do_get_domain_detail(SrvId, Updates, State) ->
-    {ok, Detail, State2} = SrvId:admin_get_detail(State),
-    {ok, [Detail|Updates], State2}.
+    case SrvId:admin_get_detail(State) of
+        {ok, Detail, State2} ->
+            {ok, [Detail|Updates], State2};
+        {error, Error, State2} ->
+            {error, Error, State2}
+    end.
 
 
 
