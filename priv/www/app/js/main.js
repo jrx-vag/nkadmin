@@ -171,12 +171,15 @@
                         }
                         console.log('Load... start: ' + start + ', end: ' + end);
                         if (!details) {
+/*
                             let objects = createObjectsData(start, end).getAll;
                             webix.ajax.$callback(view, callback, "", {
                                 total_count: 200, // used to get the total number of pages
                                 data: objects
                             }, -1);
+*/
                         } else {
+/*
                             let objects = createObjectsData(start, end).getAll;
                             webix.ajax.$callback(view, callback, "", {
                                 total_count: view.data.$max + 100,
@@ -184,6 +187,7 @@
                                 count: details.count,
                                 data: objects
                             }, -1);
+*/
                         }
                     },
                     save: function (view, update, dp, callback) {
@@ -411,7 +415,7 @@
                         updateURL(elem);
                         break;
                     case "detail":
-                        console.log("Updating detail: ", elem);
+                        updateDetail(elem);
                         break;
                     default:
                         console.log("Default: ", elem.class);
@@ -694,6 +698,17 @@
             console.log("updateURL: ", elem);
             if (elem !== undefined) {
                 setURL(elem.value.label);
+            }
+        }
+
+        function updateDetail(elem) {
+            console.log("updateDetail: ", elem);
+            if (elem && elem.value && elem.value.webix_ui) {
+                parseJSONFunctions(elem.value.webix_ui);
+                replaceBody(elem.value.webix_ui);
+                console.log("Detail updated!", elem.value.webix_ui);
+            } else if (elem && elem.value) {
+                console.log("Error: unknown detail format");
             }
         }
 
@@ -1412,6 +1427,9 @@
                         action: "selected"
                     }).then(function(response) {
                         console.log("ID clicked OK: ", response);
+                        if (response.data && response.data.elements) {
+                           updateView(response.data.elements);
+                        }
                     }).catch(function(response) {
                         console.log("Error at profileItemClick: ", response);
                         webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
@@ -1427,12 +1445,14 @@
             } else {
                 let value;
                 for (property in json) {
-                    value = json[property];
-                    if (value && typeof value === "object") {
-                        parseJSONFunctions(json[property]);
-                    } else if (value && typeof value === "string" && value.startsWith("function")) {
-                        console.log("Substituting property '" + property + "' with its evaluated javascript code: '" + value + "'");
-                        json[property] = eval('(' + value + ')');
+                    if (json.hasOwnProperty(property)) {
+                        value = json[property];
+                        if (value && typeof value === "object") {
+                            parseJSONFunctions(json[property]);
+                        } else if (value && typeof value === "string" && value.startsWith("function")) {
+                            console.log("Substituting property '" + property + "' with its evaluated javascript code: '" + value + "'");
+                            json[property] = eval('(' + value + ')');
+                        }
                     }
                 }
             }
