@@ -34,12 +34,12 @@
 %% @doc
 get_frame(State) ->
     case frame_domain(State) of
-        {ok, Frame1, State2} ->
+        {ok, Items1, State2} ->
             case frame_user(State2) of
-                {ok, Frame2, State3} ->
+                {ok, Items2, State3} ->
                     Value = #{
                         class => frame,
-                        value => #{items => Frame1 ++ Frame2}
+                        value => #{items => Items1 ++ Items2}
                     },
                     {ok, Value, State3};
                 {error, Error} ->
@@ -51,17 +51,32 @@ get_frame(State) ->
 
 
 %% @doc
-event(#nkevent{obj_id=ObjId}, Updates, State) ->
+event(#nkevent{type = <<"updated">>, obj_id=ObjId}, Updates, State) ->
     case State of
         #{domain_id:=ObjId} ->
-            {ok, Updates2} = frame_domain(State),
-            {ok, Updates2++Updates, State};
+            {ok, Items, State2} = frame_domain(State),
+            {ok, Items++Updates, State2};
         #{user_id:=ObjId} ->
-            {ok, Updates2} = frame_user(State),
-            {ok, Updates2++Updates, State};
+            {ok, Items, State2} = frame_user(State),
+            {ok, Items++Updates, State2};
         _ ->
             {ok, Updates, State}
-    end.
+    end;
+
+event(#nkevent{type = <<"deleted">>, obj_id=ObjId}, Updates, State) ->
+    case State of
+        #{domain_id:=ObjId} ->
+            nkdomain_obj:unload(self(), domain_deleted),
+            {ok, Updates, State};
+        #{user_id:=ObjId} ->
+            nkdomain_obj:unload(self(), user_deleted),
+            {ok, Updates, State};
+        _ ->
+            {ok, Updates, State}
+    end;
+
+event(_Event, Updates, State) ->
+    {ok, Updates, State}.
 
 
 %% @doc
