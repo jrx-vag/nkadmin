@@ -3,6 +3,7 @@
 	logic = (function(){
         var host = "ovh.jaraxa.com";
 	    var port = 443;
+        var pathname = '/admin';
         var path = 'api/ws';
         var useWss = true;
         var defaultDomain = "/";
@@ -35,6 +36,16 @@
 
         var DOMAIN_TREE = "domain_tree";
     
+        // Frame state:
+        var frameState = {
+            ADMIN_FRAME: {},
+            ADMIN_FRAME_DOMAIN_ICON: {},
+            ADMIN_FRAME_DOMAIN_NAME: {},
+            ADMIN_FRAME_USER_NAME: {},
+            ADMIN_FRAME_USER_ICON: {},
+            ADMIN_FRAME_USER_MENU: {}
+        };
+
         function init(_defaultDomain) {
             var hostname = window.location.hostname;
             var defaultLanguage = "es";
@@ -43,28 +54,30 @@
             // Initialize an empty workspace
             webix.ui(createEmptyWorkspace());
 
-            if (localStorage.getItem('nc-admin-host') === 'localhost') {
-    			// Use a local NetComposer instance
-    			hostname = 'localhost';
-    			host = hostname;
+            // Use current location to set the ws connection
+            hostname = window.location.hostname;
+            // 'localhost', 'v1.netc.io', 'ovh.jaraxa.net', ...
+            host = hostname;
+            // 9202, 443, 80, ...
+            port = window.location.port;
+            // https: -> wss:, http: -> ws:
+            useWss = window.location.protocol === 'https:';
+            // '/admin/', '/netcomp/v01/admin/', ...
+            pathname = window.location.pathname;
+            if (pathname.length > 1 && pathname.charAt(pathname.length-1) === '/') {
+                // '/admin', '/netcomp/v01/admin', ...
+                pathname = pathname.substring(0, pathname.length-1);
+            }
+            // '/', '/netcomp/v01/', ...
+            var parentPath = window.location.pathname.split('admin')[0];
+            // 'api/ws', 'netcomp/v01/api/ws', ...
+            path = pathname.substring(1,parentPath.length) + 'api/ws';
+            console.log('Connecting to: ', hostname, host, port, useWss, path, parentPath, pathname);
+
+            if (host === 'localhost' && port === '8001') {
+                // If it's a local test environment, use the default port instead
                 port = '9202';
-    			path = 'api/ws';
-    			useWss = false; // This argument is optional and its default value is set to true
-    		} else if (document.location.hostname == "ovh.jaraxa.com") {
-			    // Use a remote NetComposer instance
-			    hostname = 'ovh.jaraxa.com';
-                host = hostname;
-			    port = '443';
-			    path = 'api/ws';
-			    useWss = true; // This argument is optional and its default value is set to true
-		    } else if (document.location.hostname == "v1.netc.io") {
-			    // Use a remote NetComposer instance
-			    hostname = 'v1.netc.io';
-                host = hostname;
-			    port = '443';
-			    path = 'netcomp/v01/api/ws';
-			    useWss = true; // This argument is optional and its default value is set to true
-		    }
+            }
 
             var href = window.location.href.split("/");
             var relativePath = href[0] + "//" + href[2];
@@ -379,6 +392,7 @@
         function updateView(elements) {
             var elem = null;
             var length = (elements["length"])? elements.length : 0;
+            var json = null;
             
             console.log("updateView: ", elements);
             for (var i = 0; i < length; i++) {
@@ -422,17 +436,24 @@
                                 // Get the tree component
                                 tree = $$(treeId);
                                 console.log("Got tree: ", tree);
-                                // Update 
-                                console.log("Updating: ", elem.id, " with: ", createTreeElement(elem));
-                                treeRecursiveUpdate(tree, createTreeElement(elem));
+                                // Update
+                                json = createTreeElement(elem);
+                                console.log("Updating: ", elem.id, " with: ", json);
+                                treeRecursiveUpdate(tree, json);
                             } else {
                                 // It is one of the trees
                                 console.log("It is one of the trees");
-                                replaceComponent(elem.id+"container", createTreeGroup(elem));
+                                console.log("Container: ", $$(elem.id+"container"));
+                                json = createTreeGroup(elem);
+                                console.log("New group: ", json);
+                                replaceComponent(elem.id+"container", json);
                             }
                         } else if (elem.id.startsWith(ADMIN_FRAME)) {
                             // It is an element from the frame
                             console.log("It is an element from the frame");
+                            updateFrameState([elem]);
+                            console.log("New frame state: ", frameState);
+                            replaceComponent(ADMIN_FRAME, createFrame(frameState));
                         }
                 }
             }
@@ -440,10 +461,11 @@
 
         function treeRecursiveUpdate(tree, item) {
             var state = tree.getState();
-            if (!tree.isSelected(item.id)) {
-                addBadgeSpan(item, 'new!');
+            var parent_id = tree.exists(item.id)? tree.getParentId(item.id) : undefined;
+            if (tree.isBranch(item.id) && !tree.isBranchOpen(item.id)) {
+                item.style = 'font-weight: bolder';
             }
-            treeRecursiveUpdate2(tree, item, tree.getParentId(item.id), 0);
+            treeRecursiveUpdate2(tree, item, parent_id, 0);
             tree.setState(state);
         }
 
@@ -473,26 +495,28 @@
 
             console.log("updateFrame: ", frame);
             if (frame !== "undefined") {
-                items = frame.value.items;
-                length = (items.length)? items.length : 0;
-                for (var i = 0; i < length; i++) {
-                    if (items[i].id === ADMIN_FRAME_DOMAIN_NAME) {
-                        frameContent[ADMIN_FRAME_DOMAIN_NAME] = items[i];
-                    } else if (items[i].id === ADMIN_FRAME_DOMAIN_ICON) {
-                        frameContent[ADMIN_FRAME_DOMAIN_ICON] = items[i];
-                    } else if (items[i].id === ADMIN_FRAME_USER_NAME) {
-                        frameContent[ADMIN_FRAME_USER_NAME] = items[i];
-                    } else if (items[i].id === ADMIN_FRAME_USER_ICON) {
-                        frameContent[ADMIN_FRAME_USER_ICON] = items[i];
-                    } else if (items[i].id === ADMIN_FRAME_USER_MENU) {
-                        frameContent[ADMIN_FRAME_USER_MENU] = items[i];
-                    } else {
-                        console.log("Frame parameter not recognized: ", items[i]);
-                    }
-                }
-                replaceComponent(ADMIN_FRAME, createFrame(frameContent));
+                updateFrameState(frame.value.items);
+                replaceComponent(ADMIN_FRAME, createFrame(frameState));
             }
-            console.log("Frame updated!", frameContent);
+            console.log("Frame updated!", frameState);
+        }
+
+        function updateFrameState(frameItems) {
+            var length = (frameItems.length)? frameItems.length : 0;
+
+            console.log("Updating frame state", frameItems);
+            for (var i = 0; i < length; i++) {
+                if (frameItems[i].id === ADMIN_FRAME_DOMAIN_NAME
+                    || frameItems[i].id === ADMIN_FRAME_DOMAIN_ICON
+                    || frameItems[i].id === ADMIN_FRAME_USER_NAME
+                    || frameItems[i].id === ADMIN_FRAME_USER_ICON
+                    || frameItems[i].id === ADMIN_FRAME_USER_MENU) {
+                    frameState[frameItems[i].id] = frameItems[i];
+                } else {
+                    console.log("Frame parameter not recognized: ", frameItems[i]);
+                }
+            }
+            console.log("Frame state updated: ", frameState);
         }
 
         function updateWholeTree(tree) {
@@ -582,7 +606,7 @@
                         "height": (numElems * 40) + "px",
                         "type": "menuTree2",
                         "css": "menu",
-                        "template": "{common.icon()}<i class='webix_icon fa fa-#icon# #rotate#' aria-hidden='true'></i> #value##badge#",
+                        "template": "{common.icon()}<i class='webix_icon fa fa-#icon# #rotate#' aria-hidden='true'></i><span class='webix_tree_item_span' style='#style#'>#value#</span>#badge#",
                         "activeTitle": true, // Sets if the tree should open/close a branch when clicked
                         "select": true,
                         "type": {
@@ -622,7 +646,7 @@
                         "id": element.id,
                         "type": "icon",
                         "open": true,
-                        "value": element.value.label,
+                        "value": createCounterLabel(element),
                         "tooltip": element.value.tooltip !== undefined? element.value.tooltip : "",
                         "badge": createBadgeSpan(element),
                         "icon": "",
@@ -639,7 +663,7 @@
                     json = {
                         "id": element.id,
                         "open": false,
-                        "value": element.value.label,
+                        "value": createCounterLabel(element),
                         "tooltip": element.value.tooltip !== undefined? element.value.tooltip : "",
                         "badge": createBadgeSpan(element),
                         "icon": "",
@@ -673,6 +697,13 @@
             }
         }
 
+        function createCounterLabel(element) {
+            if (element.value.counter && element.value.counter > 0) {
+                return element.value.label + " (" + element.value.counter + ")";
+            }
+            return element.value.label;
+        }
+
         function createBadgeSpan(element) {
             if (element.value.badge && element.value.badge > 0) {
                 return "&nbsp;<span class='webix_badge' style='position: relative'>"+element.value.badge+"</span>";
@@ -686,6 +717,10 @@
 
         function clearBadge(element) {
             element.badge = "";
+        }
+
+        function clearStyle(element) {
+            element.style = "";
         }
 
 /* Detail function parsing example:
@@ -748,6 +783,7 @@
             // clear badge
             var tree = $$(treeId);
             var item = tree.getItem(menuId);
+            clearStyle(item);
             clearBadge(item);
             tree.updateItem(menuId, item);
             // unselect all elements from all trees
@@ -938,7 +974,7 @@
                         element = {
                             "id": items[i].id,
                             "icon": items[i].value.icon,
-                            "value": items[i].value.label,
+                            "value": createCounterLabel(items[i]),
                             "tooltip": items[i].value.tooltip !== undefined? items[i].value.tooltip : "",
                             "badge": createBadgeSpan(items[i])
                         }
@@ -982,7 +1018,7 @@
             }
         }
 
-        function createProfile(frame) {
+        function createProfile(state) {
             var user_name = "";
             var user_tooltip = "";
             var user_badge = "";
@@ -990,13 +1026,13 @@
             var user_menu = {};
             var user_menu_icon = "";
             
-            if (frame) {
-                user_name = frame[ADMIN_FRAME_USER_NAME].value.label;
-                user_tooltip = frame[ADMIN_FRAME_USER_NAME].value.tooltip !== undefined? frame[ADMIN_FRAME_USER_NAME].value.tooltip : "";
-                user_badge = createBadgeSpan(frame[ADMIN_FRAME_USER_NAME]);
-                user_img = frame[ADMIN_FRAME_USER_ICON].value.icon;
-                user_menu = frame[ADMIN_FRAME_USER_MENU];
-                user_menu_icon = frame[ADMIN_FRAME_USER_MENU].value.icon;
+            if (state) {
+                user_name = createCounterLabel(state[ADMIN_FRAME_USER_NAME]);
+                user_tooltip = state[ADMIN_FRAME_USER_NAME].value.tooltip !== undefined? state[ADMIN_FRAME_USER_NAME].value.tooltip : "";
+                user_badge = createBadgeSpan(state[ADMIN_FRAME_USER_NAME]);
+                user_img = state[ADMIN_FRAME_USER_ICON].value.icon;
+                user_menu = state[ADMIN_FRAME_USER_MENU];
+                user_menu_icon = state[ADMIN_FRAME_USER_MENU].value.icon;
                 
                 webix.ui(createProfilePopup(user_menu));
             }
@@ -1186,12 +1222,12 @@
 
         function setPath(newPath, newPathIds) {
             if (window.location.pathname !== newPath) {
-                console.log("Setting new State: " + newPath);
+                console.log("Setting new Path: " + newPath);
                 history.pushState({path: newPath, pathIds: newPathIds}, "NewPath", newPath); // Creates a new state, in Firefox it asks if it should save the user/password
                 //history.replaceState({}, "NewPath", newPath); // Replaces the state, this method doen't make Firefox to ask for user/password saving but there won't be back/forth navigation
-                console.log("State changed!");
+                console.log("Path changed!");
             } else {
-                console.log("State not changed (same path)");
+                console.log("Path not changed (same path)");
             }
             replaceComponent("toolbar-path", createBreadcrumbs(newPath, newPathIds));
             currentPath = newPath;
@@ -1203,15 +1239,18 @@
         }
 
         function setURL(newURL) {
-            if (window.location.pathname !== newURL) {
-                console.log("Setting new State: " + newURL);
+            // '/admin' + '/chattest', '/netcomp/v01/admin' + '/chattest', ...
+            console.log("pathname: ", pathname, "newURL: ", newURL);
+            var newPath = (pathname !== '/')? pathname + newURL : newURL;
+            if (window.location.pathname !== newPath) {
+                console.log("Setting new URL: " + newPath);
                 // Creates a new state, in Firefox it asks if it should save the user/password
-                pushState(newURL);
+                pushState(newPath);
                 // Replaces the state, this method doen't make Firefox to ask for user/password saving but there won't be back/forth navigation
                 //replaceState(newURL);
-                console.log("State changed!");
+                console.log("URL changed!");
             } else {
-                console.log("State not changed (same URL)");
+                console.log("URL not changed (same URL)");
             }
             currentURL = newURL;
         }
@@ -1261,14 +1300,14 @@
             webix.extend($$("workspace"), webix.ProgressBar);
         }
 
-        function createFrame(frame) {
+        function createFrame(state) {
             var domain_name = "";
             var domain_icon = "";
             
-            if (frame) {
+            if (state) {
                 // TODO: check whether other domains start with "/"
-                domain_name = "/" + frame[ADMIN_FRAME_DOMAIN_NAME].value.label;
-                domain_icon = frame[ADMIN_FRAME_DOMAIN_ICON].value.icon;
+                domain_name = "/" + state[ADMIN_FRAME_DOMAIN_NAME].value.label;
+                domain_icon = state[ADMIN_FRAME_DOMAIN_ICON].value.icon;
             }
 
             return {
@@ -1292,7 +1331,7 @@
                     "label": domain_name
                 },
                 {},
-                createProfile(frame)
+                createProfile(state)
                 ]
             }
         }
