@@ -70,24 +70,28 @@ cmd(<<"create">>, #nkreq{data=Data, srv_id=SrvId}=Req, State) ->
     end;
 
 cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}=Req, State) ->
-    {ok, DomainId} = nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, State),
-    Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
-    case nkadmin_session_obj:start(SrvId, Id, DomainId, UserId, Language, self()) of
-        {ok, ObjId, Reply} ->
-            State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
-            Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
-            Subs = #{
-                srv_id => SrvId,
-                class => ?DOMAIN_EVENT_CLASS,
-                subclass => ?DOMAIN_ADMIN_SESSION,
-                type => Types,
-                obj_id => ObjId
-            },
-            ok = nkapi_server:subscribe(self(), Subs),
-            State3 = State2#{nkadmin_session_types=>Types},
-            {ok, Reply#{obj_id=>ObjId}, State3};
-        {error, Error} ->
-            {error, Error, State}
+    case nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, State) of
+        {ok, DomainId} ->
+            Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
+            case nkadmin_session_obj:start(SrvId, Id, DomainId, UserId, Language, self()) of
+                {ok, ObjId, Reply} ->
+                    State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
+                    Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
+                    Subs = #{
+                        srv_id => SrvId,
+                        class => ?DOMAIN_EVENT_CLASS,
+                        subclass => ?DOMAIN_ADMIN_SESSION,
+                        type => Types,
+                        obj_id => ObjId
+                    },
+                    ok = nkapi_server:subscribe(self(), Subs),
+                    State3 = State2#{nkadmin_session_types=>Types},
+                    {ok, Reply#{obj_id=>ObjId}, State3};
+                {error, Error} ->
+                    {error, Error, State}
+            end;
+        Error ->
+            Error
     end;
 
 cmd(<<"start">>, #nkreq{data=Data}=Req, State) ->
