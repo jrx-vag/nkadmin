@@ -21,6 +21,7 @@
 -module(nkadmin_util).
 -export([i18n/2, menu_item/4, get_parts/1, append_type/2]).
 -export([get_key/2, add_key/3, remove_key/2]).
+-export([append_path/3, update_path/2]).
 -export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
 
 
@@ -130,7 +131,7 @@ remove_object_tag(ObjId, Tag, #{objects:=Objects}=State) ->
 
 %% @doc
 get_parts(Path) ->
-    case binary:split(Path, <<"/">>, [global]) of
+    case binary:split(to_bin(Path), <<"/">>, [global]) of
         [<<>>, <<>>] -> [<<"/">>];
         [<<>>|Rest] -> [<<"/">>|Rest]
     end.
@@ -138,7 +139,35 @@ get_parts(Path) ->
 
 %% @doc
 append_type(<<"/">>, Type) -> <<$/, (to_bin(Type))/binary>>;
-append_type(Path, Type) -> <<Path/binary, $/, (to_bin(Type))/binary>>.
+append_type(Path, Type) -> <<(to_bin(Path))/binary, $/, (to_bin(Type))/binary>>.
+
+
+
+%% @private
+append_path(Path, Updates, #{domain_path:=Base}) ->
+    update_path(append_type(Base, Path), Updates).
+
+
+%% @private
+update_path(Path, Updates) ->
+    [
+        #{
+            class => url,
+            id => url,
+            value => #{label => Path}
+        },
+        #{
+            class => breadcrumbs,
+            id => breadcrumbs,
+            value => #{items => nkadmin_util:get_parts(Path)}
+        },
+        #{
+            class => detail,
+            value => #{}
+        }
+        | Updates
+    ].
+
 
 
 
