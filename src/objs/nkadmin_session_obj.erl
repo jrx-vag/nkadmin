@@ -134,7 +134,7 @@ find(Srv, User) ->
 
 %% @doc Starts a new session, connected to the Caller
 %% If the caller stops, we will stop the session
-%% TODO: if the session is stopped, a final event should be sent
+%% If we stop, it will be detected at nkdomain_callbacks:api_server_handle_info and the WS will be stopped
 -spec start(nkservice:id(), nkdomain:id(), start_opts()) ->
     {ok, nkdomain:obj_id(), Reply::map()} | {error, term()}.
 
