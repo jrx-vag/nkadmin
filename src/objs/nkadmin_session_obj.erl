@@ -23,7 +23,7 @@
 -behavior(nkdomain_obj).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([create/2, find/2, start/6, stop/2]).
+-export([create/2, find/2, start/3, stop/2]).
 -export([switch_domain/3, element_action/5]).
 -export([object_get_info/0, object_mapping/0, object_parse/3,
          object_api_syntax/2, object_api_allow/3, object_api_cmd/3]).
@@ -45,6 +45,15 @@
 %% ===================================================================
 %% Types
 %% ===================================================================
+
+
+-type start_opts() :: #{
+    language => binary(),
+    caller_pid => pid(),
+    domain_id => binary(),
+    user_id => binary(),
+    url => binary()
+}.
 
 
 -type state() :: #{
@@ -126,20 +135,19 @@ find(Srv, User) ->
 %% @doc Starts a new session, connected to the Caller
 %% If the caller stops, we will stop the session
 %% TODO: if the session is stopped, a final event should be sent
-start(Srv, Id, DomainId, UserId, Language, CallerPid) ->
-    case nkdomain_obj_lib:load(Srv, Id, #{usage_link=>{CallerPid, ?MODULE}}) of
+-spec start(nkservice:id(), nkdomain:id(), start_opts()) ->
+    {ok, nkdomain:obj_id(), Reply::map()} | {error, term()}.
+
+start(Srv, Id, Opts) ->
+    LoadOpts = case Opts of
+        #{caller_pid:=CallerPid} ->
+            #{usage_link=>{CallerPid, ?MODULE}};
+        _ ->
+            #{}
+    end,
+    case nkdomain_obj_lib:load(Srv, Id, LoadOpts) of
         #obj_id_ext{pid=Pid} ->
-            case nkdomain_obj_lib:load(Srv, DomainId, #{}) of
-                #obj_id_ext{obj_id=DomainObjId, type=?DOMAIN_DOMAIN} ->
-                    State = #{user_id=>UserId, language=>Language},
-                    nkdomain_obj:sync_op(Pid, {?MODULE, start, DomainObjId, State, CallerPid});
-                #obj_id_ext{} ->
-                    {error, domain_unknown};
-                {error, object_not_found} ->
-                    {error, domain_unknown};
-                {error, Error} ->
-                    {error, Error}
-            end;
+            nkdomain_obj:sync_op(Pid, {?MODULE, start, Opts});
         {error, Error} ->
             {error, Error}
     end.
@@ -177,9 +185,6 @@ element_action(Srv, Id, ElementId, Action, Value) ->
 
 -record(?MODULE, {
     state :: state(),
-    api_pids = [] :: [pid()],
-    %subs = #{},
-    %user_config = #{} :: map(),
     meta = #{} :: map()
 }).
 
@@ -243,14 +248,12 @@ object_start(#obj_session{obj=Obj}=Session) ->
 
 
 %% @private
-object_sync_op({?MODULE, start, DomainId, State, Pid}, _From, Session) ->
+object_sync_op({?MODULE, start, Opts}, _From, Session) ->
     #obj_session{obj_id=ObjId, srv_id=SrvId, data=Data} = Session,
-    #?MODULE{api_pids=Pids} = Data,
-    Data2 = Data#?MODULE{
-        state = State#{srv_id=>SrvId},
-        api_pids = [Pid|Pids]
-    },
+    Opts2 = maps:merge(#{language => <<"en">>}, Opts),
+    Data2 = Data#?MODULE{state = Opts2#{srv_id=>SrvId}},
     Session2 = Session#obj_session{data=Data2},
+    #{domain_id:=DomainId} = Opts2,
     case do_switch_domain(DomainId, Session2) of
         {ok, Reply, Session3} ->
             {reply, {ok, ObjId, Reply}, Session3};
@@ -333,13 +336,13 @@ do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
                         keys => #{}
                     },
                     case do_get_domain_reply(SrvId, State2) of
-                        {ok, Updates, State3} ->
+                        {ok, Updates, #{}=State3} ->
                             unsubscribe_domain(Session),
                             subscribe_domain(Path, Session),
                             Data3 = Data#?MODULE{state=State3},
                             Session3 = Session#obj_session{data=Data3},
                             {ok, #{elements=>lists:reverse(Updates)}, Session3};
-                        {error, Error, State3} ->
+                        {error, Error, #{}=State3} ->
                             Data3 = Data#?MODULE{state=State3},
                             Session3 = Session#obj_session{data=Data3},
                             {error, Error, Session3}

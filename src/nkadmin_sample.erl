@@ -26,7 +26,7 @@ session_create(UserId) ->
     cmd(<<"objects/admin.session/create">>, #{user_id=>UserId}).
 
 session_start() ->
-    cmd(<<"objects/admin.session/start">>, #{language=>en}).
+    cmd(<<"objects/admin.session/start">>, #{language=>en, url=>"/url"}).
 
 session_start(SessId) ->
     cmd(<<"objects/admin.session/start">>, #{id=>SessId}).

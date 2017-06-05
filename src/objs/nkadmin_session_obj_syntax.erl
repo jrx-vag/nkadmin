@@ -42,7 +42,8 @@ api(<<"create">>, Syntax) ->
     Syntax#{
         user_id => binary,
         domain_id => binary,
-        language => {atom, [en, es]},
+        language => binary,             %% <<"en">>, <<"es">>
+        url => binary,
         events => {list, binary}
     };
 
@@ -50,7 +51,8 @@ api(<<"start">>, Syntax) ->
     Syntax#{
         id => binary,
         domain_id => binary,
-        language => {atom, [en, es]},
+        language => binary,             %% <<"en">>, <<"es">>
+        url => binary,
         events => {list, binary}
     };
 

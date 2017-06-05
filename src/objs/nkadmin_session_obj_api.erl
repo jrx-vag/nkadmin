@@ -60,8 +60,7 @@ cmd(<<"create">>, #nkreq{data=Data, srv_id=SrvId}=Req, State) ->
         {ok, UserId} ->
             case nkadmin_session_obj:create(SrvId, UserId) of
                 {ok, #{obj_id:=ObjId}, _Pid} ->
-                    Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
-                    cmd(<<"start">>, Req#nkreq{data=Data#{id=>ObjId, language=>Language}}, State);
+                    cmd(<<"start">>, Req#nkreq{data=Data#{id=>ObjId}}, State);
                 {error, Error} ->
                     {error, Error, State}
             end;
@@ -69,11 +68,12 @@ cmd(<<"create">>, #nkreq{data=Data, srv_id=SrvId}=Req, State) ->
             Error
     end;
 
-cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}=Req, State) ->
+cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}, State) ->
     case nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, State) of
         {ok, DomainId} ->
-            Language = nklib_util:to_binary(maps:get(language, Data, <<"en">>)),
-            case nkadmin_session_obj:start(SrvId, Id, DomainId, UserId, Language, self()) of
+            Opts1 = maps:remove(id, Data),
+            Opts2 = Opts1#{domain_id=>DomainId, user_id=>UserId, caller_pid=>self()},
+            case nkadmin_session_obj:start(SrvId, Id, Opts2) of
                 {ok, ObjId, Reply} ->
                     State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),
                     Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
