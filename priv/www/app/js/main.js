@@ -15,6 +15,8 @@
         var currentPath = "/";
         var currentPathIds = "/";
         var currentURL = "/";
+        var currentHash = "#/";
+        var currentURLId = null;
         var currentDomainId = null;
         var currentBreadcrumbs = null;
         var currentDetailId = null;
@@ -76,7 +78,7 @@
 
             if (host === 'localhost' && port === '8001') {
                 // If it's a local test environment, use the default port instead
-                port = '9202';
+                port = '9301';
             }
 
             var href = window.location.href.split("/");
@@ -233,6 +235,14 @@
             })
 
             window.onpopstate = function(event) {
+                console.log("onpopstate -> ", window.location.hash);
+                // currentURL starts with "#" just like window.location.hash
+                if (currentHash !== window.location.hash) {
+                    // Send this new URL (hash) to the server
+                    console.log("Sending URL hash to the server: ", window.location.hash);
+                    sendURL();
+                }
+/*
                 console.log("onpopstate -> " + location.pathname);
                 if (event.state) {
                     console.log("Restore currentDomainId: ", event.state.currentDomainId,
@@ -250,6 +260,7 @@
                     currentDetailId = null;
                 }
                 unselectAll();
+*/
             };
 /*
                 // Old on popstate:
@@ -331,14 +342,16 @@
                     console.log("Found an admin.session", response);
                     return ncClient.sendMessageAsync("objects/admin.session/start", {
                         id: response.data.sessions[0].obj_id,
-                        language: "en"
+                        language: "en",
+                        url: window.location.hash
                     });
                 }).catch(function(response) {
                     if (response.data.code === "session_not_found") {
                         console.log("Error at find", response);
                         // Error at find
                         return ncClient.sendMessageAsync("objects/admin.session/create", {
-                            language: "en"
+                            language: "en",
+                            url: window.location.hash
                         });
                     } else {
                         // This error response will reach the next "catch"
@@ -687,7 +700,7 @@
             console.log("updateBreadcrumbs: ", path);
             if (path !== undefined) {
                 currentBreadcrumbs = path;
-                replaceState(window.location.pathname);
+//                replaceState(window.location.pathname);
                 newPath = createBreadcrumbs(path);
                 replaceComponent("toolbar-path", newPath);
                 console.log("Breadcrumbs updated!", newPath);
@@ -697,6 +710,7 @@
         function updateURL(elem) {
             console.log("updateURL: ", elem);
             if (elem !== undefined) {
+                currentURLId = elem.id;
                 setURL(elem.value.label);
             }
         }
@@ -1253,25 +1267,47 @@
             return { "path": currentPath, "pathIds": currentPathIds };
         }
 
+        function sendURL() {
+            var url = "/";
+            var hash = window.location.hash;
+            if (hash && hash.length > 0) {
+                url = hash.substring(1);
+            }
+            ncClient.sendMessageAsync("objects/admin.session/element_action", {
+                element_id: currentURLId,
+                action: "updated",
+                value: url
+            }).then(function(response) {
+                console.log("URL updated: ", response);
+                if (response.data && response.data.elements) {
+                    updateView(response.data.elements);
+                }
+            }).catch(function(response) {
+                console.log("Error at sendURL: ", response);
+                webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
+            });
+        }
+
         function setURL(newURL) {
-            // '/admin' + '/chattest', '/netcomp/v01/admin' + '/chattest', ...
             console.log("pathname: ", pathname, "newURL: ", newURL);
-            var newPath = (pathname !== '/')? pathname + newURL : newURL;
-            if (window.location.pathname !== newPath) {
-                console.log("Setting new URL: " + newPath);
+            var newHash = "#" + newURL;
+            if (window.location.hash !== newHash) {
+                console.log("Setting new URL: " + newURL);
                 // Creates a new state, in Firefox it asks if it should save the user/password
-                pushState(newPath);
+                //pushState(newPath);
+                currentURL = newURL;
+                currentHash = newHash;
+                window.location.hash = newURL;
                 // Replaces the state, this method doen't make Firefox to ask for user/password saving but there won't be back/forth navigation
                 //replaceState(newURL);
-                console.log("URL changed!");
+                console.log("URL changed!", window.location.hash);
             } else {
                 console.log("URL not changed (same URL)");
             }
-            currentURL = newURL;
         }
 
         function getURL() {
-            return { "url": currentURL, "urlIds": currentURLIds };
+            return { "url": currentURL };
         }
 
         function pushState(newURL) {
