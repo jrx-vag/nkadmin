@@ -26,10 +26,12 @@ session_create(UserId) ->
     cmd(<<"objects/admin.session/create">>, #{user_id=>UserId}).
 
 session_start() ->
-    cmd(<<"objects/admin.session/start">>, #{language=>en, url=>"/url"}).
+    {ok, #{<<"obj_id">>:=S}} = cmd(<<"objects/admin.session/start">>, #{language=>en, url=>"/url"}),
+    S.
 
 session_start(SessId) ->
-    cmd(<<"objects/admin.session/start">>, #{id=>SessId}).
+    {ok, #{<<"obj_id">>:=S}} = cmd(<<"objects/admin.session/start">>, #{id=>SessId}),
+    S.
 
 session_get() ->
     cmd(<<"objects/admin.session/get">>, #{}).
