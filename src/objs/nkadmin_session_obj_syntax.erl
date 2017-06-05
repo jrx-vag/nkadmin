@@ -72,7 +72,7 @@ api(<<"switch_domain">>, Syntax) ->
 api(<<"element_action">>, Syntax) ->
     Syntax#{
         id => binary,
-        action => {atom, [selected]},
+        action => {atom, [selected, updated]},
         element_id => binary,
         value => any,
         '__mandatory' => [element_id, action]

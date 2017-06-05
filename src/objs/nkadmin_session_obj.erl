@@ -141,10 +141,11 @@ find(Srv, User) ->
 start(Srv, Id, Opts) ->
     LoadOpts = case Opts of
         #{caller_pid:=CallerPid} ->
-            #{usage_link=>{CallerPid, ?MODULE}};
+            #{usage_link=>{CallerPid, {?MODULE, CallerPid}}};
         _ ->
             #{}
     end,
+    % If all callers go down, the session is unloaded
     case nkdomain_obj_lib:load(Srv, Id, LoadOpts) of
         #obj_id_ext{pid=Pid} ->
             nkdomain_obj:sync_op(Pid, {?MODULE, start, Opts});
