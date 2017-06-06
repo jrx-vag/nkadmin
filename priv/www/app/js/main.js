@@ -158,49 +158,201 @@
                 adminSessionId = data.obj_id;
                 console.log("adminSessionId: ", adminSessionId);
 
+                // Define a custom data filter
+                webix.ui.datafilter.extendedFilter = webix.extend({
+                    refresh:function(master, node, column){
+                        //event handlers
+                        node.onclick = function(e) {
+                            // Prevent the column from changing the order when clicking the filter
+                            e.stopPropagation();
+                        };
+                        node.onkeyup = function(){
+                            let input = this.children[0].children[0];
+                            if (input.prevValue !== input.value) {
+                                console.log('Filter ' + column.columnId + ' changed: ' + input.value);
+                                // This clears datatable before showing the results
+                                //master.clearAll();
+                                let newObj = {
+                                    //id: "message-2MGj5cA4hqD8xdFNhCGS2cjrTjH", // This id value is used to detect content change
+                                    id: "message-Sw0QWMpRzOKt3BE0c0AoZHe6ep3", // This id value is used to detect content change
+                                    path: "/conversations/channel1/messages/2MGj5cA",
+                                    conversation: "conversation-1oeOM3nHwthFVxWkFEExdioMZjF",
+                                    text: "Doce -> ¡La duodécima!",
+                                    hasFile: false,
+                                    createdBy: "user-U3qSXUo8MWC4e56H0ua7BQmNGYm",
+                                    createdTime: 1496733894433
+                                };
+                                if (column.columnId === 'path') {
+                                    newObj.path = input.value;
+                                } else if (column.columnId === 'conversation') {
+                                    newObj.conversation = input.value;
+                                } else if (column.columnId === 'text') {
+                                    newObj.text = input.value;
+                                } else if (column.columnId === 'hasFile') {
+                                    newObj.hasFile = input.value;
+                                } else if (column.columnId === 'createdBy') {
+                                    newObj.createdBy = input.value;
+                                } else if (column.columnId === 'createdTime') {
+                                    newObj.createdTime = input.value;
+                                }
+                                //master.markSorting(column.columnId, 'asc');
+                                //master.markSorting(column.columnId, 'desc');
+                                master.markSorting('path', 'desc');
+                                master.markSorting('conversation', 'desc');
+                                master.markSorting('text', 'desc');
+                                //master.add(newObj, 0);
+                                master.parse([newObj], "json");
+                                // master.
+                            };
+                            input.prevValue = input.value;
+                        }
+                    }
+                }, webix.ui.datafilter.textFilter);
+
                 // Define a proxy template for data collections updates
                 webix.proxy.wsProxy = {
                     $proxy: true,
                     load: function (view, callback, details) {
+//                        console.log("wsProxy: ", "view:", view, "callback:", callback, "details:", details);
                         // your loading pattern logic
                         //webix.ajax(this.source, callback, view);
                         let pager = view.getPager();
                         let start = 0;
-                        let end = 150;
+                        let end = 50;
                         if (details) {
                             start = details.start;
                             end = start + details.count;
                         }
-                        console.log('Load... start: ' + start + ', end: ' + end);
-                        if (!details) {
-/*
-                            let objects = createObjectsData(start, end).getAll;
-                            webix.ajax.$callback(view, callback, "", {
-                                total_count: 200, // used to get the total number of pages
-                                data: objects
-                            }, -1);
-*/
-                        } else {
-/*
-                            let objects = createObjectsData(start, end).getAll;
-                            webix.ajax.$callback(view, callback, "", {
-                                total_count: view.data.$max + 100,
-                                pos: start, // let us return only the requested data (starting a 'pos' index)
-                                count: details.count,
-                                data: objects
-                            }, -1);
-*/
+                        console.log('Load... start: ' + start + ', end: ' + end, 'Details: ', details);
+                        var query = {
+            				id: "/",
+            				filters: {
+            					type: "message"
+            				},
+//          				fields: [ "_all" ],
+            				from: start,
+            				size: end
+//            				simple_query: tag.query,
+//            				simple_query_opts: {
+//            					fields: [ "message.text" ]
+//            				},
+            			};
+                        if (details && details.sort && details.sort.id && details.sort.dir) {
+                            var id = "";
+                            switch(details.sort.id) {
+                                case "conversation":
+                                    id = "parent_id";
+                                    break;
+                                case "text":
+                                    id = "message.text.keyword";
+                                    break;
+                                case "hasFile":
+                                    id = "file_id";
+                                    break;
+                                case "createdBy":
+                                    id = "created_by";
+                                    break;
+                                case "createdTime":
+                                    id = "created_time";
+                                    break;
+                                default:
+                                    id = "path";
+                            }
+                            query.sort = [
+            					//"desc:created_time"
+                                details.sort.dir + ":" + id
+            				];
                         }
+                        if (details && details.filter) {
+                            var simple_query = "";
+                            var simple_query_opts = {
+                                fields: []
+                            };
+                            var fieldName;
+                            for (key in details.filter) {
+                                fieldName = "";
+                                switch(key) {
+                                case "conversation":
+                                    fieldName = "parent_id";
+                                    break;
+                                case "text":
+                                    fieldName = "message.text.keyword";
+                                    break;
+                                case "hasFile":
+                                    fieldName = "file_id";
+                                    break;
+                                case "createdBy":
+                                    fieldName = "created_by";
+                                    break;
+                                case "createdTime":
+                                    fieldName = "created_time";
+                                    break;
+                                default:
+                                    fieldName = "path";
+                                }
+                                if (details.filter.hasOwnProperty(key)) {
+                                    if (details.filter[key] !== "") {
+                                        simple_query = details.filter[key] + "*";
+                                    }
+                                    simple_query_opts.fields.push(fieldName);
+                                }
+                            }
+                            if (simple_query !== "") {
+                                query.simple_query = simple_query;
+                                query.simple_query_opts = simple_query_opts;
+                            }
+                        }
+                        console.log('Loading: ', query);
+                        ncClient.sendMessageAsync("objects/domain/find_all", query)
+                        .then(function(response) {
+            				if (response.result === "ok") {
+                                console.log(response);
+            					if (response.data.total === 0) {
+                                    console.log("Loaded!", "total_count", response.data.total, "data", objects, "requested", end-start, "got", response.data.data.length);
+            						webix.ajax.$callback(view, callback, "", {
+                                        total_count: 0, // used to get the total number of pages
+                                        pos: start,
+                                        data: []
+                                    }, -1);
+            					} else {
+                                    var objects = response.data.data;
+                                    var length = objects.length;
+            						for (var i=0; i<length; i++) {
+            							objects[i].id = objects[i].obj_id;
+                                        objects[i].conversation = objects[i].parent_id;
+                                        objects[i].text = objects[i].message.text;
+                                        objects[i].hasFile = objects[i].hasOwnProperty('file_id');
+                                        objects[i].createdBy = objects[i].created_by;
+                                        objects[i].createdTime = objects[i].created_time;
+            						}
+                                    console.log("Loaded!", "total_count", response.data.total, "data", objects, "requested", end-start, "got", response.data.data.length);
+            						webix.ajax.$callback(view, callback, "", {
+                                        total_count: response.data.total, // used to get the total number of pages
+                                        pos: start,
+                                        data: objects
+                                    }, -1);
+            					}
+            				}
+            			}).catch(function(response) {
+                            console.log("ERROR at load: ", response);
+                            //total.define("counter", 0);
+                            //total.refresh();
+                            webix.ajax.$callback(view, callback, "", {
+                                total_count: 0, // used to get the total number of pages
+                                pos: start,
+                                data: []
+                            }, -1);
+                        });
                     },
                     save: function (view, update, dp, callback) {
                         //your saving pattern for single records ... 
                         //webix.ajax().post(url, update, callback);
-                        alert('Default save');
+                        console.log('Default save', 'view', view, 'update', update, 'dp', dp, 'callback', callback);
                     },
                     result: function (state, view, dp, text, data, loader) {
                         //your logic of server-side response processing ... 
                         //dp.processResult(state, data, details);
-                        alert('Default result');
+                        console.log('Default result', 'state', state, 'view', view, 'dp', dp, 'text', text, 'data', data, 'loader', loader);
                     }
                     //other custom properties and methods
                     //prop1:value1,
@@ -552,7 +704,7 @@
                 for (var i = 0; i < length; i++) {
                     groups.push(createTreeGroup(items[i]));
                     treeIds.push(items[i].id);
-                }                
+                }
             }
 
             // Create sidebar using the data read
@@ -1279,6 +1431,8 @@
                 value: url
             }).then(function(response) {
                 console.log("URL updated: ", response);
+                currentURL = url;
+                currentHash = hash;
                 if (response.data && response.data.elements) {
                     updateView(response.data.elements);
                 }
