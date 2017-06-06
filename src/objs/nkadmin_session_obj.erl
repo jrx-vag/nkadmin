@@ -182,6 +182,7 @@ element_action(Srv, Id, ElementId, Action, Value) ->
 
 -record(?MODULE, {
     session :: session(),
+    api_pid :: pid(),
     meta = #{} :: map()
 }).
 
@@ -247,18 +248,24 @@ object_start(#?NKOBJ{obj=Obj}=State) ->
 %% @private
 object_sync_op({?MODULE, start, Opts}, _From, State) ->
     #{api_server_pid:=ApiPid} = Opts,
-    State2 = nkdomain_obj_util:link_server_api(?MODULE, ApiPid, State),
-    #?NKOBJ{obj_id=ObjId, srv_id=SrvId, data=Data} = State,
-    Opts2 = maps:merge(#{language => <<"en">>}, Opts),
-    Data2 = Data#?MODULE{session = Opts2#{srv_id=>SrvId}},
-    State3 = State2#?NKOBJ{data=Data2},
-    #{domain_id:=DomainId} = Opts2,
-    case do_switch_domain(DomainId, State3) of
-        {ok, Reply, State4} ->
-            {reply, {ok, ObjId, Reply}, State4};
-        {error, Error, State4} ->
-            nkdomain_obj:unload(self(), internal_error),
-            {reply, {error, Error}, State4}
+    #?NKOBJ{data=#?MODULE{api_pid=OldPid}} = State,
+    case OldPid /= undefined andalso ApiPid /= OldPid of
+        true ->
+            {reply, {error, session_already_present}, State};
+        false ->
+            State2 = nkdomain_obj_util:link_server_api(?MODULE, ApiPid, State),
+            #?NKOBJ{obj_id=ObjId, srv_id=SrvId, data=Data} = State,
+            Opts2 = maps:merge(#{language => <<"en">>}, Opts),
+            Data2 = Data#?MODULE{session = Opts2#{srv_id=>SrvId}},
+            State3 = State2#?NKOBJ{data=Data2},
+            #{domain_id:=DomainId} = Opts2,
+            case do_switch_domain(DomainId, State3) of
+                {ok, Reply, State4} ->
+                    {reply, {ok, ObjId, Reply}, State4};
+                {error, Error, State4} ->
+                    nkdomain_obj:unload(self(), internal_error),
+                    {reply, {error, Error}, State4}
+            end
     end;
 
 object_sync_op({?MODULE, switch_domain, DomainId}, _From, State) ->
