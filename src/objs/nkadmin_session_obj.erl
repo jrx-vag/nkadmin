@@ -239,21 +239,21 @@ object_send_event(Event, Session) ->
 %% @private
 %% We initialize soon in case of early terminate
 object_init(Session) ->
-    {ok, Session#obj_session{data=#?MODULE{}}}.
+    {ok, Session#?NKOBJ{data=#?MODULE{}}}.
 
 
 %% @private When the object is loaded, we make our cache
-object_start(#obj_session{obj=Obj}=Session) ->
+object_start(#?NKOBJ{obj=Obj}=Session) ->
     #{?DOMAIN_ADMIN_SESSION := _UserData} = Obj,
     {ok, Session}.
 
 
 %% @private
 object_sync_op({?MODULE, start, Opts}, _From, Session) ->
-    #obj_session{obj_id=ObjId, srv_id=SrvId, data=Data} = Session,
+    #?NKOBJ{obj_id=ObjId, srv_id=SrvId, data=Data} = Session,
     Opts2 = maps:merge(#{language => <<"en">>}, Opts),
     Data2 = Data#?MODULE{state = Opts2#{srv_id=>SrvId}},
-    Session2 = Session#obj_session{data=Data2},
+    Session2 = Session#?NKOBJ{data=Data2},
     #{domain_id:=DomainId} = Opts2,
     case do_switch_domain(DomainId, Session2) of
         {ok, Reply, Session3} ->
@@ -303,6 +303,8 @@ object_handle_info(_Info, _Session) ->
 
 
 
+
+
 %% ===================================================================
 %% Internal
 %% ===================================================================
@@ -318,7 +320,7 @@ sync_op(Srv, Id, Op) ->
 
 
 %% @private
-do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+do_switch_domain(DomainId, #?NKOBJ{srv_id=SrvId, data=Data}=Session) ->
     case nkdomain_obj_lib:load(SrvId, DomainId, #{}) of
         #obj_id_ext{obj_id=DomainObjId, path=Path, type= ?DOMAIN_DOMAIN} ->
             case nkdomain_domain_obj:find_all_types(SrvId, DomainId, #{}) of
@@ -341,11 +343,11 @@ do_switch_domain(DomainId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
                             unsubscribe_domain(Session),
                             subscribe_domain(Path, Session),
                             Data3 = Data#?MODULE{state=State3},
-                            Session3 = Session#obj_session{data=Data3},
+                            Session3 = Session#?NKOBJ{data=Data3},
                             {ok, #{elements=>lists:reverse(Updates)}, Session3};
                         {error, Error, #{}=State3} ->
                             Data3 = Data#?MODULE{state=State3},
-                            Session3 = Session#obj_session{data=Data3},
+                            Session3 = Session#?NKOBJ{data=Data3},
                             {error, Error, Session3}
                     end;
                 {error, Error} ->
@@ -403,11 +405,11 @@ do_get_domain_detail(SrvId, Updates, State) ->
 
 
 %% @private
-do_event(Event, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+do_event(Event, #?NKOBJ{srv_id=SrvId, data=Data}=Session) ->
     #?MODULE{state=State1} = Data,
     {ok, UpdList, State2} = SrvId:admin_event(Event, [], State1),
     Data2 = Data#?MODULE{state=State2},
-    Session2 = Session#obj_session{data=Data2},
+    Session2 = Session#?NKOBJ{data=Data2},
     case UpdList of
         [] ->
             Session2;
@@ -423,11 +425,11 @@ send_event(Event, Session) ->
 
 %% @private
 do_element_action(ElementId, Action, Value, Session) ->
-    #obj_session{srv_id=SrvId, data=#?MODULE{state=State}=Data} = Session,
+    #?NKOBJ{srv_id=SrvId, data=#?MODULE{state=State}=Data} = Session,
     case SrvId:admin_element_action(ElementId, Action, Value, [], State) of
         {ok, UpdList, State2} ->
             Data2 = Data#?MODULE{state=State2},
-            Session2 = Session#obj_session{data=Data2},
+            Session2 = Session#?NKOBJ{data=Data2},
             case UpdList of
                 [] ->
                     {ok, #{}, Session2};
@@ -436,13 +438,13 @@ do_element_action(ElementId, Action, Value, Session) ->
             end;
         {error, Error, State2} ->
             Data2 = Data#?MODULE{state=State2},
-            Session2 = Session#obj_session{data=Data2},
+            Session2 = Session#?NKOBJ{data=Data2},
             {reply, {error, Error}, Session2}
     end.
 
 
 %% @private
-subscribe_domain(Path, #obj_session{srv_id=SrvId}=Session) ->
+subscribe_domain(Path, #?NKOBJ{srv_id=SrvId}=Session) ->
     Reg = #{
         srv_id => SrvId,
         class => ?DOMAIN_EVENT_CLASS,
@@ -453,7 +455,7 @@ subscribe_domain(Path, #obj_session{srv_id=SrvId}=Session) ->
 
 
 %% @private
-unsubscribe_domain(#obj_session{srv_id=SrvId, data=#?MODULE{state=State}}) ->
+unsubscribe_domain(#?NKOBJ{srv_id=SrvId, data=#?MODULE{state=State}}) ->
     case State of
         #{domain_path:=DomainPath} ->
             Reg = #{
@@ -468,7 +470,7 @@ unsubscribe_domain(#obj_session{srv_id=SrvId, data=#?MODULE{state=State}}) ->
 
 
 %%%% @private
-%%subscribe(Type, ObjId, #obj_session{srv_id=SrvId, data=Data}=Session) ->
+%%subscribe(Type, ObjId, #?NKOBJ{srv_id=SrvId, data=Data}=Session) ->
 %%    Reg = #{
 %%        srv_id => SrvId,
 %%        class => ?DOMAIN_EVENT_CLASS,
@@ -479,18 +481,18 @@ unsubscribe_domain(#obj_session{srv_id=SrvId, data=#?MODULE{state=State}}) ->
 %%    #?MODULE{subs=Subs1} = Data,
 %%    Subs2 = Subs1#{ObjId => Reg},
 %%    Data2 = Data#?MODULE{subs=Subs2},
-%%    Session#obj_session{data=Data2}.
+%%    Session#?NKOBJ{data=Data2}.
 %%
 %%
 %%%% @private
-%%unsubscribe(ObjId, #obj_session{data=Data}=Session) ->
+%%unsubscribe(ObjId, #?NKOBJ{data=Data}=Session) ->
 %%    #?MODULE{subs=Subs1} = Data,
 %%    case maps:find(ObjId, Subs1) of
 %%        {ok, Reg} ->
 %%            nkevent:unreg(Reg),
 %%            Subs2 = maps:remove(ObjId, Subs1),
 %%            Data2 = Data#?MODULE{subs=Subs2},
-%%            Session#obj_session{data=Data2};
+%%            Session#?NKOBJ{data=Data2};
 %%        error ->
 %%        Session
 %%    end.
