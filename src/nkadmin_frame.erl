@@ -32,56 +32,56 @@
 %% ===================================================================
 
 %% @doc
-get_frame(State) ->
-    case frame_domain(State) of
-        {ok, Items1, State2} ->
-            case frame_user(State2) of
-                {ok, Items2, State3} ->
+get_frame(Session) ->
+    case frame_domain(Session) of
+        {ok, Items1, Session2} ->
+            case frame_user(Session2) of
+                {ok, Items2, Session3} ->
                     Value = #{
                         class => frame,
                         value => #{items => Items1 ++ Items2}
                     },
-                    {ok, Value, State3};
+                    {ok, Value, Session3};
                 {error, Error} ->
                     {error, Error}
             end;
         {error, Error} ->
-            {error, Error, State}
+            {error, Error, Session}
     end.
 
 
 %% @doc
-event(#nkevent{type = <<"updated">>, obj_id=ObjId}, Updates, State) ->
-    case State of
+event(#nkevent{type = <<"updated">>, obj_id=ObjId}, Updates, Session) ->
+    case Session of
         #{domain_id:=ObjId} ->
-            {ok, Items, State2} = frame_domain(State),
-            {ok, Items++Updates, State2};
+            {ok, Items, Session2} = frame_domain(Session),
+            {ok, Items++Updates, Session2};
         #{user_id:=ObjId} ->
-            {ok, Items, State2} = frame_user(State),
-            {ok, Items++Updates, State2};
+            {ok, Items, Session2} = frame_user(Session),
+            {ok, Items++Updates, Session2};
         _ ->
-            {ok, Updates, State}
+            {ok, Updates, Session}
     end;
 
-event(#nkevent{type = <<"deleted">>, obj_id=ObjId}, Updates, State) ->
-    case State of
+event(#nkevent{type = <<"deleted">>, obj_id=ObjId}, Updates, Session) ->
+    case Session of
         #{domain_id:=ObjId} ->
             nkdomain_obj:unload(self(), domain_deleted),
-            {ok, Updates, State};
+            {ok, Updates, Session};
         #{user_id:=ObjId} ->
             nkdomain_obj:unload(self(), user_deleted),
-            {ok, Updates, State};
+            {ok, Updates, Session};
         _ ->
-            {ok, Updates, State}
+            {ok, Updates, Session}
     end;
 
-event(_Event, Updates, State) ->
-    {ok, Updates, State}.
+event(_Event, Updates, Session) ->
+    {ok, Updates, Session}.
 
 
 %% @doc
-element_action(_ElementId, _Id, _Value, Updates, State) ->
-    {ok, Updates, State}.
+element_action(_ElementId, _Id, _Value, Updates, Session) ->
+    {ok, Updates, Session}.
 
 
 %% ===================================================================
@@ -91,7 +91,7 @@ element_action(_ElementId, _Id, _Value, Updates, State) ->
 
 
 %% @private
-frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=State) ->
+frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
     case nkdomain:get_name(SrvId, DomainId) of
         {ok, #{name:=DomName, icon_id:=_DomIconId}} ->
             Items = [
@@ -106,15 +106,15 @@ frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=State) ->
                     value => #{icon => <<>>}
                 }
             ],
-            State2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, State),
-            {ok, Items, State2};
+            Session2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, Session),
+            {ok, Items, Session2};
         {error, Error} ->
             {error, Error}
     end.
 
 
 %% @private
-frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
+frame_user(#{srv_id:=SrvId, user_id:=UserId}=Session) ->
     case nkdomain_user_obj:get_name(SrvId, UserId) of
         {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname}, icon_id:=UserIconId}} ->
             Items = [
@@ -134,17 +134,17 @@ frame_user(#{srv_id:=SrvId, user_id:=UserId}=State) ->
                     value => #{
                         icon => user,
                         items => [
-                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuEntry, #{icon=>gear}, State),
+                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuEntry, #{icon=>gear}, Session),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuEntry, #{icon=>comments}, State),
+                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuEntry, #{icon=>comments}, Session),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_item(logout, menuEntry, #{icon=>'sign-out'}, State)
+                            nkadmin_util:menu_item(logout, menuEntry, #{icon=>'sign-out'}, Session)
                         ]
                     }
                 }
             ],
-            State2 = nkadmin_util:add_object_tag(UserId, nkadmin_frame_user, State),
-            {ok, Items, State2};
+            Session2 = nkadmin_util:add_object_tag(UserId, nkadmin_frame_user, Session),
+            {ok, Items, Session2};
         {error, Error} ->
             {error, Error}
     end.

@@ -38,6 +38,6 @@
 %% ===================================================================
 
 %% @doc
-get_detail(State) ->
-    {ok, #{class=>detail, id=>detail}, State}.
+get_detail(Session) ->
+    {ok, #{class=>detail, id=>detail}, Session}.
 

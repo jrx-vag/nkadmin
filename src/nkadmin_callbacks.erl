@@ -62,7 +62,7 @@ plugin_listen(Config, #{id:=SrvId}) ->
 
 
 %%-type continue() :: continue | {continue, list()}.
--type state() :: nkadmin_session_obj:state().
+-type session() :: nkadmin_session_obj:session().
 
 
 %% ===================================================================
@@ -80,26 +80,26 @@ error(_)   		                 -> continue.
 %% ===================================================================
 
 %% @doc Must return the frame elements
--spec admin_get_frame(state()) ->
-    {ok, map(), state()} | {error, term(), state()}.
+-spec admin_get_frame(session()) ->
+    {ok, map(), session()} | {error, term(), session()}.
 
-admin_get_frame(State) ->
-    nkadmin_frame:get_frame(State).
+admin_get_frame(Session) ->
+    nkadmin_frame:get_frame(Session).
 
 
 %% @doc Must return the tree elements
--spec admin_get_tree(state()) ->
-    {ok, map(), state()} | {error, term(), state()}.
+-spec admin_get_tree(session()) ->
+    {ok, map(), session()} | {error, term(), session()}.
 
-admin_get_tree(State) ->
-    nkadmin_tree:get_tree(State).
+admin_get_tree(Session) ->
+    nkadmin_tree:get_tree(Session).
 
 
 %% @doc
--spec admin_get_url(state()) ->
-    {ok, binary(), list(), state()} | {error, term(), state()}.
+-spec admin_get_url(session()) ->
+    {ok, binary(), list(), session()} | {error, term(), session()}.
 
-admin_get_url(#{detail_path:=Path}=State) ->
+admin_get_url(#{detail_path:=Path}=Session) ->
     Url = #{
         class => url,
         id => url,
@@ -110,42 +110,42 @@ admin_get_url(#{detail_path:=Path}=State) ->
         id => breadcrumbs,
         value => #{items => nkadmin_util:get_parts(Path)}
     },
-    {ok, Url, BreadCrumbs, State}.
+    {ok, Url, BreadCrumbs, Session}.
 
 
 %% @doc Must return the detail elements
--spec admin_get_detail(state()) ->
-    {ok, map(), state()} | {error, term(), state()}.
+-spec admin_get_detail(session()) ->
+    {ok, map(), session()} | {error, term(), session()}.
 
-admin_get_detail(State) ->
-    nkadmin_detail:get_detail(State).
+admin_get_detail(Session) ->
+    nkadmin_detail:get_detail(Session).
 
 
 %% @doc Called when a registered event is received
 %% Must reply with updates for the client
 %% Domain and other will add reply before reaching here
--spec admin_event(#nkevent{}, list(), state()) ->
-    {ok, list(), state()} | {error, term(), state()}.
+-spec admin_event(#nkevent{}, list(), session()) ->
+    {ok, list(), session()} | {error, term(), session()}.
 
-admin_event(Event, Updates, State) ->
-    nkadmin_frame:event(Event, Updates, State).
+admin_event(Event, Updates, Session) ->
+    nkadmin_frame:event(Event, Updates, Session).
 
 
 %% @doc
-admin_element_action(ElementId, Action, Value, Updates, State) ->
-    nkadmin_frame:element_action(ElementId, Action, Value, Updates, State).
+admin_element_action(ElementId, Action, Value, Updates, Session) ->
+    nkadmin_frame:element_action(ElementId, Action, Value, Updates, Session).
 
 
 %% @doc Must add desired categories as a map with the position (lower first)
--spec admin_tree_categories(map(), state()) ->
-    {ok, map(), state()}.
+-spec admin_tree_categories(map(), session()) ->
+    {ok, map(), session()}.
 
-admin_tree_categories(Map, State) ->
-    {ok, Map, State}.
+admin_tree_categories(Map, Session) ->
+    {ok, Map, Session}.
 
 
 %% @doc
-admin_tree_get_category(_Category, State) ->
-    {ok, #{}, State}.
+admin_tree_get_category(_Category, Session) ->
+    {ok, #{}, Session}.
 
 

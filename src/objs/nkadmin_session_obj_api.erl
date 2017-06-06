@@ -72,7 +72,7 @@ cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}, Stat
     case nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, State) of
         {ok, DomainId} ->
             Opts1 = maps:remove(id, Data),
-            Opts2 = Opts1#{domain_id=>DomainId, user_id=>UserId, caller_pid=>self()},
+            Opts2 = Opts1#{domain_id=>DomainId, user_id=>UserId, api_server_pid=>self()},
             case nkadmin_session_obj:start(SrvId, Id, Opts2) of
                 {ok, ObjId, Reply} ->
                     State2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, State),

@@ -50,28 +50,28 @@ i18n(Key, Data) ->
 
 
 %% @doc
--spec menu_item(atom()|binary(), menu_type(), menu_value(), nkadmin_session_obj:state()) ->
+-spec menu_item(atom()|binary(), menu_type(), menu_value(), nkadmin_session_obj:session()) ->
     map().
 
-menu_item(Id, menuCategory, #{items:=_}=Value, State) ->
+menu_item(Id, menuCategory, #{items:=_}=Value, Session) ->
     #{
         id => Id,
         class => menuCategory,
-        value => add_label(Id, Value, State)
+        value => add_label(Id, Value, Session)
     };
 
-menu_item(Id, menuGroup, #{items:=_}=Value, State) ->
+menu_item(Id, menuGroup, #{items:=_}=Value, Session) ->
     #{
         id => Id,
         class => menuGroup,
-        value => add_label(Id, Value, State)
+        value => add_label(Id, Value, Session)
     };
 
-menu_item(Id, menuEntry, Value, State) ->
+menu_item(Id, menuEntry, Value, Session) ->
     #{
         id => Id,
         class => menuEntry,
-        value => add_label(Id, Value, State)
+        value => add_label(Id, Value, Session)
     }.
 
 
@@ -81,15 +81,15 @@ get_key(Key, #{keys:=Keys}) ->
 
 
 %% @doc
-add_key(Key, Value, #{keys:=Keys}=State) ->
+add_key(Key, Value, #{keys:=Keys}=Session) ->
     Keys2 = Keys#{to_bin(Key) => Value},
-    State#{keys:=Keys2}.
+    Session#{keys:=Keys2}.
 
 
 %% @doc
-remove_key(Key, #{keys:=Keys}=State) ->
+remove_key(Key, #{keys:=Keys}=Session) ->
     Keys2 = maps:remove(to_bin(Key), Keys),
-    State#{keys:=Keys2}.
+    Session#{keys:=Keys2}.
 
 
 
@@ -99,19 +99,19 @@ get_object_tags(ObjId, #{objects:=Objects}) ->
 
 
 %% @doc
-add_object_tag(ObjId, Tag, #{objects:=Objects}=State) ->
+add_object_tag(ObjId, Tag, #{objects:=Objects}=Session) ->
     Tags = maps:get(ObjId, Objects, []),
     case lists:member(Tag, Tags) of
         true ->
-            State;
+            Session;
         false ->
             Objects2 = Objects#{ObjId => [Tag|Tags]},
-            State#{objects:=Objects2}
+            Session#{objects:=Objects2}
     end.
 
 
 %% @doc
-remove_object_tag(ObjId, Tag, #{objects:=Objects}=State) ->
+remove_object_tag(ObjId, Tag, #{objects:=Objects}=Session) ->
     Tags = maps:get(ObjId, Objects, []),
     case lists:member(Tag, Tags) of
         true ->
@@ -121,9 +121,9 @@ remove_object_tag(ObjId, Tag, #{objects:=Objects}=State) ->
                 Tags2 ->
                     Objects#{ObjId => Tags2}
             end,
-            State#{objects:=Objects2};
+            Session#{objects:=Objects2};
         false ->
-            State
+            Session
     end.
 
 
@@ -176,10 +176,10 @@ update_path(Path, Updates) ->
 %% ===================================================================
 
 %% @private
-add_label(Id, Value, State) ->
+add_label(Id, Value, Session) ->
     case maps:is_key(label, Value) of
         true -> Value;
-        false -> Value#{label=>nkadmin_util:i18n(Id, State)}
+        false -> Value#{label=>nkadmin_util:i18n(Id, Session)}
     end.
 
 

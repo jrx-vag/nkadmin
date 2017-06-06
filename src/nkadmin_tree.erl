@@ -38,17 +38,17 @@
 %% ===================================================================
 
 %% @doc
-get_tree(State) ->
-    case get_categories(State) of
-        {ok, Categories, State2} ->
-            case load_categories(lists:reverse(Categories), [], State2) of
-                {ok, List, State3} ->
-                    {ok, #{class=>tree, value=>#{items=>List}}, State3};
-                {error, Error, State2} ->
-                    {error, Error, State2}
+get_tree(Session) ->
+    case get_categories(Session) of
+        {ok, Categories, Session2} ->
+            case load_categories(lists:reverse(Categories), [], Session2) of
+                {ok, List, Session3} ->
+                    {ok, #{class=>tree, value=>#{items=>List}}, Session3};
+                {error, Error, Session2} ->
+                    {error, Error, Session2}
             end;
-        {error, Error, State2} ->
-            {error, Error, State2}
+        {error, Error, Session2} ->
+            {error, Error, Session2}
     end.
 
 
@@ -57,28 +57,28 @@ get_tree(State) ->
 %% ===================================================================
 
 %% @private
-get_categories(#{srv_id:=SrvId}=State) ->
-    case SrvId:admin_tree_categories(#{}, State) of
-        {ok, Categories1, State2} ->
+get_categories(#{srv_id:=SrvId}=Session) ->
+    case SrvId:admin_tree_categories(#{}, Session) of
+        {ok, Categories1, Session2} ->
             Categories2 = [{Weight, Key} || {Key, Weight} <- maps:to_list(Categories1)],
-            {ok, [Key || {_Weight, Key} <- lists:sort(Categories2)], State2};
-        {error, Error, State2} ->
-            {error, Error, State2}
+            {ok, [Key || {_Weight, Key} <- lists:sort(Categories2)], Session2};
+        {error, Error, Session2} ->
+            {error, Error, Session2}
     end.
 
 
 %% @private
-load_categories([], Acc, State) ->
-    {ok, Acc, State};
+load_categories([], Acc, Session) ->
+    {ok, Acc, Session};
 
-load_categories([Category|Rest], Acc, #{srv_id:=SrvId}=State) ->
-    case SrvId:admin_tree_get_category(Category, State) of
-        {ok, Map, State2} when map_size(Map)==0 ->
-            load_categories(Rest, Acc, State2);
-        {ok, Map, State2} when is_map(Map) ->
-            load_categories(Rest, [Map|Acc], State2);
-        {error, Error, State2} ->
-            {error, Error, State2}
+load_categories([Category|Rest], Acc, #{srv_id:=SrvId}=Session) ->
+    case SrvId:admin_tree_get_category(Category, Session) of
+        {ok, Map, Session2} when map_size(Map)==0 ->
+            load_categories(Rest, Acc, Session2);
+        {ok, Map, Session2} when is_map(Map) ->
+            load_categories(Rest, [Map|Acc], Session2);
+        {error, Error, Session2} ->
+            {error, Error, Session2}
     end.
 
 
