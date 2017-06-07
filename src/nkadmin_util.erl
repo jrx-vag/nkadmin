@@ -46,7 +46,13 @@
 
 %% @private
 i18n(Key, Data) ->
-    nklib_i18n:get(Key, maps:get(language, Data, <<"en">>)).
+    case nklib_i18n:get(Key, maps:get(language, Data, <<"en">>)) of
+        <<>> ->
+            lager:warning("Missing i18n: ~s", [Key]),
+            <<>>;
+        Other ->
+            Other
+    end.
 
 
 %% @doc
