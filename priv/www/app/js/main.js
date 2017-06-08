@@ -245,6 +245,40 @@
                         }
 
                         console.log('Load... start: ' + start + ', end: ' + end, 'Details: ', details);
+
+                        var query = {
+            				//element_id: view.config.id,
+                            element_id: "domain_detail_chat_messages_table",
+                            start: start,
+                            end: end,
+            			};
+                        if (details) {
+                            if (details.filter) {
+                                query.filter = details.filter;
+                            }
+                            if (details.sort) {
+                                query.sort = details.sort;
+                            }
+                        }
+                        ncClient.sendMessageAsync("objects/admin.session/get_data", query)
+                        .then(function(response) {
+                            console.log("Loaded!", "total_count", response.data.total_count, "data", response.data.data, "requested", end-start, "got", response.data.data.length);
+            				webix.ajax.$callback(view, callback, "", {
+                                total_count: response.data.total_count, // used to get the total number of pages
+                                pos: response.data.pos,
+                                data: response.data.data
+                            }, -1);
+                        }).catch(function(response) {
+                            console.log("ERROR at load: ", response);
+                            //total.define("counter", 0);
+                            //total.refresh();
+                            webix.ajax.$callback(view, callback, "", {
+                                total_count: 0, // used to get the total number of pages
+                                pos: start,
+                                data: []
+                            }, -1);
+                        });
+/*
                         var query = {
             				id: "/",
             				filters: {
@@ -366,6 +400,7 @@
                                 data: []
                             }, -1);
                         });
+*/
                     },
                     save: function (view, update, dp, callback) {
                         //your saving pattern for single records ... 
@@ -892,10 +927,10 @@
 
         function updateDetail(elem) {
             console.log("updateDetail: ", elem);
-            if (elem && elem.value && elem.value.webix_ui) {
-                parseJSONFunctions(elem.value.webix_ui);
-                replaceBody(elem.value.webix_ui);
-                console.log("Detail updated!", elem.value.webix_ui);
+            if (elem && elem.value && elem.value.class === 'webix_ui' && elem.value.value) {
+                parseJSONFunctions(elem.value.value);
+                replaceBody(elem.value.value);
+                console.log("Detail updated!", elem.value.value);
             } else if (elem && elem.value) {
                 console.log("Error: unknown detail format");
             }
