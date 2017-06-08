@@ -23,7 +23,7 @@
 -export([plugin_deps/0, plugin_syntax/0, plugin_listen/2]).
 -export([error/1]).
 -export([admin_get_frame/1, admin_get_tree/1, admin_get_url/1, admin_get_detail/1]).
--export([admin_event/3, admin_element_action/5]).
+-export([admin_event/3, admin_element_action/5, admin_get_data/3]).
 -export([admin_tree_categories/2, admin_tree_get_category/2]).
 
 -include_lib("nkevent/include/nkevent.hrl").
@@ -134,6 +134,12 @@ admin_event(Event, Updates, Session) ->
 %% @doc
 admin_element_action(ElementId, Action, Value, Updates, Session) ->
     nkadmin_frame:element_action(ElementId, Action, Value, Updates, Session).
+
+
+%% @doc
+admin_get_data(_ElementId, _Spec, Session) ->
+    {error, unrecognized_element, Session}.
+
 
 
 %% @doc Must add desired categories as a map with the position (lower first)

@@ -51,6 +51,11 @@ session_switch_domain(Domain) ->
 session_action(ElementId) ->
     cmd(<<"objects/admin.session/element_action">>, #{element_id=>ElementId, action=>selected}).
 
+session_table_users() ->
+    cmd(<<"objects/admin.session/get_data">>, #{element_id=><<"domain_detail_user_table">>}).
+
+
+
 
 %% ===================================================================
 %% Client fun

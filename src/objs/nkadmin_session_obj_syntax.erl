@@ -78,5 +78,19 @@ api(<<"element_action">>, Syntax) ->
         '__mandatory' => [element_id, action]
     };
 
+api(<<"get_data">>, Syntax) ->
+    Syntax#{
+        id => binary,
+        element_id => binary,
+        start => {integer, 0, none},
+        'end' =>  {integer, 0, none},
+        filter => map,
+        sort => #{
+            id => binary,
+            dir => {atom, [asc, desc]}
+        },
+        '__mandatory' => [element_id]
+    };
+
 api(Cmd, Syntax) ->
     nkdomain_obj_syntax:syntax(Cmd, ?DOMAIN_ADMIN_SESSION, Syntax).
