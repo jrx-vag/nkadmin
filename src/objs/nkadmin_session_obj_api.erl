@@ -159,6 +159,20 @@ cmd(<<"element_action">>, #nkreq{data=Data, srv_id=SrvId}, State) ->
             Error
     end;
 
+cmd(<<"get_data">>, #nkreq{data=Data, srv_id=SrvId}, State) ->
+    #{element_id:=ElementId} = Data,
+    case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, State) of
+        {ok, Id} ->
+            case nkadmin_session_obj:get_data(SrvId, Id, ElementId, Data) of
+                {ok, Reply} ->
+                    {ok, Reply, State};
+                {error, Error} ->
+                    {error, Error, State}
+            end;
+        Error ->
+            Error
+    end;
+
 cmd(Cmd, Req, State) ->
     nkdomain_obj_api:api(Cmd, ?DOMAIN_ADMIN_SESSION, Req, State).
 

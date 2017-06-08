@@ -24,7 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([create/2, find/2, start/3, stop/2]).
--export([switch_domain/3, element_action/5]).
+-export([switch_domain/3, element_action/5, get_data/4]).
 -export([object_get_info/0, object_mapping/0, object_parse/3,
          object_api_syntax/2, object_api_allow/3, object_api_cmd/3]).
 -export([object_init/1, object_start/1, object_send_event/2,
@@ -174,6 +174,12 @@ element_action(Srv, Id, ElementId, Action, Value) ->
     sync_op(Srv, Id, {?MODULE, element_action, ElementId, Action, Value}).
 
 
+%% @doc
+get_data(Srv, Id, ElementId, Data) ->
+    sync_op(Srv, Id, {?MODULE, get_data, ElementId, Data}).
+
+
+
 
 %% ===================================================================
 %% nkdomain_obj behaviour
@@ -278,6 +284,14 @@ object_sync_op({?MODULE, switch_domain, DomainId}, _From, State) ->
 
 object_sync_op({?MODULE, element_action, ElementId, Action, Value}, _From, State) ->
     case do_element_action(ElementId, Action, Value, State) of
+        {ok, Reply, State2} ->
+            {reply, {ok, Reply}, State2};
+        {error, Error} ->
+            {reply, {error, Error}, State}
+    end;
+
+object_sync_op({?MODULE, get_data, ElementId, Data}, _From, State) ->
+    case do_get_data(ElementId, Data, State) of
         {ok, Reply, State2} ->
             {reply, {ok, Reply}, State2};
         {error, Error} ->
@@ -446,6 +460,22 @@ do_element_action(ElementId, Action, Value, State) ->
             State2 = State#?NKOBJ{data=Data2},
             {reply, {error, Error}, State2}
     end.
+
+
+%% @private
+do_get_data(ElementId, Spec, State) ->
+    #?NKOBJ{srv_id=SrvId, data=#?MODULE{session=Session}=Data} = State,
+    case SrvId:admin_get_data(ElementId, Spec, Session) of
+        {ok, Reply, Session2} ->
+            Data2 = Data#?MODULE{session=Session2},
+            State2 = State#?NKOBJ{data=Data2},
+            {ok, Reply, State2};
+        {error, Error, Session2} ->
+            Data2 = Data#?MODULE{session=Session2},
+            State2 = State#?NKOBJ{data=Data2},
+            {reply, {error, Error}, State2}
+    end.
+
 
 
 %% @private
