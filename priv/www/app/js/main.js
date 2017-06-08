@@ -223,6 +223,27 @@
                             start = details.start;
                             end = start + details.count;
                         }
+                        console.log('wsProxy Load: ', 'View', view, 'Datatable: ', view.config.id);
+                        if (details) {
+                            console.log('Details:', details, 'start', details.start, 'count', details.count, 'sort', details.sort, 'filter', details.filter);
+                        } else {
+                            console.log('No details available');
+                        }
+                        if (view.config.nkFilters) {
+                            var filter;
+                            for (f in view.config.nkFilters) {
+                                filter = view.config.nkFilters[f];
+                                if ($$(filter)) {
+                                    console.log('Extra filter found!: ', filter, 'value', $$(filter).getValue());
+                                    hey = $$(filter).getValue();
+                                } else {
+                                    console.log('Extra filter not found!');
+                                }
+                            }
+                        } else {
+                            console.log('No extra filters defined');
+                        }
+
                         console.log('Load... start: ' + start + ', end: ' + end, 'Details: ', details);
                         var query = {
             				id: "/",
@@ -318,12 +339,14 @@
                                     var objects = response.data.data;
                                     var length = objects.length;
             						for (var i=0; i<length; i++) {
+                                        objects[i].pos = start + i + 1;
             							objects[i].id = objects[i].obj_id;
                                         objects[i].conversation = objects[i].parent_id;
-                                        objects[i].text = objects[i].message.text;
-                                        objects[i].hasFile = objects[i].hasOwnProperty('file_id');
-                                        objects[i].createdBy = objects[i].created_by;
-                                        objects[i].createdTime = objects[i].created_time;
+                                        objects[i]["message.text"] = objects[i].message.text;
+                                        objects[i].has_file = objects[i].hasOwnProperty('file_id');
+                                        objects[i].created_by = objects[i].created_by;
+                                        objects[i].created_time = objects[i].created_time;
+                                        objects[i].enabled_icon = true;
             						}
                                     console.log("Loaded!", "total_count", response.data.total, "data", objects, "requested", end-start, "got", response.data.data.length);
             						webix.ajax.$callback(view, callback, "", {
@@ -1639,7 +1662,7 @@
                         value = json[property];
                         if (value && typeof value === "object") {
                             parseJSONFunctions(json[property]);
-                        } else if (value && typeof value === "string" && value.startsWith("function")) {
+                        } else if (value && typeof value === "string" && value.trim().startsWith("function")) {
                             console.log("Substituting property '" + property + "' with its evaluated javascript code: '" + value + "'");
                             json[property] = eval('(' + value + ')');
                         }
