@@ -54,6 +54,8 @@ session_action(ElementId) ->
 session_table_users() ->
     cmd(<<"objects/admin.session/get_data">>, #{element_id=><<"domain_detail_user_table">>}).
 
+session_table_messages() ->
+    cmd(<<"objects/admin.session/get_data">>, #{element_id=><<"domain_detail_chat_messages_table">>}).
 
 
 
