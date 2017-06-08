@@ -294,8 +294,8 @@ object_sync_op({?MODULE, get_data, ElementId, Data}, _From, State) ->
     case do_get_data(ElementId, Data, State) of
         {ok, Reply, State2} ->
             {reply, {ok, Reply}, State2};
-        {error, Error} ->
-            {reply, {error, Error}, State}
+        {error, Error, State2} ->
+            {reply, {error, Error}, State2}
     end;
 
 object_sync_op(_Op, _From, _State) ->
@@ -473,7 +473,7 @@ do_get_data(ElementId, Spec, State) ->
         {error, Error, Session2} ->
             Data2 = Data#?MODULE{session=Session2},
             State2 = State#?NKOBJ{data=Data2},
-            {reply, {error, Error}, State2}
+            {error, Error, State2}
     end.
 
 
