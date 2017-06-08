@@ -3,8 +3,8 @@
 	logic = (function(){
         var host = "ovh.jaraxa.com";
 	    var port = 443;
-        var pathname = '/admin';
-        var path = 'api/ws';
+        var pathname = '/_admin';
+        var path = '_api/ws';
         var useWss = true;
         var defaultDomain = "/";
 	    var lsNcLogin = "nc-admin-login";
@@ -71,9 +71,9 @@
                 pathname = pathname.substring(0, pathname.length-1);
             }
             // '/', '/netcomp/v01/', ...
-            var parentPath = window.location.pathname.split('admin')[0];
+            var parentPath = window.location.pathname.split('_admin')[0];
             // 'api/ws', 'netcomp/v01/api/ws', ...
-            path = pathname.substring(1,parentPath.length) + 'api/ws';
+            path = pathname.substring(1,parentPath.length) + '_api/ws';
             console.log('Connecting to: ', hostname, host, port, useWss, path, parentPath, pathname);
 
             if (host === 'localhost' && port === '8001') {
