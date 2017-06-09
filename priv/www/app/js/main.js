@@ -247,8 +247,8 @@
                         console.log('Load... start: ' + start + ', end: ' + end, 'Details: ', details);
 
                         var query = {
-            				//element_id: view.config.id,
-                            element_id: "domain_detail_chat_messages_table",
+            				element_id: view.config.id,
+                            //element_id: "domain_detail_chat_messages_table",
                             start: start,
                             end: end,
             			};

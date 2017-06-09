@@ -186,7 +186,7 @@ body_pager() ->
 
 body_data(Opts) ->
     #{
-        id => <<"objectsData">>,
+        id => <<"domain_detail_user_table">>,
         view => <<"datatable">>,
         select => true,
         dragColumn => true,
