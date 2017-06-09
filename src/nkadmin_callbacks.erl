@@ -22,7 +22,7 @@
 
 -export([plugin_deps/0, plugin_syntax/0, plugin_listen/2]).
 -export([error/1]).
--export([admin_get_frame/1, admin_get_tree/1, admin_get_url/1, admin_get_detail/1]).
+-export([admin_get_frame/1, admin_get_tree/1]).
 -export([admin_event/3, admin_element_action/5, admin_get_data/3]).
 -export([admin_tree_categories/2, admin_tree_get_category/2]).
 
@@ -95,21 +95,21 @@ admin_get_tree(Session) ->
     nkadmin_tree:get_tree(Session).
 
 
-%% @doc
--spec admin_get_url(session()) ->
-    {ok, binary(), list(), session()} | {error, term(), session()}.
-
-admin_get_url(#{detail_path:=Path}=Session) ->
-    {Updates2, Session2} = nkadmin_util:update_path_absolute(Path, [], Session),
-    {ok, Updates2, Session2}.
-
-
-%% @doc Must return the detail elements
--spec admin_get_detail(session()) ->
-    {ok, map(), session()} | {error, term(), session()}.
-
-admin_get_detail(Session) ->
-    nkadmin_detail:get_detail(Session).
+%%%% @doc
+%%-spec admin_get_url(session()) ->
+%%    {ok, binary(), list(), session()} | {error, term(), session()}.
+%%
+%%admin_get_url(#{detail_path:=Path}=Session) ->
+%%    {Updates2, Session2} = nkadmin_util:update_path_absolute(Path, [], Session),
+%%    {ok, Updates2, Session2}.
+%%
+%%
+%%%% @doc Must return the detail elements
+%%-spec admin_get_detail(session()) ->
+%%    {ok, map(), session()} | {error, term(), session()}.
+%%
+%%admin_get_detail(Session) ->
+%%    nkadmin_detail:get_detail(Session).
 
 
 %% @doc Called when a registered event is received
