@@ -20,6 +20,7 @@
         var currentDomainId = null;
         var currentBreadcrumbs = null;
         var currentDetailId = null;
+        var wsError = "";
         var loggedOut = false;
         var userId = null;
         var sessionId = null;
@@ -117,6 +118,9 @@
                 if (!loggedOut) {
                     $$("loginError").setHTML("Websocket connection lost!");
                     console.log("onWsClose: ", response);
+                } else if (wsError !== "") {
+                    $$("loginError").setHTML(wsError);
+                    wsError = "";
                 }
             });
 
@@ -144,9 +148,12 @@
                     localStorage.removeItem(lsNcLogin);
                     localStorage.removeItem(lsNcPwd);
                 }
-                $$("login-popup").show();
-                $$("userLogin").focus();
-                $$("loginError").setHTML(response.detail[0].data.error);
+                //$$("login-popup").show();
+                //$$("userLogin").focus();
+                wsError = response.detail[0].data.error;
+                // Closing the websocket on login error
+                loggedOut = true;
+                ncClient.close();
             });
 
             document.addEventListener("sessionStartedEvent", function(response) {
