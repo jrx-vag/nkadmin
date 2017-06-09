@@ -84,7 +84,7 @@ cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}=Req) 
                         obj_id => ObjId
                     },
                     ok = nkapi_server:subscribe(self(), Subs),
-                    UserMeta1 = nkdomain_api_util:add_user_meta(?DOMAIN_ADMIN_SESSION, ObjId, Req),
+                    UserMeta1 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, Req),
                     UserMeta2 = UserMeta1#{nkadmin_session_types=>Types},
                     {ok, Reply#{obj_id=>ObjId}, UserMeta2};
                 {error, Error} ->
