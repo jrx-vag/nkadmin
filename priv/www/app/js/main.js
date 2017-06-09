@@ -229,13 +229,19 @@
                         } else {
                             console.log('No details available');
                         }
+                        if (!details) {
+                            details = {};
+                        }
+                        if (!details.filter) {
+                            details.filter = {};
+                        }
                         if (view.config.nkFilters) {
                             var filter;
                             for (f in view.config.nkFilters) {
                                 filter = view.config.nkFilters[f];
                                 if ($$(filter)) {
                                     console.log('Extra filter found!: ', filter, 'value', $$(filter).getValue());
-                                    hey = $$(filter).getValue();
+                                    details.filter[filter] = $$(filter).getValue();
                                 } else {
                                     console.log('Extra filter not found!');
                                 }
@@ -260,9 +266,14 @@
                                 query.sort = details.sort;
                             }
                         }
+                        console.log('Load query:', query);
                         ncClient.sendMessageAsync("objects/admin.session/get_data", query)
                         .then(function(response) {
                             console.log("Loaded!", "total_count", response.data.total_count, "data", response.data.data, "requested", end-start, "got", response.data.data.length);
+                            var length = response.data.data.length;
+                            for (var i = 0; i < length; i++) {
+                                response.data.data[i].pos = response.data.pos+i+1;
+                            }
             				webix.ajax.$callback(view, callback, "", {
                                 total_count: response.data.total_count, // used to get the total number of pages
                                 pos: response.data.pos,

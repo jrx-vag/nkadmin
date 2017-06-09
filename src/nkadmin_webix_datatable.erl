@@ -153,7 +153,14 @@ toolbar_show_subdomains(Opts) ->
                 on => #{
                     onChange => <<"
                         function() {
-                            console.log('Checkbox value: ' + this.getValue());
+                            var grid = $$(\"domain_detail_user_table\");
+                            var pager = grid.getPager();
+                            var page = pager.config.page;
+                            var start = page * pager.config.size;
+                            console.log('grid', grid);
+                            //grid.loadNext(number count,number start,function callback,string url,boolean now);
+                            grid.clearAll();
+                            grid.loadNext(grid.config.datafetch, 0, null, grid.config.url, true);
                         }
                     ">>
                 }
