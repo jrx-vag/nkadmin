@@ -249,8 +249,9 @@ column(Id, date, Name, _Column, Opts) ->
         ">>
     };
 
-column(_Id, {icon, Icon}, _Name, _Column, _Opts) ->
+column(Id, {icon, Icon}, _Name, _Column, _Opts) ->
     #{
+        id => Id,
         header => <<"&nbsp;">>,
         width => 60,
         template => <<"
