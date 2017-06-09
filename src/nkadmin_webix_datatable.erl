@@ -191,13 +191,19 @@ body_pager() ->
     }.
 
 
-body_data(Opts) ->
+body_data(#{table_id:=TableId}=Opts) ->
     #{
-        id => <<"domain_detail_user_table">>,
+        id => TableId,
         view => <<"datatable">>,
+        css => <<"nk_datatable">>,
         select => true,
         dragColumn => true,
+        resizeColumn => true,
         editable => true,
+        editaction => <<"dblclick">>,
+        scrollX => true,
+        rightSplit => 2,
+        navigation => true,
         nkFilters => maps:get(filters, Opts, []),
         nkDomain => maps:get(domain_id, Opts),
         columns => make_columns(Opts),
@@ -229,18 +235,26 @@ make_columns([], _Opts, Acc) ->
 
 make_columns([#{id:=Id, type:=Type}=Column|Rest], Opts, Acc) ->
     Name = maps:get(name, Column, <<"&nbsp;">>),
-    Data = column(Id, Type, Name, Column, Opts),
-    make_columns(Rest, Opts, [Data|Acc]).
+    Data1 = column(Id, Type, Name, Column, Opts),
+    Data2 = column_opts(Data1, Column),
+    make_columns(Rest, Opts, [Data2|Acc]).
 
 
 
 %% @private
+column(Id, pos, _Name, _Column, _Opts) ->
+    #{
+        id => Id,
+        header => <<"#">>,
+        width => 50
+    };
+
 column(Id, text, Name, _Column, Opts) ->
     #{
         id => Id,
         header => [nkadmin_util:i18n(Name, Opts), #{ content => <<"serverFilter">> }],
         fillspace => <<"1">>,
-        sort => <<"server">>
+        minWidth => <<"100">>
     };
 
 column(Id, date, Name, _Column, Opts) ->
@@ -248,7 +262,7 @@ column(Id, date, Name, _Column, Opts) ->
         id => Id,
         header => [nkadmin_util:i18n(Name, Opts), #{ content => <<"serverFilter">> }],
         fillspace => <<"1">>,
-        sort => <<"server">>,
+        minWidth => <<"100">>,
         format => <<"
             function(value) {   // 'en-US', 'es-ES', etc.
                     return (new Date(value)).toLocaleString();
@@ -265,6 +279,26 @@ column(Id, {icon, Icon}, _Name, _Column, _Opts) ->
            <span style='cursor:pointer;' class='webix_icon #", ?BIN(Icon), "#'></span>
         ">>
     }.
+
+
+%% @private
+column_opts(Data, Column) ->
+    Data2 = case Column of
+        #{sort := true} ->
+            Data#{sort => <<"server">>};
+        _ ->
+            Data
+    end,
+    case Column of
+        #{editor := text} ->
+            Data2#{editor => <<"text">>};
+        _ ->
+            Data2
+    end.
+
+
+
+
 
 %% @private
 make_on_click(#{on_click:=OnClick}=Opts) ->
