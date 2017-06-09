@@ -26,7 +26,7 @@
 -export([create/2, find/2, start/3, stop/2]).
 -export([switch_domain/3, element_action/5, get_data/4]).
 -export([object_get_info/0, object_mapping/0, object_parse/3,
-         object_api_syntax/2, object_api_allow/3, object_api_cmd/3]).
+         object_api_syntax/2, object_api_allow/3, object_api_cmd/2]).
 -export([object_init/1, object_start/1, object_send_event/2,
          object_sync_op/3, object_async_op/2, object_handle_info/2]).
 -export([object_admin_info/0]).
@@ -229,9 +229,10 @@ object_api_syntax(Cmd, Syntax) ->
 object_api_allow(_Cmd, _Req, Session) ->
     {true, Session}.
 
+
 %% @private
-object_api_cmd(Cmd, Req, Session) ->
-    nkadmin_session_obj_api:cmd(Cmd, Req, Session).
+object_api_cmd(Cmd, Req) ->
+    nkadmin_session_obj_api:cmd(Cmd, Req).
 
 
 %% @private
