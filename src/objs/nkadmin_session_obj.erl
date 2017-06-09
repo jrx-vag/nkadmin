@@ -25,6 +25,7 @@
 
 -export([create/2, find/2, start/3, stop/2]).
 -export([switch_domain/3, element_action/5, get_data/4]).
+-export([find_all/0]).
 -export([object_get_info/0, object_mapping/0, object_parse/3,
          object_api_syntax/2, object_api_allow/3, object_api_cmd/2]).
 -export([object_init/1, object_start/1, object_send_event/2,
@@ -67,8 +68,10 @@
     resources => [nkdomain:type()],
     sessions => #{nkdomain:type() => integer()},
     detail => map(),
-    objects => #{ObjId::nkdomain:obj_id() => [Tag::term]},
-    keys => #{Key::binary() => term()}
+    object_tags => #{ObjId::nkdomain:obj_id() => [Tag::term]},
+    key_data => #{Key::binary() => term()},                         % Map client keys to data
+    url_key => #{Url::binary() => Key::binary()}
+    %% url??
 }.
 
 
@@ -137,16 +140,11 @@ find(Srv, User) ->
     {ok, nkdomain:obj_id(), Reply::map()} | {error, term()}.
 
 start(Srv, Id, Opts) ->
-    case nkdomain_obj_lib:find(Srv, Id) of
-        #obj_id_ext{pid=Pid} when is_pid(Pid) ->
-            {error, session_already_present};
-        _ ->
-            case nkdomain_obj_lib:load(Srv, Id, #{}) of
-                #obj_id_ext{pid=Pid} ->
-                    nkdomain_obj:sync_op(Pid, {?MODULE, start, Opts});
-                {error, Error} ->
-                    {error, Error}
-            end
+    case nkdomain_obj_lib:load(Srv, Id, #{}) of
+        #obj_id_ext{pid=Pid} ->
+            nkdomain_obj:sync_op(Pid, {?MODULE, start, Opts});
+        {error, Error} ->
+            {error, Error}
     end.
 
 
@@ -179,6 +177,11 @@ get_data(Srv, Id, ElementId, Data) ->
     sync_op(Srv, Id, {?MODULE, get_data, ElementId, Data}).
 
 
+%% @private
+find_all() ->
+    nkdomain_domain_obj:find_all(root, root, #{filters=>#{type=>?DOMAIN_ADMIN_SESSION}}).
+
+
 
 
 %% ===================================================================
@@ -206,7 +209,7 @@ object_admin_info() ->
     #{
         class => session,
         weight => 4000,
-        tree_id => <<"domain_tree_sessions_admin">>
+        tree_id => <<"domain_tree_sessions_admin.sessions">>
     }.
 
 
@@ -283,6 +286,22 @@ object_sync_op({?MODULE, switch_domain, DomainId}, _From, State) ->
             {reply, {error, Error}, State}
     end;
 
+object_sync_op({?MODULE, element_action, <<"url">>, updated, Url}, _From, State) ->
+    #?NKOBJ{data=#?MODULE{session=Session}} = State,
+    {ElementId, Action, Value} = case nkadmin_util:get_url_key(Url, Session) of
+        undefined ->
+            lager:error("NKLOG URL NOT FOUND ~p", [Url]),
+            {<<"url">>, updated, Url};
+        Key ->
+            {Key, selected, <<>>}
+    end,
+    case do_element_action(ElementId, Action, Value, State) of
+        {ok, Reply, State2} ->
+            {reply, {ok, Reply}, State2};
+        {error, Error} ->
+            {reply, {error, Error}, State}
+    end;
+
 object_sync_op({?MODULE, element_action, ElementId, Action, Value}, _From, State) ->
     case do_element_action(ElementId, Action, Value, State) of
         {ok, Reply, State2} ->
@@ -350,13 +369,14 @@ do_switch_domain(DomainId, #?NKOBJ{srv_id=SrvId, data=Data}=State) ->
                     Session2 = Session1#{
                         domain_id => DomainObjId,
                         domain_path => Path,
-                        detail_path => Path,
+                        detail_path => Path,        % We can update it later with url
                         types => Types,
                         resources => [],
                         sessions => #{},
                         detail => #{},
-                        objects => #{},
-                        keys => #{}
+                        object_tags => #{},
+                        key_data => #{},
+                        url_key => #{}
                     },
                     case do_get_domain_reply(SrvId, Session2) of
                         {ok, Updates, #{}=Session3} ->
@@ -364,6 +384,7 @@ do_switch_domain(DomainId, #?NKOBJ{srv_id=SrvId, data=Data}=State) ->
                             subscribe_domain(Path, State),
                             Data3 = Data#?MODULE{session=Session3},
                             State3 = State#?NKOBJ{data=Data3},
+                            io:format("UPDATES:\n\n~p\n", [Updates]),
                             {ok, #{elements=>lists:reverse(Updates)}, State3};
                         {error, Error, #{}=Session3} ->
                             Data3 = Data#?MODULE{session=Session3},
@@ -397,30 +418,61 @@ do_get_domain_frame(SrvId, Updates, Session) ->
 do_get_domain_tree(SrvId, Updates, Session) ->
     case SrvId:admin_get_tree(Session) of
         {ok, Tree, Session2} ->
-            do_get_domain_url(SrvId, [Tree|Updates], Session2);
+%%            do_get_domain_url(SrvId, [Tree|Updates], Session2);
+            do_get_domain_detail(SrvId, [Tree|Updates], Session2);
         {error, Error, Session2} ->
             {error, Error, Session2}
     end.
 
 
-%% @private
-do_get_domain_url(SrvId, Updates, Session) ->
-    case SrvId:admin_get_url(Session) of
-        {ok, Url, BreadCrumb, Session2} ->
-            do_get_domain_detail(SrvId, [Url, BreadCrumb|Updates], Session2);
-        {error, Error, Session2} ->
-            {error, Error, Session2}
-    end.
-
-
-%% @private
 do_get_domain_detail(SrvId, Updates, Session) ->
-    case SrvId:admin_get_detail(Session) of
-        {ok, Detail, Session2} ->
-            {ok, [Detail|Updates], Session2};
-        {error, Error, Session2} ->
-            {error, Error, Session2}
+    Url = case Session of
+        #{url:=<<"#", Rest/binary>>} -> Rest;
+        #{url:=Rest} -> Rest;
+        _ -> maps:get(domain_path, Session)
+    end,
+    case nkadmin_util:get_url_key(Url, maps:remove(url, Session)) of
+        undefined ->
+            lager:error("NKLOG URL NOT FOUND ~p", [Url]),
+            {Updates2, Session2} = nkadmin_util:update_detail(<<>>, #{}, Updates, Session),
+            {ok, Updates2, Session2};
+        Key ->
+            case SrvId:admin_element_action(Key, selected, <<>>, Updates, Session) of
+                {ok, Updates2, Session2} ->
+                    {ok, Updates2, Session2};
+                {error, Error, Session2} ->
+                    lager:error("NKLOG ERROR IN URL ~p", [Error]),
+                    {ok, Updates, Session2}
+            end
     end.
+
+
+
+
+%%%% @private
+%%do_get_domain_url(SrvId, Updates, Session) ->
+%%    Path = case Session of
+%%        #{url:=<<"#", Rest/binary>>} -> Rest;
+%%        #{url:=Rest} -> Rest;
+%%        _ -> maps:get(domain_path, Session)
+%%    end,
+%%
+%%    case SrvId:admin_get_url(Session#{detail_path=>Path}) of
+%%        {ok, Updates2, Session2} ->
+%%            do_get_domain_detail(SrvId, Updates++Updates2, Session2);
+%%        {error, Error, Session2} ->
+%%            {error, Error, Session2}
+%%    end.
+%%
+%%
+%%%% @private
+%%do_get_domain_detail(SrvId, Updates, Session) ->
+%%    case SrvId:admin_get_detail(Session) of
+%%        {ok, Detail, Session2} ->
+%%            {ok, [Detail|Updates], Session2};
+%%        {error, Error, Session2} ->
+%%            {error, Error, Session2}
+%%    end.
 
 
 

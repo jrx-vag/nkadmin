@@ -19,11 +19,13 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_util).
--export([i18n/2, menu_item/4, get_parts/1, append_type/2]).
--export([get_key/2, add_key/3, remove_key/2]).
--export([append_path/3, update_path/2]).
+-export([i18n/2, menu_item/4]).
+-export([get_key_data/2, set_key_data/3, remove_key_data/2]).
+-export([update_path_absolute/3, update_detail/4]).
+-export([get_url_key/2, set_url_key/3, remove_url_key/2]).
 -export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
 
+-include("nkadmin.hrl").
 
 %% ===================================================================
 %% Types
@@ -40,19 +42,9 @@
 
 
 %% ===================================================================
-%% Public
+%% Updates management
 %% ===================================================================
 
-
-%% @private
-i18n(Key, Data) ->
-    case nklib_i18n:get(Key, maps:get(language, Data, <<"en">>)) of
-        <<>> ->
-            lager:warning("Missing i18n: ~s", [Key]),
-            <<>>;
-        Other ->
-            Other
-    end.
 
 
 %% @doc
@@ -82,42 +74,97 @@ menu_item(Id, menuEntry, Value, Session) ->
 
 
 %% @doc
-get_key(Key, #{keys:=Keys}) ->
+update_path_absolute(Path, Updates, Session) ->
+    Updates2 = [
+          #{
+              class => url,
+              id => url,
+              value => #{label => Path}
+          },
+          #{
+              class => breadcrumbs,
+              id => breadcrumbs,
+              value => #{items => get_parts(Path)}
+          }
+        | Updates
+    ],
+    Session2 = ?ADMIN_SESSION(detail_path, Path, Session),
+    {Updates2, Session2}.
+
+
+%% @doc
+update_detail(Path, Detail, Updates, #{domain_path:=Base}=Session) ->
+    {Updates2, Session2} = update_path_absolute(append_type(Base, Path), Updates, Session),
+    Item = #{
+        class => detail,
+        id => detail,
+        value => Detail
+    },
+    {[Item|Updates2], Session2}.
+
+
+
+%% ===================================================================
+%% Session management
+%% ===================================================================
+
+
+%% @doc Keys map client Ids to data
+get_key_data(Key, #{key_data:=Keys}) ->
     maps:get(to_bin(Key), Keys, undefined).
 
 
 %% @doc
-add_key(Key, Value, #{keys:=Keys}=Session) ->
+set_key_data(Key, Value, #{key_data:=Keys} = Session) ->
     Keys2 = Keys#{to_bin(Key) => Value},
-    Session#{keys:=Keys2}.
+    ?ADMIN_SESSION(key_data, Keys2, Session).
 
 
 %% @doc
-remove_key(Key, #{keys:=Keys}=Session) ->
+remove_key_data(Key, #{key_data:=Keys} = Session) ->
     Keys2 = maps:remove(to_bin(Key), Keys),
-    Session#{keys:=Keys2}.
+    ?ADMIN_SESSION(key_data, Keys2, Session).
 
+
+
+%% @doc Maps Urls to Keys
+get_url_key(Url, #{url_key:=Urls}) ->
+    maps:get(to_bin(Url), Urls, undefined).
 
 
 %% @doc
-get_object_tags(ObjId, #{objects:=Objects}) ->
+set_url_key(Url, Key, #{url_key:=Urls} = Session) ->
+    Urls2 = Urls#{to_bin(Url) => Key},
+    ?ADMIN_SESSION(url_key, Urls2, Session).
+
+
+%% @doc
+remove_url_key(Url, #{url_key:=Urls}=Session) ->
+    Urls2 = maps:remove(to_bin(Url), Urls),
+    ?ADMIN_SESSION(url_key, Urls2, Session).
+
+
+
+%% @doc Associate a tag with an object
+%% Not yet used, we will use it to subscribe to specific objects only
+get_object_tags(ObjId, #{object_tags:=Objects}) ->
     maps:get(ObjId, Objects, []).
 
 
 %% @doc
-add_object_tag(ObjId, Tag, #{objects:=Objects}=Session) ->
+add_object_tag(ObjId, Tag, #{object_tags:=Objects}=Session) ->
     Tags = maps:get(ObjId, Objects, []),
     case lists:member(Tag, Tags) of
         true ->
             Session;
         false ->
             Objects2 = Objects#{ObjId => [Tag|Tags]},
-            Session#{objects:=Objects2}
+            ?ADMIN_SESSION(object_tags, Objects2, Session)
     end.
 
 
 %% @doc
-remove_object_tag(ObjId, Tag, #{objects:=Objects}=Session) ->
+remove_object_tag(ObjId, Tag, #{object_tags:=Objects}=Session) ->
     Tags = maps:get(ObjId, Objects, []),
     case lists:member(Tag, Tags) of
         true ->
@@ -127,13 +174,27 @@ remove_object_tag(ObjId, Tag, #{objects:=Objects}=Session) ->
                 Tags2 ->
                     Objects#{ObjId => Tags2}
             end,
-            Session#{objects:=Objects2};
+            ?ADMIN_SESSION(object_tags, Objects2, Session);
         false ->
             Session
     end.
 
 
 
+%% ===================================================================
+%% Util
+%% ===================================================================
+
+
+%% @private
+i18n(Key, Data) ->
+    case nklib_i18n:get(Key, maps:get(language, Data, <<"en">>)) of
+        <<>> ->
+            lager:warning("Missing i18n: ~s", [Key]),
+            <<>>;
+        Other ->
+            Other
+    end.
 
 %% @doc
 get_parts(Path) ->
@@ -142,37 +203,6 @@ get_parts(Path) ->
         [<<>>|Rest] -> [<<"/">>|Rest]
     end.
 
-
-%% @doc
-append_type(<<"/">>, Type) -> <<$/, (to_bin(Type))/binary>>;
-append_type(Path, Type) -> <<(to_bin(Path))/binary, $/, (to_bin(Type))/binary>>.
-
-
-
-%% @private
-append_path(Path, Updates, #{domain_path:=Base}) ->
-    update_path(append_type(Base, Path), Updates).
-
-
-%% @private
-update_path(Path, Updates) ->
-    [
-        #{
-            class => url,
-            id => url,
-            value => #{label => Path}
-        },
-        #{
-            class => breadcrumbs,
-            id => breadcrumbs,
-            value => #{items => nkadmin_util:get_parts(Path)}
-        },
-        #{
-            class => detail,
-            value => #{}
-        }
-        | Updates
-    ].
 
 
 
@@ -187,6 +217,11 @@ add_label(Id, Value, Session) ->
         true -> Value;
         false -> Value#{label=>nkadmin_util:i18n(Id, Session)}
     end.
+
+
+%% @doc
+append_type(<<"/">>, Type) -> <<$/, (to_bin(Type))/binary>>;
+append_type(Path, Type) -> <<(to_bin(Path))/binary, $/, (to_bin(Type))/binary>>.
 
 
 %% @private

@@ -25,7 +25,11 @@
 %% Defines
 %% ===================================================================
 
+-define(ADMIN_SESSION(Key, Val, Session), Session#{Key => Val}).
+
+
 -define(DOMAIN_ADMIN_SESSION, <<"admin.session">>).
+
 
 
 %% ===================================================================

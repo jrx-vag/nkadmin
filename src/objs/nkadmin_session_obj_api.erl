@@ -68,11 +68,11 @@ cmd(<<"create">>, #nkreq{data=Data, srv_id=SrvId}=Req) ->
             {error, Error}
     end;
 
-cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}=Req) ->
+cmd(<<"start">>, #nkreq{conn_id=ConnPid, data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}=Req) ->
     case nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, Req) of
         {ok, DomainId} ->
             Opts1 = maps:remove(id, Data),
-            Opts2 = Opts1#{domain_id=>DomainId, user_id=>UserId, api_server_pid=>self()},
+            Opts2 = Opts1#{domain_id=>DomainId, user_id=>UserId, api_server_pid=>ConnPid},
             case nkadmin_session_obj:start(SrvId, Id, Opts2) of
                 {ok, ObjId, Reply} ->
                     Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
@@ -83,7 +83,7 @@ cmd(<<"start">>, #nkreq{data=#{id:=Id}=Data, user_id=UserId, srv_id=SrvId}=Req) 
                         type => Types,
                         obj_id => ObjId
                     },
-                    ok = nkapi_server:subscribe(self(), Subs),
+                    ok = nkapi_server:subscribe(ConnPid, Subs),
                     UserMeta1 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, ObjId, Req),
                     UserMeta2 = UserMeta1#{nkadmin_session_types=>Types},
                     {ok, Reply#{obj_id=>ObjId}, UserMeta2};
@@ -104,7 +104,7 @@ cmd(<<"start">>, #nkreq{data=Data}=Req) ->
             {error, Error}
     end;
 
-cmd(<<"stop">>, #nkreq{data=Data, srv_id=SrvId, user_meta=UserMeta}=Req) ->
+cmd(<<"stop">>, #nkreq{conn_id=ConnPid, data=Data, srv_id=SrvId, user_meta=UserMeta}=Req) ->
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, Req) of
         {ok, Id} ->
             UserMeta2 = case UserMeta of
@@ -116,7 +116,7 @@ cmd(<<"stop">>, #nkreq{data=Data, srv_id=SrvId, user_meta=UserMeta}=Req) ->
                         type => Types,
                         obj_id => Id
                     },
-                    nkapi_server:unsubscribe(self(), Subs),
+                    nkapi_server:unsubscribe(ConnPid, Subs),
                     maps:remove(nkadmin_session_types, UserMeta);
                 _ ->
                     UserMeta

@@ -100,17 +100,8 @@ admin_get_tree(Session) ->
     {ok, binary(), list(), session()} | {error, term(), session()}.
 
 admin_get_url(#{detail_path:=Path}=Session) ->
-    Url = #{
-        class => url,
-        id => url,
-        value => #{label => Path}
-    },
-    BreadCrumbs = #{
-        class => breadcrumbs,
-        id => breadcrumbs,
-        value => #{items => nkadmin_util:get_parts(Path)}
-    },
-    {ok, Url, BreadCrumbs, Session}.
+    {Updates2, Session2} = nkadmin_util:update_path_absolute(Path, [], Session),
+    {ok, Updates2, Session2}.
 
 
 %% @doc Must return the detail elements
