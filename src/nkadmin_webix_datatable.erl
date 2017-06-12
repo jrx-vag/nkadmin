@@ -195,9 +195,16 @@ body_data(Opts) ->
     #{
         id => <<"domain_detail_user_table">>,
         view => <<"datatable">>,
+        css => <<"nk_datatable">>,
         select => true,
         dragColumn => true,
+        resizeColumn => true,
         editable => true,
+        editaction => <<"dblclick">>,
+        scrollX => true,
+        navigation => true,
+        % Fix the last N columns to make them always visible -> for action buttons/icons
+        %rightSplit => 2, 
         nkFilters => maps:get(filters, Opts, []),
         nkDomain => maps:get(domain_id, Opts),
         columns => make_columns(Opts),
@@ -240,6 +247,8 @@ column(Id, text, Name, _Column, Opts) ->
         id => Id,
         header => [nkadmin_util:i18n(Name, Opts), #{ content => <<"serverFilter">> }],
         fillspace => <<"1">>,
+        % Enables a "text" editor for this column
+        editor => <<"text">>,
         sort => <<"server">>
     };
 
@@ -260,7 +269,7 @@ column(Id, {icon, Icon}, _Name, _Column, _Opts) ->
     #{
         id => Id,
         header => <<"&nbsp;">>,
-        width => 60,
+        width => 30,
         template => <<"
            <span style='cursor:pointer;' class='webix_icon #", ?BIN(Icon), "#'></span>
         ">>
@@ -291,7 +300,7 @@ on_click(Id, delete, _OnClick, _Opts, Acc) ->
                     \"cancel\": \"Cancel\",
                     \"callback\": function(res) {
                         if(res) {
-                            webix.$$(\"objectsData\").remove(id);
+                            webix.$$(\"domain_detail_user_table\").remove(id);
                         }
                     }
                 });
@@ -309,10 +318,10 @@ on_click(Id, disable, _OnClick, _Opts, Acc) ->
                     \"cancel\": \"Cancel\",
                     \"callback\": function(res) {
                         if (res) {
-                            var item = webix.$$(\"objectsData\").getItem(id);
+                            var item = webix.$$(\"domain_detail_user_table\").getItem(id);
                             item.enabled = false;
                             item.enabled_icon = \"fa-times\";
-                            webix.$$(\"objectsData\").refresh(id);
+                            webix.$$(\"domain_detail_user_table\").refresh(id);
                         }
                     }
                 });
@@ -330,10 +339,10 @@ on_click(Id, enable, _OnClick, _Opts, Acc) ->
                     cancel: \"Cancel\",
                     callback: function(res) {
                         if (res) {
-                            var item = webix.$$(\"objectsData\").getItem(id);
+                            var item = webix.$$(\"domain_detail_user_table\").getItem(id);
                             item.enabled = true;
                             item.enabled_icon = \"fa-check\";
-                            webix.$$(\"objectsData\").refresh(id);
+                            webix.$$(\"domain_detail_user_table\").refresh(id);
                         }
                     }
                 });
@@ -409,7 +418,7 @@ on_before_load(_Opts) ->
 fake_delay() ->
     <<"
         function() {
-            var grid = $$(\"objectsData\");
+            var grid = $$(\"domain_detail_user_table\");
             grid.showProgress();
             webix.delay(function() {
                 grid.hideProgress();
