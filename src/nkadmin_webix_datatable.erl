@@ -202,7 +202,8 @@ body_data(#{table_id:=TableId}=Opts) ->
         editable => true,
         editaction => <<"dblclick">>,
         scrollX => true,
-        rightSplit => 2,
+        leftSplit => maps:get(left_split, Opts, 0),
+        rightSplit => maps:get(right_split, Opts, 0),
         navigation => true,
         nkFilters => maps:get(filters, Opts, []),
         nkDomain => maps:get(domain_id, Opts),
@@ -253,11 +254,16 @@ column(Id, pos, _Name, _Column, _Opts) ->
 column(Id, text, Name, Column, Opts) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
+    FilterOptions = maps:get(options, Column, []),
+    case FilterOptions of
+        [] -> Filter = #{ content => <<"serverFilter">>, colspan => FilterColspan };
+        _ -> Filter = #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => FilterOptions }
+    end,
     #{
         id => Id,
         header => [
             #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
-            #{ content => <<"serverFilter">>, colspan => FilterColspan }
+            Filter
         ],
         fillspace => <<"1">>,
         minWidth => <<"100">>
