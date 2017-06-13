@@ -23,7 +23,7 @@
 -export([get_key_data/2, set_key_data/3, remove_key_data/2]).
 -export([update_path_absolute/3, update_detail/4]).
 -export([get_url_key/2, set_url_key/3, remove_url_key/2]).
--export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
+-export([get_object_tags/2, add_object_tag/3, remove_object_tag/3, add_to_session/3]).
 
 -include("nkadmin.hrl").
 
@@ -179,6 +179,10 @@ remove_object_tag(ObjId, Tag, #{object_tags:=Objects}=Session) ->
             Session
     end.
 
+
+%% @doc Updates a key in the session
+add_to_session(Key, Val, Session) ->
+    ?ADMIN_SESSION(Key, Val, Session).
 
 
 %% ===================================================================
