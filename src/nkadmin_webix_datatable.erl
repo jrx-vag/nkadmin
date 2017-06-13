@@ -250,18 +250,28 @@ column(Id, pos, _Name, _Column, _Opts) ->
         width => 50
     };
 
-column(Id, text, Name, _Column, Opts) ->
+column(Id, text, Name, Column, Opts) ->
+    HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
+    FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
     #{
         id => Id,
-        header => [nkadmin_util:i18n(Name, Opts), #{ content => <<"serverFilter">> }],
+        header => [
+            #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
+            #{ content => <<"serverFilter">>, colspan => FilterColspan }
+        ],
         fillspace => <<"1">>,
         minWidth => <<"100">>
     };
 
-column(Id, date, Name, _Column, Opts) ->
+column(Id, date, Name, Column, Opts) ->
+    HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
+    FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
     #{
         id => Id,
-        header => [nkadmin_util:i18n(Name, Opts), #{ content => <<"serverFilter">> }],
+        header => [
+            #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
+            #{ content => <<"serverFilter">>, colspan => FilterColspan }
+        ],
         fillspace => <<"1">>,
         minWidth => <<"100">>,
         format => <<"
