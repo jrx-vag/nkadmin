@@ -218,7 +218,8 @@ body_data(#{table_id:=TableId}=Opts) ->
             }
         ">>,
         on => #{
-            <<"onBeforeLoad">> => on_before_load(Opts)
+            <<"onBeforeLoad">> => on_before_load(Opts),
+            <<"data->onStoreUpdated">> => on_store_updated()
         }
     }.
 
@@ -438,6 +439,17 @@ on_before_load(_Opts) ->
         }
     ">>.
 
+%% @private
+on_store_updated() ->
+    <<"
+        function() {
+            this.data.each(function(obj, i) {
+                if (obj !== undefined) {
+                    obj.index = i+1;
+                }
+            })
+        }
+    ">>.
 
 %% @private
 fake_delay() ->
