@@ -28,8 +28,20 @@
 -type column() ::
     #{
         id => binary(),
-        type => text | date | {icon, binary()},
-        name => binary()
+        type => pos | text | date | {icon, binary()} | {fixed_icon, binary()},
+        name => binary(),
+        options => filter_options(),
+        header_colspan => integer(),
+        filter_colspan => integer(),
+        fillspace => integer(),
+        editor => text,
+        sort => boolean()
+    }.
+
+-type filter_options() ::
+    #{
+        id => binary(),
+        value => binary()
     }.
 
 -type on_click() ::
@@ -108,32 +120,32 @@ toolbar_refresh(Opts) ->
         icon => <<"refresh">>,
         autowidth => true,
         label => nkadmin_util:i18n(domain_refresh, Opts),
-        click => fake_delay()
+        click => fake_delay(Opts)
     }.
 
 
-toolbar_pause(_Opts) ->
+toolbar_pause(Opts) ->
     #{
         view => <<"button">>,
         type => <<"iconButton">>,
         icon => <<"pause">>,
         autowidth => true,
         label => <<"Pause">>,
-        click => fake_delay()
+        click => fake_delay(Opts)
     }.
 
-toolbar_new(_Opts) ->
+toolbar_new(Opts) ->
     #{
         view => <<"button">>,
         type => <<"iconButton">>,
         icon => <<"plus">>,
         autowidth => true,
         label => <<"New">>,
-        click => fake_delay()
+        click => fake_delay(Opts)
     }.
 
 
-toolbar_show_subdomains(Opts) ->
+toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=Opts) ->
     #{
         view => <<"layout">>,
         cols => [
@@ -145,7 +157,7 @@ toolbar_show_subdomains(Opts) ->
                 align => <<"right">>
             },
             #{
-                id => <<"objectsDataShowSubdomains">>,
+                id => <<SubdomainsId/binary>>,
                 view => <<"checkbox">>,
                 name => <<"show_subdomains_checkbox">>,
                 width => 20,
@@ -153,7 +165,7 @@ toolbar_show_subdomains(Opts) ->
                 on => #{
                     onChange => <<"
                         function() {
-                            var grid = $$(\"domain_detail_user_table\");
+                            var grid = $$(\"", TableId/binary, "\");
                             var pager = grid.getPager();
                             var page = pager.config.page;
                             var start = page * pager.config.size;
@@ -202,7 +214,8 @@ body_data(#{table_id:=TableId}=Opts) ->
         editable => true,
         editaction => <<"dblclick">>,
         scrollX => true,
-        rightSplit => 2,
+        leftSplit => maps:get(left_split, Opts, 0),
+        rightSplit => maps:get(right_split, Opts, 0),
         navigation => true,
         nkFilters => maps:get(filters, Opts, []),
         nkDomain => maps:get(domain_id, Opts),
@@ -243,36 +256,52 @@ make_columns([#{id:=Id, type:=Type}=Column|Rest], Opts, Acc) ->
 
 
 %% @private
-column(Id, pos, _Name, _Column, _Opts) ->
+column(Id, pos, _Name, Column, _Opts) ->
+    HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     #{
         id => Id,
-        header => <<"#">>,
+        header => #{ text => <<"#">>, colspan => HeaderColspan },
         width => 50
     };
 
 column(Id, text, Name, Column, Opts) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
+    FilterOptions = maps:get(options, Column, []),
+    Fillspace = maps:get(fillspace, Column, <<"1">>),
+    case FilterOptions of
+        [] -> Filter = #{ content => <<"serverFilter">>, colspan => FilterColspan };
+        _ -> Filter = #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => FilterOptions }
+    end,
     #{
         id => Id,
         header => [
             #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
-            #{ content => <<"serverFilter">>, colspan => FilterColspan }
+            Filter
         ],
-        fillspace => <<"1">>,
+        fillspace => Fillspace,
         minWidth => <<"100">>
     };
 
 column(Id, date, Name, Column, Opts) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
+    Fillspace = maps:get(fillspace, Column, <<"1">>),
+    CreateOptions = [
+        #{ id => <<"">>, value => <<"">> },
+        #{ id => <<"today">>, value => <<"Today">> },
+        #{ id => <<"yesterday">>, value => <<"Yesterday">> },
+        #{ id => <<"last_7">>, value => <<"Last 7 days">> },
+        #{ id => <<"last_30">>, value => <<"Last 30 days">> },
+        #{ id => <<"custom">>, value => <<"Custom">> }
+    ],
     #{
         id => Id,
         header => [
             #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
-            #{ content => <<"serverFilter">>, colspan => FilterColspan }
+            #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => CreateOptions }
         ],
-        fillspace => <<"1">>,
+        fillspace => Fillspace,
         minWidth => <<"100">>,
         format => <<"
             function(value) {   // 'en-US', 'es-ES', etc.
@@ -285,9 +314,19 @@ column(Id, {icon, Icon}, _Name, _Column, _Opts) ->
     #{
         id => Id,
         header => <<"&nbsp;">>,
-        width => 60,
+        width => 30,
         template => <<"
            <span style='cursor:pointer;' class='webix_icon #", ?BIN(Icon), "#'></span>
+        ">>
+    };
+
+column(Id, {fixed_icon, Icon}, _Name, _Column, _Opts) ->
+    #{
+        id => Id,
+        header => <<"&nbsp;">>,
+        width => 30,
+        template => <<"
+           <span style='cursor:pointer;' class='webix_icon ", ?BIN(Icon), "'></span>
         ">>
     }.
 
@@ -326,7 +365,7 @@ make_on_click([#{id:=Id, type:=Type}=OnClick|Rest], Opts, Acc) ->
 
 
 %% @private
-on_click(Id, delete, _OnClick, _Opts, Acc) ->
+on_click(Id, delete, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
@@ -336,7 +375,7 @@ on_click(Id, delete, _OnClick, _Opts, Acc) ->
                     \"cancel\": \"Cancel\",
                     \"callback\": function(res) {
                         if(res) {
-                            webix.$$(\"objectsData\").remove(id);
+                            webix.$$(\"", TableId/binary, "\").remove(id);
                         }
                     }
                 });
@@ -344,7 +383,7 @@ on_click(Id, delete, _OnClick, _Opts, Acc) ->
         ">>
     };
 
-on_click(Id, disable, _OnClick, _Opts, Acc) ->
+on_click(Id, disable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
@@ -354,10 +393,10 @@ on_click(Id, disable, _OnClick, _Opts, Acc) ->
                     \"cancel\": \"Cancel\",
                     \"callback\": function(res) {
                         if (res) {
-                            var item = webix.$$(\"objectsData\").getItem(id);
+                            var item = webix.$$(\"", TableId/binary, "\").getItem(id);
                             item.enabled = false;
                             item.enabled_icon = \"fa-times\";
-                            webix.$$(\"objectsData\").refresh(id);
+                            webix.$$(\"", TableId/binary, "\").refresh(id);
                         }
                     }
                 });
@@ -365,7 +404,7 @@ on_click(Id, disable, _OnClick, _Opts, Acc) ->
         ">>
     };
 
-on_click(Id, enable, _OnClick, _Opts, Acc) ->
+on_click(Id, enable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
@@ -375,10 +414,10 @@ on_click(Id, enable, _OnClick, _Opts, Acc) ->
                     cancel: \"Cancel\",
                     callback: function(res) {
                         if (res) {
-                            var item = webix.$$(\"objectsData\").getItem(id);
+                            var item = webix.$$(\"", TableId/binary, "\").getItem(id);
                             item.enabled = true;
                             item.enabled_icon = \"fa-check\";
-                            webix.$$(\"objectsData\").refresh(id);
+                            webix.$$(\"", TableId/binary, "\").refresh(id);
                         }
                     }
                 });
@@ -462,10 +501,10 @@ on_store_updated() ->
     ">>.
 
 %% @private
-fake_delay() ->
+fake_delay(#{table_id:=TableId}=_Opts) ->
     <<"
         function() {
-            var grid = $$(\"objectsData\");
+            var grid = $$(\"", TableId/binary, "\");
             grid.showProgress();
             webix.delay(function() {
                 grid.hideProgress();

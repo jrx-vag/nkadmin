@@ -242,6 +242,8 @@
                         if (!details.filter) {
                             details.filter = {};
                         }
+                        // The time-zone offset is the difference, in minutes, between UTC and local time
+                        details.filter.timezone_offset = new Date().getTimezoneOffset();
                         if (view.config.nkFilters) {
                             var filter;
                             for (f in view.config.nkFilters) {
