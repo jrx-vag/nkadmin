@@ -287,11 +287,19 @@ column(Id, date, Name, Column, Opts) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
     Fillspace = maps:get(fillspace, Column, <<"1">>),
+    CreateOptions = [
+        #{ id => <<"">>, value => <<"">> },
+        #{ id => <<"today">>, value => <<"Today">> },
+        #{ id => <<"yesterday">>, value => <<"Yesterday">> },
+        #{ id => <<"last_7">>, value => <<"Last 7 days">> },
+        #{ id => <<"last_30">>, value => <<"Last 30 days">> },
+        #{ id => <<"custom">>, value => <<"Custom">> }
+    ],
     #{
         id => Id,
         header => [
             #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
-            #{ content => <<"serverFilter">>, colspan => FilterColspan }
+            #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => CreateOptions }
         ],
         fillspace => Fillspace,
         minWidth => <<"100">>,

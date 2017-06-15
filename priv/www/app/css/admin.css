@@ -486,13 +486,16 @@ textarea.webix_invalid {
 	text-transform: none;
 }
 
+/*
 .webix_ss_header td {
 	border-right: 1px solid #edf2f1;
 }
-
+*/
 .webix_column > div,
 .webix_table_cell {
+/*
 	border-right: 1px solid #edf2f1;
+*/
 	border-bottom: 1px solid #edf2f1;
 	padding-left: 10px;
 }
