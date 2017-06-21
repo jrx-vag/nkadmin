@@ -27,7 +27,7 @@
 -export([switch_domain/3, element_action/5, get_data/4]).
 -export([find_all/0]).
 -export([object_info/0, object_parse/3,
-         object_api_syntax/2, object_api_allow/3, object_api_cmd/2]).
+         object_api_syntax/2, object_api_cmd/2]).
 -export([object_init/1, object_start/1, object_send_event/2,
          object_sync_op/3, object_async_op/2, object_handle_info/2]).
 -export([object_admin_info/0]).
@@ -229,11 +229,6 @@ object_api_syntax(Cmd, Syntax) ->
 
 
 %% @private
-object_api_allow(_Cmd, _Req, Session) ->
-    {true, Session}.
-
-
-%% @private
 object_api_cmd(Cmd, Req) ->
     nkadmin_session_obj_api:cmd(Cmd, Req).
 
@@ -264,7 +259,7 @@ object_sync_op({?MODULE, start, Opts}, _From, State) ->
             {reply, {error, session_already_present}, State};
         false ->
             State2 = nkdomain_obj_util:link_server_api(?MODULE, ApiPid, State),
-            #?STATE{obj_id=ObjId, srv_id=SrvId, data=Data} = State,
+            #?STATE{id=#obj_id_ext{obj_id=ObjId, srv_id=SrvId}, data=Data} = State,
             Opts2 = maps:merge(#{language => <<"en">>}, Opts),
             Data2 = Data#?MODULE{session = Opts2#{srv_id=>SrvId}},
             State3 = State2#?STATE{data=Data2},
