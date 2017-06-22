@@ -208,7 +208,8 @@ body_data(#{table_id:=TableId}=Opts) ->
         id => TableId,
         view => <<"datatable">>,
         css => <<"nk_datatable">>,
-        select => true,
+        select => <<"row">>,
+        multiselect => true,
         dragColumn => true,
         resizeColumn => true,
         editable => true,
@@ -387,16 +388,27 @@ on_click(Id, disable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
+                // id === { row: obj_id, column: column_id };
                 webix.confirm({
                     \"text\": \"This object will be disabled. <br/> Are you sure?\",
                     \"ok\": \"Yes\",
                     \"cancel\": \"Cancel\",
                     \"callback\": function(res) {
                         if (res) {
-                            var item = webix.$$(\"", TableId/binary, "\").getItem(id);
-                            item.enabled = false;
-                            item.enabled_icon = \"fa-times\";
-                            webix.$$(\"", TableId/binary, "\").refresh(id);
+                            var grid = webix.$$(\"", TableId/binary, "\");
+                            ncClient.sendMessageAsync(\"objects/admin.session/element_action\", {
+                                element_id: \"", TableId/binary, "\",
+                                action: \"disabled\",
+                                value: {
+                                    obj_id: id.row
+                                }
+                            });
+                            // Remove this lines (the state of the row will be changed by an event)
+                            if(grid) {
+                                grid.addRowCss(id, \"webix_cell_disabled\");
+                                grid.getItem(id).enabled_icon = \"fa-check\";
+                                grid.refresh(id);
+                            }
                         }
                     }
                 });
@@ -408,16 +420,27 @@ on_click(Id, enable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
+                // id === { row: obj_id, column: column_id };
                 webix.confirm({
                     text: \"This object will be enabled. <br/> Are you sure?\",
                     ok: \"Yes\",
                     cancel: \"Cancel\",
                     callback: function(res) {
                         if (res) {
-                            var item = webix.$$(\"", TableId/binary, "\").getItem(id);
-                            item.enabled = true;
-                            item.enabled_icon = \"fa-check\";
-                            webix.$$(\"", TableId/binary, "\").refresh(id);
+                            var grid = webix.$$(\"", TableId/binary, "\");
+                            ncClient.sendMessageAsync(\"objects/admin.session/element_action\", {
+                                element_id: \"", TableId/binary, "\",
+                                action: \"enabled\",
+                                value: {
+                                    obj_id: id.row
+                                }
+                            });
+                            // Remove this lines (the state of the row will be changed by an event)
+                            if(grid) {
+                                grid.removeRowCss(id, \"webix_cell_disabled\");
+                                grid.getItem(id).enabled_icon = \"fa-times\";
+                                grid.refresh(id);
+                            }
                         }
                     }
                 });
