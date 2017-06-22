@@ -349,7 +349,18 @@ textarea.webix_invalid {
     display: inline-block;
 }
 
+.webix_column > div.webix_cell_disabled {
+	color: #bbb;
+}
 
+/*
+.webix_column > div.webix_cell_select,
+.webix_column > div.webix_column_select,
+.webix_column > div.webix_row_select {
+  color: #545454;
+  background: #f2f2f2;
+}
+*/
 
 /**************************************/
 

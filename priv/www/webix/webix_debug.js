@@ -1,8 +1,9 @@
 /*
 @license
 webix UI v.4.3.0
-This software is allowed to use under GPL or you need to obtain Commercial License 
- to use it in non-GPL project. Please contact sales@webix.com for details
+This software is covered by Webix Trial License.
+Usage without proper license is prohibited.
+(c) XB Software Ltd.
 */
 if (!window.webix) 
 	webix={};
@@ -25024,6 +25025,52 @@ webix.attachEvent("onDataTable", function(table){
 
 
 
+webix.extend(webix.ui.datatable, {
+	topSplit_setter:function(value){
+		if (this.data)
+			this.data.$freeze = value;
+		return value;
+	},
+	freezeRow:function(id, mode){
+		var index,
+			freezeLine = this._settings.topSplit,
+			order = this.data.order,
+			filterOrder = this.data._filter_order;
+
+		function moveFrozenRow(index, id, mode, order, skipSplitChange){
+			var i;
+			if (mode && index >= freezeLine){
+				if(!skipSplitChange)
+					freezeLine++;
+				for (i=index; i >= freezeLine; i--){
+					order[i] = order[i-1];
+				}
+				order[freezeLine-1] = id;
+			}
+			if (!mode && index <freezeLine){
+				if(!skipSplitChange)
+					freezeLine--;
+				for (i=index; i<freezeLine; i++){
+					order[i] = order[i+1];
+				}
+				order[freezeLine] = id;
+			}
+		}
+
+		if(id){
+			index = this.getIndexById(id);
+			id = id.toString();
+			moveFrozenRow(index, id, mode, order);
+			if(filterOrder)
+				moveFrozenRow(filterOrder.find(id), id, mode, filterOrder, true);
+		}
+		else if(!mode)
+			freezeLine = 0; // unfreeze all rows
+
+		this.define("topSplit", freezeLine);
+		this.refresh();
+	}
+});
 
 
 
@@ -25105,6 +25152,737 @@ webix.protoUI({
 		return webix.ui.datatable.prototype._run_load_next.call(this, conf, direction);
 	},
 }, webix.TreeAPI, webix.TreeStateCheckbox, webix.TreeDataLoader, webix.ui.datatable);
+
+
+webix.extend(webix.ui.datatable, {
+	spans_setter:function(value){
+		if (value && !this._spans_pull)
+			this._init_spans_once();
+
+		return value;
+	},
+	_init_spans_once:function(){
+		this._spans_pull = {};
+		this._spans_areas = [];
+
+		this.data.attachEvent("onStoreLoad", webix.bind(function(driver, data){
+			if (data && data.spans)
+				this.addSpan(data.spans);
+		}, this));
+		this.data.attachEvent("onClearAll", webix.bind(function(){
+			this._spans_pull = {};
+		}, this));
+
+		this.attachEvent("onScrollY", this._adjust_spans_xy);
+		this.attachEvent("onScrollX", this._adjust_spans_xy);
+		this.data.attachEvent("onStoreUpdated", webix.bind(function(id, obj, mode){
+			if (mode != "paint" && this._columns.length)
+				this._paint_spans();
+		}, this));
+		this.attachEvent("onStructureLoad", this._paint_spans);
+		this.attachEvent("onStructureUpdate", this._paint_spans);
+
+		this.attachEvent("onColumnResize", 	this._paint_spans);
+		this.attachEvent("onRowResize", 	this._paint_spans);
+		this.attachEvent("onSelectChange", this._paint_spans_selection);
+	},
+	addSpan:function(id, index, width, height, value, css){
+		//accept an array of objects
+		if (typeof id == "object"){
+			for (var i = 0; i < id.length; i++)
+				this.addSpan.apply(this, id[i]);
+			return;
+		}
+
+		height = height || 1;
+		width  = width  || 1;
+
+		if (!this._spans_pull[id])
+			this._spans_pull[id] = {};
+
+		this._spans_pull[id][index] = [width, height, value, css];
+	},
+
+	removeSpan:function(id, index){
+		if(!arguments.length)
+			this._spans_pull = {};
+
+		var line = this._spans_pull[id];
+		if (line)
+			delete line[index];
+	},
+	getSpan: function(row, column){
+		if (!row) return this._spans_pull;
+
+		var i, iSpan, j, jSpan, span,
+			column, row,
+			spans = this._spans_pull;
+
+		i = this.getIndexById(row);
+		j = this.getColumnIndex(column);
+
+		for(row in spans){
+			for(column in spans[row]){
+				span = spans[row][column];
+				iSpan = this.getIndexById(row);
+				jSpan = this.getColumnIndex(column);
+				if( !(i > iSpan+span[1]-1 || i < iSpan || j > jSpan+span[0]-1|| j < jSpan)){
+					return [row,column].concat(span);
+				}
+			}
+		}
+
+		return null;
+	},
+	_paint_spans:function(){
+		webix.html.remove(this._spans_areas);
+		for (var i=0; i<3; i++){
+			var area = this._spans_areas[i] = webix.html.create("DIV",{ "class" : "webix_span_layer" });
+			this._body.childNodes[i].appendChild(area);
+		}
+
+		// touch scroll
+		this.attachEvent("onSyncScroll", function(x,y,t){
+			for (var i=0; i<3; i++)
+				webix.Touch._set_matrix(this._spans_areas[i], x, y, t);
+		});
+
+		this._adjust_spans_xy();
+		
+		if (this._settings.leftSplit)
+			this._paint_spans_area(this._spans_areas[0],0,this._settings.leftSplit);
+		if (this._settings.rightSplit)
+			this._paint_spans_area(this._spans_areas[2],this._rightSplit,this._columns.length);
+
+		this._paint_spans_area(this._spans_areas[1],this._settings.leftSplit,(this._rightSplit || this._columns.length));
+	},
+
+	_paint_spans_area:function(area, start, end){
+		var top = 0;
+		var count = this.data.order.length;
+		for (var i = 0; i < count; i++) {
+			var id = this.data.order[i];
+			var line = this._spans_pull[id];
+			if (line){
+				for (var j = start; j < end; j++){					
+					var cid = this._columns[j].id;
+					if (line[cid])
+						this._add_span_to_area(area, i, j, line, top, start, id, cid);
+				}
+			}
+			top += this._getRowHeight(this.getItem(id));
+		}
+	},
+
+	_paint_spans_selection:function(){
+		var config = this.config.select;
+		var cell = (config == "cell" || config == "column");
+
+		var selected = this.getSelectedId(true);
+		var newselected = [];
+		var last = this._last_selected || [];
+		var id = webix.uid()+"";
+		var repaint = false;
+		
+		for (var i = 0; i < selected.length; i++){
+			var line = this._spans_pull[selected[i]];
+			if (line && (!cell || line[selected[i].column])){
+				if (!line.$selected || line.$selected.id != selected[i].id)
+					repaint = true;
+				line.$selected = selected[i];
+				line.$time = id;
+				newselected.push(selected[i].id);
+			}
+		}
+
+
+		for (var i = 0; i < last.length; i++){
+			var line = this._spans_pull[last[i]];
+			if (line && line.$time !== id){
+				delete line.$selected;
+				repaint = true;
+			}
+		}
+
+		this._last_selected = [].concat(selected);
+		if (repaint)
+			this._paint_spans();
+	},
+
+	_span_sum_width:function(start, end){
+		var summ = 0;
+		for (var i = start; i < end; i++){
+			var next = this._columns[i];
+			summ += next?next.width:0;
+		}
+
+		return summ;
+	},
+
+	_span_sum_height:function(start, end){
+		var summ = 0;
+		for (var i = start; i < end; i++){
+			var next = this.getItem(this.data.order[i]);
+			summ += next?this._getRowHeight(next):this._settings.rowHeight;
+		}
+
+		return summ;
+	},
+
+	_add_span_to_area:function(area, ind, cind, config, top, start, id, cid){
+
+		var line = config[cid];
+		var value = line[2] || this.getText(id, cid);
+		var selected = "";
+		if (config.$selected && (this._settings.select === "row" || config.$selected.column === cid))
+			selected = "webix_selected ";
+
+		var attributes = {
+			"column": cind,
+			"row" : ind,
+			"class" : selected+"webix_cell webix_table_cell webix_dtable_span "+(line[3]||""),
+			"aria-colindex":cind+1,
+			"aria-rowindex":ind+1
+		};
+
+		if(line[0]>1) attributes["aria-colspan"] = line[0];
+		if(line[1]>1) attributes["aria-rowspan"] = line[1];
+
+		var span = webix.html.create("DIV", attributes, ""+value);
+
+		span.style.top    = top+"px";
+		span.style.left   = this._span_sum_width(start, cind)+"px";
+		span.style.width  = this._span_sum_width(cind, cind+line[0])+"px";
+		span.style.height = this._span_sum_height(ind, ind+line[1])+"px";
+
+		area.appendChild(span);
+	},
+
+	_adjust_spans_xy:function(){
+		if(!this._settings.prerender){
+			var state = this.getScrollState();
+			for (var i=0; i<3; i++)
+				this._spans_areas[i].style.top = "-"+(state.y||0) +"px";
+		}
+	},
+	_checkCellMerge:function(id0,id1){
+		var span0, span1,
+			result = false;
+
+		if(this._spans_pull){
+			span0 = this.getSpan(id0.row,id0.column);
+			span1 = this.getSpan(id1.row,id1.column);
+			if(span0 && span1 && span0[0] == span1[0] && span0[1] == span1[1])
+				result = true;
+		}
+		return result;
+	}
+});
+webix.extend(webix.ui.datatable, {
+	subrow_setter:function(value){
+		if (value){
+			this._init_subrow_once();
+			this._settings.fixedRowHeight = false;
+			return webix.template(value);
+		}
+		return false;
+	},
+	subview_setter:function(value){
+		if (value)
+			this._settings.subrow = this.subrow_setter("<div></div>");
+		return value;
+	},
+	defaults:{
+		subRowHeight:35
+	},
+	_refresh_sub_all: function(){
+		this.data.each(function(obj){
+			if (obj)
+				obj.$sub = this._settings.subrow(obj, this.type);
+		}, this);
+
+		this._resize_sub_all();
+	},
+	_resize_sub_all: function(resize){
+		if (this._settings.subRowHeight === "auto" && this._content_width)
+			this._adjustSubRowHeight();
+		if (resize && this._settings.subview){
+			for (var key in this._subViewStorage){
+				var subview = webix.$$(this._subViewStorage[key]);
+				if (!subview._settings.hidden)
+					subview.adjust();
+			}
+		}
+	},
+	_refresh_sub_one:function(id){
+		var obj = this.getItem(id);
+		obj.$sub = this._settings.subrow(obj, this.type);
+		
+		if (this._settings.subRowHeight === "auto")
+			this._adjustSubRowHeight(obj.id, obj.$sub);
+	},
+	$init:function(){
+		this._init_subrow_once = webix.once(function(){
+			var css = "#"+this._top_id +" .webix_cell.webix_dtable_subview { line-height:normal;}";
+			//if initial fixedRowHeight is true, preserve white-space for non sub cells
+			if(this._settings.fixedRowHeight)
+				css += "#"+this._top_id +" .webix_column .webix_cell { white-space: nowrap;}";
+
+			webix.html.addStyle(css);
+			
+			this._subViewStorage = {};
+			this.attachEvent("onSubViewRender", this._render_sub_view);
+			this.data.attachEvent("onStoreUpdated", webix.bind(function(id, data, mode){
+				if (!id)
+					this._refresh_sub_all();
+				else if (mode == "update" || mode == "add")
+					this._refresh_sub_one(id);
+			}, this));
+			this.attachEvent("onResize", function(w,h,wo){
+				if (wo != w)
+					this._resize_sub_all(true);
+			});
+		});
+
+		this.type.subrow = function(obj){
+			if (obj.$sub){
+				if (obj.$subopen)
+					return "<div class='webix_tree_open webix_sub_open'></div>";
+				else
+					return "<div class='webix_tree_close webix_sub_close'></div>";
+			} else
+				return "<div class='webix_tree_none'></div>";
+		};
+		this.on_click.webix_sub_open = function(e, id){
+			this.closeSub(id);
+			return false;
+		};
+		this.on_click.webix_sub_close = function(e, id){
+			this.openSub(id);
+			return false;
+		};
+	},
+	openSub:function(id){
+		var obj = this.getItem(id);
+		if (obj.$subopen) return;
+
+		obj.$row = this._settings.subrow;
+		obj.$subHeight = (obj.$subHeight || this._settings.subRowHeight);
+		obj.$subopen = true;
+
+		var sub = this._subViewStorage[obj.$subContent];
+		if (sub)
+			sub.repaintMe = true;
+
+		this.refresh(id);
+		this.callEvent("onSubViewOpen", [id]);
+	},
+	getSubView:function(id){
+		var obj = this.getItem(id);
+		if (obj){
+			var sub = this._subViewStorage[obj.$subContent];
+			if (sub)
+				return webix.$$(sub);
+		}
+
+		return null;
+	},
+	resizeSubView:function(id){
+		var view = this.getSubView(id);
+		if (view)
+			this._resizeSubView( this.getItem(id), view);
+	},
+	_resizeSubView:function(obj, view){
+		var height = view.$getSize(0,0)[2];
+		var eheight = obj.$subHeight || this._settings.subRowHeight;
+		var delta = Math.abs(height - (eheight || 0));
+		if (delta > 2){
+			obj.$subHeight = height;
+			this.refresh(obj.id);
+		}
+	},
+	_checkSubWidth: function(view){
+		var width = view.$width;
+		// if layout
+		if(view._layout_sizes){
+			var number = view._cells.length-view._hiddencells;
+			if (view._vertical_orientation)
+				width -= view._paddingX*2+2;
+			else
+				width -= view._margin*(number-1)+view._paddingX*2+number*2;
+		}
+		return width > 0;
+	},
+	_render_sub_view:function(obj, row){
+		var sub = this._subViewStorage[obj.$subContent], view;
+		if (sub){
+			row.firstChild.appendChild(sub);
+			view = webix.$$(obj.$subContent);
+			if (!this._checkSubWidth(view))
+				view.adjust();
+			if (sub.repaintMe){
+				delete sub.repaintMe;
+				view.config.hidden = false;
+				view._render_hidden_views();
+			}
+		} else {
+			view = webix.ui(webix.copy(this._settings.subview), row.firstChild);
+			view.getMasterView = webix.bind(function(){ return this; }, this);
+			obj.$subContent = view.config.id;
+			this._subViewStorage[obj.$subContent] = view.$view;
+
+			this.callEvent("onSubViewCreate", [view, obj]);
+		}
+		this._resizeSubView(obj, (view || webix.$$(sub)));
+	},
+	_destroy_sub_view:function(id){
+		var obj = this.getItem(id);
+		var div = this._subViewStorage[obj.$subContent];
+		if (div){
+			delete obj.$subContent;
+			var view = webix.$$(div);
+			if (view && view != this)
+				view.destructor();
+		}
+	},
+	_adjustSubRowHeight:function(id, text){
+		var d = webix.html.create("DIV",{"class":"webix_measure_size webix_cell webix_dtable_subrow"}, "");
+		d.style.cssText = "width:"+this._content_width+"px; height:auto; visibility:hidden; position:absolute; top:0px; left:0px; overflow:hidden;";
+		this.$view.appendChild(d);
+
+		this.data.each(function(obj){
+			if (obj && !id || obj.id == id && obj.$sub){
+				d.innerHTML = text || this._settings.subrow(obj, this.type);
+				obj.$subHeight = d.offsetHeight;
+			}
+		}, this);
+
+		d = webix.html.remove(d);
+	},
+	closeSub:function(id){
+		var obj = this.getItem(id);
+		if (!obj.$subopen) return;
+
+		obj.$row = false;
+		obj.$subopen = false;
+
+		var sub = this._subViewStorage[obj.$subContent];
+		if (sub)
+			webix.$$(sub).config.hidden = true;
+
+		this.refresh(id);
+		this.callEvent("onSubViewClose", [id]);
+	}
+});
+webix.extend(webix.ui.datatable, {
+	headermenu_setter:function(value){
+		if (value){
+			if (value.data)
+				this._preconfigured_hmenu = true;
+			value = this._init_hmenu_once(value);
+		}
+		return value;
+	},
+	_init_hmenu_once:function(value){
+
+		var menuobj = {
+			view:"contextmenu",
+			template:"<span class='webix_icon {common.hidden()}'></span> &nbsp; #value#",
+			type:{
+				hidden:function(obj){
+					if (obj.hidden)
+						return "fa-empty";
+					else
+						return "fa-eye";
+				}
+			},
+			on:{
+				onMenuItemClick:webix.bind(function(id, ev){
+					var menu = webix.$$(this._settings.headermenu);
+					var state = menu.getItem(id).hidden;
+					menu.getItem(id).hidden = !state;
+					menu.refresh(id);
+					menu.$blockRender = true;
+
+					if (state)
+						this.showColumn(id);
+					else
+						this.hideColumn(id);
+
+					menu.$blockRender = false;
+					return false;
+				}, this)
+			},
+			data:[]
+		};
+		if (typeof value == "object")
+			webix.extend(menuobj, value, true);
+
+		var menu = webix.ui(menuobj);
+
+		menu.attachTo(this._header);
+		this._destroy_with_me.push(menu);
+		this.attachEvent("onStructureLoad", this._generate_menu_columns);
+		this.attachEvent("onStructureUpdate", this._generate_menu_columns);
+
+		this._init_hmenu_once = function(v){ return v; };
+		return menu._settings.id;
+	},
+	_generate_menu_columns:function(){
+		var column, data, hidden, i;
+
+		var menu = webix.$$(this._settings.headermenu);
+		if (menu.$blockRender || this._preconfigured_hmenu) return;
+ 
+		data = [];
+		for (i = 0; i < this._columns.length; i++){
+			column = this._columns[i];
+			var content = column.header[0];
+			if (column.headermenu !== false && content)
+				data.push({ id:column.id, value:content.text });
+		}
+
+		hidden = this.getState().hidden;
+		for (i = hidden.length - 1; i >= 0; i--){
+			column = this.getColumnConfig(hidden[i]);
+			var content = column.header[0];
+			if (column.headermenu !== false && content)
+				data.push({ id:hidden[i], value:content.text, hidden:1 });
+		}
+
+		if (data.length)
+			menu.data.importData(data);
+	}
+});
+
+webix.ui.datafilter.headerMenu = {
+		getValue:function(){},
+		setValue:function(){},
+		refresh:function(master, node, config){
+			if (!master._settings.headermenu){
+				master.define("headermenu", true);
+				master._generate_menu_columns();
+			}
+
+			node.onclick = function(){
+				webix.$$(master.config.headermenu).show(node);
+			};
+		},
+		render:function(master, config){
+			return "<span class='webix_icon fa-columns' role='button' tabindex='0' aria-label='"+webix.i18n.aria.headermenu+"'>";
+		}
+};
+
+webix.ui.datafilter.richSelectFilter = {
+	getInputNode:function(node){
+		return webix.$$(node.$webix) || null;
+	},
+	getValue:function(node){
+		var ui = this.getInputNode(node);
+		return ui?ui.getValue():"";
+	},
+	setValue:function(node, value){
+		var ui = this.getInputNode(node);
+		return ui?ui.setValue(value):"";
+	},
+	compare:function(a,b){
+		return a == b;
+	},
+	refresh:function(master, node, value){
+		if (master.$destructed) return;
+
+		var select = webix.$$(value.richselect);
+
+		//IE8 can destory the content of richselect, so recreating
+		if (!select.$view.parentNode) {
+			var d = webix.html.create("div", { "class" : "webix_richfilter" });
+			d.appendChild(select.$view);
+		}
+
+		node.$webix = value.richselect;
+		node.style.marginLeft = "-10px";
+
+		value.compare = value.compare || this.compare;
+		value.prepare = value.prepare || this.prepare;
+		master.registerFilter(node, value, this);
+
+		var data;
+		var options = value.options;
+		if (options){
+			if(typeof options =="string"){
+				data = value.options = [];
+				webix.ajax(options).then(webix.bind(function(data){
+					value.options = data.json();
+					this.refresh(master, node, value);
+				}, this));
+			} else
+				data = options;
+		} else
+			data = master.collectValues(value.columnId);
+
+
+		if ((!this.$noEmptyOption && value.emptyOption !== false) || value.emptyOption){
+			var emptyOption = { id:"", value: value.emptyOption||"", $empty: true };
+			if(data.add)
+				data.add(emptyOption,0); //DataStore
+			else
+				data.unshift(emptyOption); //array
+		}
+
+		var list = select.getPopup().getList();
+
+		var optview = webix.$$(options);
+		if(optview && optview.data && optview.data.getRange){
+			data = optview.data.getRange();
+		}
+
+		//reattaching node back to master container
+		node.firstChild.appendChild(select.$view.parentNode);
+
+		//load data in list, must be after reattaching, as callback of parse can try to operate with innerHTML
+		if (list.parse){
+			list.clearAll();
+			list.parse(data);
+		}
+
+		//set actual value for the filter
+		if (value.value) this.setValue(node, value.value);
+
+		//repaint the filter control
+		select.render();
+
+		//adjust sizes after full rendering
+		webix.delay(select.resize, select);
+	},
+	render:function(master, config){
+		if (!config.richselect){
+			var d = webix.html.create("div", { "class" : "webix_richfilter" });
+
+			var richconfig = {
+				container:d,
+				view:this.inputtype,
+				options:[]
+			};
+
+			var inputConfig = webix.extend( this.inputConfig||{}, config.inputConfig||{}, true );
+			webix.extend(richconfig, inputConfig);
+
+			if (config.separator)
+				richconfig.separator = config.separator;
+			if(config.suggest)
+				richconfig.suggest = config.suggest;
+
+			var richselect = webix.ui(richconfig);
+				richselect.attachEvent("onChange", function(){
+					master.filterByAll();
+				});
+			
+			config.richselect = richselect._settings.id;
+			master._destroy_with_me.push(richselect);
+		}
+
+		config.css = "webix_div_filter";
+		return " ";
+	},
+	inputtype:"richselect"
+};
+
+webix.ui.datafilter.multiSelectFilter = webix.extend({
+	$noEmptyOption: true,
+	inputtype:"multiselect",
+	prepare:function(value, filter){
+		if (!value) return value;
+		var hash = {};
+		var parts = value.toString().split(filter.separator || ",");
+		for (var i = 0; i < parts.length; i++)
+			hash[parts[i]] = 1;
+		return hash;
+	},
+	compare:function(a,b){
+		return !b || b[a];
+	}
+}, webix.ui.datafilter.richSelectFilter);
+
+webix.ui.datafilter.serverMultiSelectFilter = webix.extend({
+	$server:true,
+	_on_change:function(e, node, value){
+		var id = this._comp_id;
+		webix.$$(id).filterByAll();
+	}
+}, webix.ui.datafilter.multiSelectFilter);
+
+webix.ui.datafilter.multiComboFilter = webix.extend({
+	inputtype:"multicombo",
+	inputConfig:{
+		tagMode: false
+	}
+}, webix.ui.datafilter.multiSelectFilter);
+
+webix.ui.datafilter.datepickerFilter = webix.extend({
+	prepare:function(value){ return value||""; },
+	compare:function(a,b){ return a*1 == b*1; },
+	inputtype:"datepicker"
+}, webix.ui.datafilter.richSelectFilter);
+
+
+webix.ui.datafilter.columnGroup = {
+	getValue:function(){},
+	setValue:function(){},
+	getHelper:function(node, config){
+		return {
+			open:function(){ config.closed = true; node.onclick(); },
+			close:function(){ config.closed = false; node.onclick(); },
+			isOpened:function(){ return config.closed; }
+		};
+	},
+	refresh:function(master, node, config){
+		node.onclick = function(){
+			var mark = this.firstChild.firstChild;
+			if (config.closed){
+				config.closed = false;
+				mark.className = "webix_tree_open";
+			} else {
+				config.closed = true;
+				mark.className = "webix_tree_close";
+			}
+
+			webix.delay(function(){
+				master.callEvent("onColumnGroupCollapse", [config.columnId, config.batch, !config.closed]);
+				master.showColumnBatch(config.batch, !config.closed);
+			});
+		};
+
+		if (!config.firstRun){
+			config.firstRun = 1;
+			if (config.closed)
+				master.showColumnBatch(config.batch, false);
+		}
+	},
+	render:function(master, config){
+		return "<div role='button' tabindex='0' aria-label='"+webix.i18n.aria[config.closed?"openGroup":"closeGroup"]+"' class='"+(config.closed?"webix_tree_close":"webix_tree_open")+"'></div>&nbsp;"+(config.groupText||"");
+	}
+};
+
+webix.ui.datafilter.dateRangeFilter = webix.extend({
+	prepare:function(value){
+		return webix.ui.daterange.prototype._correct_value(value);
+	},
+	compare:function(a, b){
+		return ((!b.start || a>=b.start) && (!b.end || a<=b.end));
+	},
+	inputtype:"daterangepicker"
+}, webix.ui.datafilter.richSelectFilter);
+
+webix.ui.datafilter.serverDateRangeFilter = webix.extend({
+	$server:true
+}, webix.ui.datafilter.dateRangeFilter);
+
+webix.editors.$popup.multiselect = {
+	view:"multisuggest",
+	suggest:{
+		button:true
+	}
+};
 
 
 
@@ -30740,6 +31518,507 @@ webix.protoUI({
 
 
 webix.protoUI({
+	name:"daterange",
+	defaults:{
+		button:false,
+		icons:false,
+		calendarCount:2,
+		borderless:false
+	},
+	$init:function(config){
+		config.calendar = config.calendar || {};
+		config.value = this._correct_value(config.value);
+		delete config.calendar.type; // other types are not implemented
+		
+		this._viewobj.className += " webix_daterange";
+		this._zoom_level = this._types[config.calendar.type] || 0;
+
+		var cols = [],
+			skinConf = webix.skin.$active.calendar,
+			cheight = skinConf && skinConf.height ? skinConf.height : 250,
+			cwidth = skinConf && skinConf.width ? skinConf.width : 250,
+			calendar = webix.extend({ view:"calendar", width:cwidth, height:cheight }, config.calendar || {}, true),
+			count = config.calendarCount = this._zoom_level === 0 ? (config.calendarCount || this.defaults.calendarCount) : this.defaults.calendarCount,
+			basecss = (calendar.css?calendar.css + " ":"")+"webix_range_",
+			start = config.value.start || new Date();
+		
+		for(var i = 0; i<count; i++){
+			var date = webix.Date.add(start, this._steps[this._zoom_level]*i, "month", true);
+
+			webix.extend(calendar, {
+				events:webix.bind(this._isInRange, this),
+				css:basecss+(count ===1?"":(i === 0 ? "0" : (i+1 == count ? "N" :"1"))),
+				timepicker: this._zoom_level === 0?config.timepicker:false,
+				borderless:true,
+				date:date,
+				master:config.id
+			}, true);
+			
+			cols.push(webix.copy(calendar));
+		}
+
+
+		config.rows = [
+			{ type:"clean", cols: cols},
+			this._footer_row(config, cwidth*count)
+		];
+		
+		config.height = config.height || (calendar.height+(config.icons || config.button?35:0));
+		config.type = "line";
+
+		this.$ready.push(this._after_init);
+
+		webix.event(this.$view, "keydown", webix.bind(function(e){
+			this._onKeyPress( e.which || e.keyCode, e);
+		}, this));
+	},
+	value_setter:function(value){
+		return this._correct_value(value);
+	},
+	getValue:function(){
+		return this._settings.value;
+	},
+	setValue:function(value, silent){
+		value = this._correct_value(value);
+		this._settings.value = value;
+
+		var start = value.start || value.end || new Date();
+
+		if(!silent){
+			this._cals[0].showCalendar(value.start);
+			
+			for(var i = 1; i<this._cals.length; i++){
+				this._cals[i]._settings.date = start;
+				this._changeDateSilent(this._cals[i], 1, i);
+			}
+		}
+		this.callEvent("onChange", [value]);
+		this.refresh();
+	},
+	refresh:function(){
+		var v = this._settings.value;
+		for(var i = 0; i<this._cals.length; i++){
+
+			if(this._cals[i]._zoom_level === this._zoom_level){
+				webix.html.removeCss(this._cals[i].$view, "webix_cal_timepicker");
+				webix.html.removeCss(this._cals[i].$view, "webix_range_timepicker");
+				
+
+				var rel = this._related_date(this._cals[i].getVisibleDate());
+				if(rel.start || rel.end){
+					this._cals[i]._settings.date = rel.start || rel.end;
+					if(this._settings.timepicker){
+						var css = "webix_"+(rel.start && rel.end?"range":"cal")+"_timepicker";
+						webix.html.addCss(this._cals[i].$view, css);
+					}
+				}
+				else
+					webix.Date.datePart(this._cals[i]._settings.date);
+
+				this._cals[i].refresh();
+			}
+		}
+	},
+	addToRange:function(date){
+		var value = this._add_date(this._string_to_date(date));
+		this.setValue(value);
+	},
+	_icons:[
+		{
+			template:function(){
+				return "<span role='button' tabindex='0' class='webix_cal_icon_today webix_cal_icon'>"+webix.i18n.calendar.today+"</span>";
+			},
+			on_click:{
+				"webix_cal_icon_today":function(){
+					this.addToRange(new Date());
+					this.callEvent("onTodaySet",[this.getValue()]);
+				}
+			}
+		},
+		{
+			template:function(){
+				return "<span role='button' tabindex='0' class='webix_cal_icon_clear webix_cal_icon'>"+webix.i18n.calendar.clear+"</span>";
+			},
+			on_click:{
+				"webix_cal_icon_clear":function(){
+					this.setValue("");
+					this.callEvent("onDateClear", []);
+				}
+			}
+		}
+	],
+	_icons_template:function(icons){
+		if(!icons)
+			return { width:0};
+		else{
+			icons = (typeof icons =="object") ? icons:this._icons; //custom or default 
+			var icons_template = { css:"webix_cal_footer ", borderless:true, height:30, template:"<div class='webix_cal_icons'>", onClick:{}};
+
+			for(var i = 0; i<icons.length; i++){
+				if(icons[i].template){
+					var template = (typeof(icons[i].template) == "function"?icons[i].template: webix.template(icons[i].template));
+					icons_template.template += template.call(this);
+				}	
+				if(icons[i].on_click){
+					for(var k in icons[i].on_click){
+						icons_template.onClick[k] = webix.bind(icons[i].on_click[k], this);
+					}
+				}
+			}
+			icons_template.template += "</div>";
+			icons_template.width = webix.html.getTextSize(icons_template.template).width+30;
+			return icons_template;
+		}
+	},
+	_footer_row:function(config, width){
+		var button = { view:"button", value:webix.i18n.calendar.done,
+			minWidth:100, maxWidth:230,
+			align:"center", height:30, click:function(){
+				this.getParentView().getParentView().hide();
+		}};
+
+		var icons = this._icons_template(config.icons);
+
+		var row = { css:"webix_range_footer",  cols:[
+			{ width:icons.width }
+		]};
+		if((config.button || config.icons) && (icons.width*2+button.minWidth) > width)
+			row.cols[0].width = 0;
+
+		row.cols.push(config.button ? button : {});
+		row.cols.push(icons);
+
+		return row;
+	},
+	_types:{
+		"time":-1,
+		"month":1,
+		"year":2
+	},
+	_steps:{
+		0:1,
+		1:12,
+		2:120
+	},
+	_correct_value:function(value){
+		if(!value) value = { start:null, end:null};
+
+		if(!value.start && !value.end)
+			value = {start: value};
+		
+		value.end = this._string_to_date(value.end) || null;
+		value.start = this._string_to_date(value.start) || null;
+
+		if((value.end && value.end < value.start) || !value.start)
+			value.end = [value.start, value.start = value.end][0];
+		return value;
+	},
+	_string_to_date:function(date, format){
+		if(typeof date == "string"){
+			if (format)
+				date = webix.Date.strToDate(format)(date);
+			else
+				date=webix.i18n.parseFormatDate(date);
+		}
+		return isNaN(date*1) ? null : date;
+	},
+	_isInRange:function(date){
+		var v = this._settings.value,
+			s = v.start? webix.Date.datePart(webix.Date.copy(v.start)) : null,
+			e = v.end ? webix.Date.datePart(webix.Date.copy(v.end)) : null,
+			d = webix.Date.datePart(date),
+			css = "";
+		
+		if(d>=s && e && d<=e)
+			css = "webix_cal_range";
+		if(webix.Date.equal(d, s))
+			css = "webix_cal_range_start";
+		if(webix.Date.equal(d, e))
+			css = "webix_cal_range_end";
+
+		var holiday =webix.Date.isHoliday(date)+" " || "";
+		return css+" "+holiday;
+	},
+	_after_init:function(){
+		var cals = this._cals = this.getChildViews()[0].getChildViews();
+		var range = this;
+
+		this._cals_hash = {};
+
+		for(var i = 0; i<cals.length; i++){
+			this._cals_hash[cals[i].config.id] = i;
+
+			//events
+			cals[i].attachEvent("onBeforeDateSelect", function(date){ return range._on_date_select(this, date); });
+			cals[i].attachEvent("onBeforeZoom", function(zoom){ return range._before_zoom(this, zoom); });
+			
+			if(i===0 || i  === cals.length-1){
+				cals[i].attachEvent("onAfterMonthChange", webix.bind(this._month_change, this));
+				cals[i].attachEvent("onAfterZoom", function(zoom, oldzoom){ range._after_zoom(this, zoom, oldzoom);});
+			}
+		}
+		if(this._settings.timepicker)
+			this.refresh();
+	},
+	_before_zoom:function(view, zoom){
+		var ind = this._getIndexById(view.config.id);
+
+		if(zoom >=0 && ind>0 && ind !== this._cals.length-1)
+			return false;
+		if(zoom ===-1){ //time mode
+			var rel = this._related_date(view.getVisibleDate());
+			if(rel.start && rel.end) //both dates are in one calendar
+				view._settings.date = rel[this._time_mode];
+		}
+		return true;
+	},
+	_month_change:function(now, prev){
+		var dir = now>prev ? 1: -1;
+		var start = now>prev ? this._cals[this._cals.length-1] : this._cals[0];
+		var step = start._zoom_logic[start._zoom_level]._changeStep;
+
+		this._shift(dir, step, start);
+		this.refresh();
+	},
+	_after_zoom:function(start, zoom, oldzoom){
+		var step = start._zoom_logic[start._zoom_level]._changeStep;
+		var ind = this._getIndexById(start.config.id);
+		var dir = ind === 0 ? 1 :-1;
+		if(!this._cals[ind+dir]) 
+			return;
+		
+		var next = this._cals[ind+dir]._settings.date;
+		
+		if(oldzoom>zoom && zoom >=0){
+			var diff = 0;
+			if(zoom === 1){ //year was changed 
+				var year = next.getFullYear();
+				if(this._zoom_level || (dir === -1 && next.getMonth() === 11) || (dir ===1 && next.getMonth() === 0))
+					year = year - dir;
+				diff = start._settings.date.getFullYear()-year;
+			}
+			else if(zoom === 0 ){//month was changed
+				var month = next.getMonth()-dir;
+				if(month === 12 || month ==-1)
+					month = (month === -1) ? 11: 0;
+				
+				diff = start._settings.date.getMonth()-month;
+			}
+			this._shift(diff, step, start);
+			this.refresh();
+		}
+	},
+	_changeDateSilent:function(view, dir, step){
+		view.blockEvent();
+		if(view._zoom_level>=0)
+			view._changeDate(dir, step);
+		view.unblockEvent();
+	},
+	_getIndexById:function(id){
+		return this._cals_hash[id];
+	},
+	_shift:function(dir, step, start){
+		for(var i =0; i<this._cals.length; i++){
+			var next = this._cals[i];
+			if(!start || next.config.id !==start.config.id)
+				this._changeDateSilent(next, dir, step);
+		}
+	},
+	_related_date:function(date){
+		var v = this._settings.value;
+		var rel = {};
+		if(v.start && v.start.getYear() === date.getYear() && v.start.getMonth() === date.getMonth())
+			rel.start = v.start;
+		if(v.end && v.end.getYear() === date.getYear() && v.end.getMonth() === date.getMonth())
+			rel.end = v.end;
+		return rel;
+	},
+	_set_time:function(date, source){
+		date.setHours(source.getHours());
+		date.setMinutes(source.getMinutes());
+		date.setSeconds(source.getSeconds());
+		date.setMilliseconds(source.getMilliseconds());
+	},
+	_add_date:function(date, ind){
+		var v = webix.copy(this._settings.value);
+		//year, month
+		if(this._zoom_level !==0 && !webix.isUndefined(ind)){
+			var key = ind?"end":"start";
+			v[key] = date;
+		}
+		else{
+			if(v.start && !v.end)
+				v.end = date;
+			else {
+				v.start = date;
+				v.end = null;
+			}
+		}
+		
+		return v;
+	},
+	_on_date_select:function(view, date){
+		if(this.callEvent("onBeforeDateSelect", [date])){
+			var v = this._settings.value;
+
+			if(view._zoom_level<0){ //time set
+				var rel = webix.copy(this._related_date(date)),
+					reldate;
+				
+				reldate = (rel.start && rel.end) ? rel[this._time_mode] : rel.start || rel.end;
+				if(reldate)
+					this._set_time(reldate, date);
+
+				view._zoom_level = 0;
+
+				v = webix.extend(webix.copy(v), rel, true);
+			}
+			else{
+				var vis = view.getVisibleDate();
+				var ind = this._getIndexById(view.config.id);
+				
+				if(date.getMonth() !== vis.getMonth() && (ind ===0 || ind === this._cals.length-1)){
+					var dir = date>vis? 1 : -1;
+					this._shift(dir, 1);
+				}
+				v = this._add_date(date, ind);
+			}
+
+			if(view._zoom_level !== this._zoom_level)
+				view.showCalendar(date);
+			
+			this.setValue(v, true);
+			this.callEvent("onAfterDateSelect", [this.getValue()]);
+		}
+
+		return false;
+	}
+}, webix.ui.layout);
+
+
+
+webix.protoUI({
+	name:"daterangesuggest",
+	defaults:{
+		type:"daterange",
+		body: {
+			view:"daterange", icons:true, button:true, borderless:true
+		}
+	},
+	getValue:function(){
+		return this.getRange().getValue();
+	},
+	setValue:function(value){
+		this.getRange().setValue(webix.copy(value));
+	},
+	getRange:function(){
+		return this.getBody();
+	},
+	getButton:function(){
+		return this.getBody().getChildViews()[1].getChildViews()[1];
+	},
+	_setValue:function(value, hide){
+		var master = webix.$$(this._settings.master);
+
+		if(master){
+			master.setValue(value);
+			if(hide) this.hide();
+		}
+		else
+			this.setValue(value);
+	},
+	_set_on_popup_click:function(){
+		var range  = this.getRange();
+		range.attachEvent("onAfterDateSelect", webix.bind(function(value) {this._setValue(value);}, this));
+		range.attachEvent("onDateClear", webix.bind(function(value) {this._setValue(value);}, this));
+		range.attachEvent("onTodaySet", webix.bind(function(value) {this._setValue(value);}, this));
+	}
+}, webix.ui.suggest);
+
+
+webix.protoUI({
+	$cssName:"datepicker",
+	name:"daterangepicker",
+	$init:function(){
+		//set non-empty initial value
+		this._settings.value = {};
+	},
+	_init_popup:function(){
+		var obj = this._settings;
+		if (obj.suggest)
+			obj.popup = obj.suggest;
+		else if (!obj.popup){
+			obj.popup = obj.suggest = this.suggest_setter({
+				view:"daterangesuggest", body:{
+					timepicker:obj.timepicker, calendarCount:obj.calendarCount, height:250+(obj.button || obj.icons?30:0)
+				}
+			});
+		}
+		this._init_once = function(){};
+	},
+	$prepareValue:function(value){
+		value = value || {};
+		value.start = webix.ui.datepicker.prototype.$prepareValue.call(this, value.start?value.start:null);
+		value.end = webix.ui.datepicker.prototype.$prepareValue.call(this, value.end?value.end:null);
+		return value;
+	},
+	$compareValue:function(oldvalue, value){
+		var compare = webix.ui.datepicker.prototype.$compareValue;
+		var start = compare.call(this, oldvalue.start, value.start);
+		var end = compare.call(this, oldvalue.end, value.end);
+
+		return (start && end);
+	},
+	$setValue:function(value){
+		value = value || {};
+
+		var popup =  webix.$$(this._settings.popup.toString());
+		var daterange = popup.getRange();
+
+		this._settings.text = (value.start?this._get_visible_text(value.start):"")+(value.end?(" - "+ this._get_visible_text(value.end)):"");
+		this._set_visible_text();
+	},
+	$render:function(obj){
+		obj.value = this.$prepareValue(obj.value);
+		this.$setValue(obj.value);
+	},
+	getValue:function(){
+
+		var type = this._settings.type;
+		//time mode
+		var timeMode = (type == "time");
+		//date and time mode
+		var timepicker = this.config.timepicker;
+
+		var value = this._settings.value;
+
+		if(this._settings.stringResult){
+			var formatStr =webix.i18n.parseFormatStr;
+			if(timeMode) 
+				formatStr = webix.i18n.parseTimeFormatStr;
+			if(this._formatStr && (type == "month" || type == "year")){
+				formatStr = this._formatStr;
+			}
+
+			return this._formatValue(formatStr, value);
+		}
+		
+		return value||null;
+	},
+	_formatValue:function(format, value){
+		var popup =  webix.$$(this._settings.popup.toString());
+		var daterange = popup.getRange();
+		value = webix.copy(daterange._correct_value(value));
+
+		if(value.start) value.start = format(value.start);
+		if(value.end) value.end = format(value.end);
+		return value;
+	}
+}, webix.ui.datepicker);
+
+
+
+webix.protoUI({
 	name:"resizer",
 	defaults:{
 		width:7, height:7
@@ -31265,7 +32544,1049 @@ webix.protoUI({
 }, webix.ui.toolbar);
 
 
+(function(){
 
+	var controls = {};
+	for(var i in webix.UIManager._controls){
+		controls[webix.UIManager._controls[i]] = i;
+	}
+	var nav_controls = {
+		9:'tab',
+		38:'up',
+		40:'down',
+		37:'left',
+		39:'right'
+	};
+
+	webix.patterns = {
+		phone:{ mask:"+# (###) ###-####", allow:/[0-9]/g },
+		card: { mask:"#### #### #### ####", allow:/[0-9]/g },
+		date: { mask:"####-##-## ##:##", allow:/[0-9]/g }
+	};
+
+	webix.extend(webix.ui.text, {
+		$init:function(config){
+			if(config.pattern){
+				this.attachEvent("onKeyPress", function(code, e){
+					if(e.ctrlKey || e.altKey)
+						return;
+
+					if(code>105 && code<112) //numpad operators
+						code -=64;
+
+					if(controls[code] && code !== 8 && code !==46){  //del && bsp
+						if(!nav_controls[code])
+							webix.html.preventEvent(e);
+						return;
+					}
+
+					webix.html.preventEvent(e);
+					this._on_key_pressed(e, code);
+				});
+
+				this.attachEvent("onAfterRender", this._after_render);
+				this.getText = function(){ return this.getInputNode().value; };
+				this._pattern = function(value, mode){
+					if (mode === false)
+						return this._getRawValue(value);
+					else
+						return this._matchPattern(value);
+				};
+				config.invalidMessage = config.invalidMessage || webix.i18n.controls.invalidMessage;
+			}
+		},
+		pattern_setter:function(value){
+			var pattern = webix.patterns[value] || value;
+			
+			if(typeof pattern =="string") pattern = { mask: pattern };
+			pattern.allow =  pattern.allow || /[A-Za-z0-9]/g;
+			
+			this._patternScheme(pattern);
+			return pattern;
+		},
+		_init_validation:function(){
+			this.config.validate = this.config.validate || webix.bind(function(){
+				var value = this.getText();
+				var raw = value.replace(this._pattern_chars, "");
+				var matches = (value.toString().match(this._pattern_allows) || []).join("");
+				return (matches.length == raw.length && value.length == this._settings.pattern.mask.length);
+			}, this);
+		},
+		_after_render:function(){
+			var ev =  webix.env.isIE8?"propertychange":"input";
+			
+			webix._event(this.getInputNode(), ev, function(e){
+				var stamp =  (new Date()).valueOf();
+				var width = this.$view.offsetWidth; //dark ie8 magic
+				if(!this._property_stamp || stamp-this._property_stamp>100){
+					this._property_stamp = stamp;
+					this.$setValue(this.getText());
+				}
+			}, {bind:this});
+
+			webix._event(this.getInputNode(), "blur", function(e){
+				this._applyChanges();
+			}, {bind:this});
+		},
+		_patternScheme:function(pattern){
+			var mask = pattern.mask, scheme = {}, chars = "", count = 0;
+			
+			for(var i = 0; i<mask.length; i++){
+				if(mask[i] === "#"){
+					scheme[i] = count; count++;
+				}
+				else{
+					scheme[i] = false;
+					if(chars.indexOf(mask[i]) === -1) chars+="\\"+mask[i];
+				}
+			}
+			this._pattern_allows = pattern.allow;
+			this._pattern_chars = new RegExp("["+chars+"]", "g");
+			this._pattern_scheme = scheme;
+
+			this._init_validation();
+		},
+		_on_key_pressed:function(e, code){
+			var node = this.getInputNode();
+			var value = node.value;
+			var pos = webix.html.getSelectionRange(node);
+			var chr = "";
+
+			if(code == 8 || code == 46){
+				if(pos.start == pos.end){
+					if(code == 8) pos.start--;
+					else pos.end++;
+				}
+			}
+			else{
+				chr = String.fromCharCode(code);
+				if(!e.shiftKey) chr = chr.toLowerCase();
+			}
+
+			value = value.substr(0, pos.start) + chr +value.substr(pos.end);
+			pos = this._getCaretPos(chr, value.length, pos.start, code);
+
+			this._input_code = code;
+			this.$setValue(value);
+
+			webix.html.setSelectionRange(node, pos);
+		},
+		_getCaretPos:function(chr, len, pos, code){
+			if((chr && chr.match(this._pattern_allows)) || (code ==8 || code ==46)){
+				pos = chr ? pos+1 : pos;
+				pos = this._fixCaretPos(pos, code);
+			}
+			else if(len-1 == pos && code !==8 && code !==46){
+				var rest = this._settings.pattern.mask.indexOf("#", pos);
+				if(rest>0) pos += rest;
+			}
+			return pos;
+		},
+		_fixCaretPos:function(pos, code){
+			var prev = pos-(code !== 46)*1;
+
+			if(this._pattern_scheme[prev] === false){
+				pos = pos+(code ==8 ? -1: 1);
+				return this._fixCaretPos(pos, code);
+			}
+			if(this._pattern_scheme[pos] === false && code !==8)
+				return this._fixCaretPos(pos+1, code)-1;
+			return pos;
+		},
+		_getRawValue:function(value){
+			value = value || "";
+			var matches = value.toString().match(this._pattern_allows) || [];
+			return matches.join("").replace(this._pattern_chars, "");
+		},
+		_matchPattern:function(value){
+			var raw = this._getRawValue(value),
+				pattern = this._settings.pattern.mask,
+				mask = this._settings.pattern.mask,
+				scheme = this._pattern_scheme,
+				end = false,
+				index = 0,
+				rawIndex = 0,
+				rawLength = 0;
+
+			for(var i in scheme){
+				if(scheme[i]!==false){
+					if(!end){
+						index = i*1;
+						rawIndex = scheme[i];
+						var rchar = raw[rawIndex]||"";
+						var next = raw[rawIndex+1];
+
+						pattern = (rchar?pattern.substr(0, index):"") + rchar +(rchar && next?pattern.substr(index + 1):"");
+						if(!next) end = true;
+					}
+					rawLength++;
+				}
+			}
+
+			//finalize value with subsequent mask chars 
+			var icode = this._input_code;
+			if((icode && icode !== 8) || (!icode && rawLength-1 === rawIndex && pattern.length < mask.length)){
+				if(raw){
+					var nind = index+1;
+					if(mask.charAt(nind)!=="#" && pattern.length < mask.length){
+						var lind = mask.indexOf("#", nind);
+						if(lind<0) lind = mask.length;
+						pattern += mask.substr(nind, lind-nind);
+					}
+				}
+				else if(icode !==46){
+					pattern += mask.substr(0, mask.indexOf("#"));
+				}
+			}
+			this._input_code = null;
+			return pattern;
+		}
+	});
+
+})();
+webix.protoUI({
+	name:"gridsuggest",
+	defaults:{
+		type:"datatable",
+		fitMaster:false,
+		width:0,
+		body:{
+			navigation:true,
+			autoheight:true,
+			autowidth:true,
+			select:true
+		},
+		filter:function(item, value){
+			var text = this.config.template(item);
+			if (text.toString().toLowerCase().indexOf(value.toLowerCase())===0) return true;
+				return false;
+		}
+	},
+	$init:function(obj){
+		if (!obj.body.columns)
+			obj.body.autoConfig = true;
+		if (!obj.template)
+			obj.template = webix.bind(this._getText, this);
+	},
+	_getText:function(item, common){
+		var grid = this.getBody();
+		var value = this.config.textValue || grid.config.columns[0].id;
+		return grid.getText(item.id, value);
+	}
+}, webix.ui.suggest);
+webix.protoUI({
+	name:"datasuggest",
+	defaults:{
+		type:"dataview",
+		fitMaster:false,
+		width:0,
+		body:{
+			xCount:3,
+			autoheight:true,
+			select:true
+		}
+	}
+}, webix.ui.suggest);
+
+
+webix.protoUI({
+	name:"multiselect",
+	$cssName:"richselect",
+	defaults:{
+        separator:","
+	},
+	_suggest_config:function(value){
+		var isobj = !webix.isArray(value) && typeof value == "object" && !value.name; 
+		var suggest = { view:"checksuggest", separator:this.config.separator, buttonText: this.config.buttonText, button: this.config.button };
+
+		if (this._settings.optionWidth)
+			suggest.width = this._settings.optionWidth;
+		else
+			suggest.fitMaster = true;
+
+		if (isobj)
+			webix.extend(suggest, value, true);
+
+		var view = webix.ui(suggest);
+		var list = view.getList();
+		if (typeof value == "string")
+			list.load(value);
+		else if (!isobj)
+			list.parse(value);
+
+		view.attachEvent("onShow",function(node,mode, point){
+			view.setValue(webix.$$(view._settings.master).config.value);
+		});
+
+		return view;
+	},
+
+	$setValue:function(value){
+		if (!this._rendered_input) return;
+		var popup = this.getPopup();
+		var text = "";
+		if(popup){
+			text = popup.setValue(value);
+			if(typeof text == "object"){
+				text = text.join(this.config.separator+" ");
+			}
+
+		}
+		this._settings.text = text;
+
+		var node = this.getInputNode();
+		node.innerHTML = text || this._get_div_placeholder();
+	},
+	getValue:function(){
+		return this._settings.value||"";
+	},
+}, webix.ui.richselect);
+
+webix.editors.multiselect = webix.extend({
+	popupType:"multiselect"
+}, webix.editors.richselect);
+
+webix.type(webix.ui.list, {
+	name:"multilist",
+	templateStart:webix.template('<div webix_l_id="#!id#" class="{common.classname()}" style="width:{common.widthSize()}; height:{common.heightSize()}; overflow:hidden;" {common.aria()}>')
+}, "default");
+
+webix.type(webix.ui.list, {
+	name:"checklist",
+	templateStart:webix.template('<div webix_l_id="#!id#" {common.aria()} class="{common.classname()}" style="width:{common.widthSize()}; height:{common.heightSize()}; overflow:hidden; white-space:nowrap;">{common.checkbox()}'),
+	checkbox: function(obj, common){
+		var icon = obj.$checked?"fa-check-square":"fa-square-o";
+		return "<span role='checkbox' tabindex='-1' aria-checked='"+(obj.$checked?"true":"false")+"' class='webix_icon "+icon+"'></span>";
+	},
+	aria:function(obj){
+		return "role='option' tabindex='-1' "+(obj.$checked?"aria-selected='true'":"");
+	},
+	template: webix.template("#value#")
+}, "default");
+
+
+webix.protoUI({
+	name:"multisuggest",
+	defaults:{
+		separator:",",
+		type:"layout",
+		button:true,
+		width:0,
+		filter:function(item,value){
+			var itemText = this.getItemText(item.id);
+			return (itemText.toString().toLowerCase().indexOf(value.toLowerCase())>-1);
+		},
+		body:{
+			rows:[
+				{ view:"list", type:"multilist", borderless:true,  autoheight:true, yCount:5, multiselect:"touch", select:true,
+				  on:{
+					onItemClick: function(id){
+						var popup = this.getParentView().getParentView();
+						webix.delay(function(){
+							popup._toggleOption(id);
+						});
+					}
+				}},
+				{ view:"button", click:function(){
+					var suggest = this.getParentView().getParentView();
+					suggest.setMasterValue({ id:suggest.getValue() });
+					suggest.hide();
+				}}
+			]
+		}
+	},
+
+	_toggleOption: function(id, ev){
+		var value = this.getValue();
+		var values = webix.toArray(value?this.getValue().split(this._settings.separator):[]);
+
+		if(values.find(id)<0){
+			values.push(id);
+		}
+		else
+			values.remove(id);
+		var master = webix.$$(this._settings.master);
+		if(master){
+			master.setValue(values.join(this._settings.separator));
+		}
+		else
+			this.setValue(values);
+
+		if(ev){ //only for clicks in checksuggest
+			var checkbox = this.getList().getItemNode(id).getElementsByTagName("SPAN");
+			if(checkbox && checkbox.length) checkbox[0].focus();
+		}
+	},
+	_get_extendable_cell:function(obj){
+		return obj.rows[0];
+	},
+	_set_on_popup_click:function(){
+		var button = this.getButton();
+		var text = (this._settings.button?(this._settings.buttonText || webix.i18n.controls.select):0);
+		if(button){
+			if(text){
+				button._settings.value = text;
+				button.refresh();
+			}
+			else
+				button.hide();
+		}
+	},
+	getButton:function(){
+		return this.getBody().getChildViews()[1];
+	},
+	getList:function(){
+		return this.getBody().getChildViews()[0];
+	},
+	setValue:function(value){
+		var text = [];
+		var list = this.getList();
+		list.unselect();
+
+		if (value){
+			if (typeof value == "string")
+				value = value.split(this.config.separator);
+
+			if (value[0]){
+				for (var i = 0; i < value.length; i++){
+					if (list.getItem(value[i])){
+						if(list.exists(value[i]))
+							list.select(value[i], true);
+						text.push(this.getItemText(value[i]));
+					}
+				}
+			}
+		}
+
+		this._settings.value = value?value.join(this.config.separator):"";
+		return text;
+	},
+	getValue:function(){
+		return this._settings.value;
+	}
+}, webix.ui.suggest);
+
+webix.protoUI({
+	name:"checksuggest",
+	defaults:{
+		button:false,
+		body:{
+			rows:[
+				{ view:"list",  css:"webix_multilist", borderless:true, autoheight:true, yCount:5, select: true,
+					type:"checklist",
+					on:{
+						onItemClick: function(id, e){
+							var item = this.getItem(id);
+							item.$checked = item.$checked?0:1;
+							this.refresh(id);
+							var popup = this.getParentView().getParentView();
+							popup._toggleOption(id, e);
+						}
+					}
+				},
+				{ view:"button", click:function(){
+					var suggest = this.getParentView().getParentView();
+					suggest.setMasterValue({ id:suggest.getValue() });
+					suggest.hide();
+				}}
+			]
+		}
+	},
+	$init: function(){
+		this._valueHistory = {};
+		this.$ready.push(this._onReady);
+	},
+	_onReady: function(){
+		var list = this.getList();
+		if(list.config.dataFeed){
+			var suggest = this;
+			list.attachEvent("onAfterLoad", function(){
+				suggest.setValue(suggest._settings.value);
+			});
+			list.getItem = function(id){
+				return this.data.pull[id] || suggest._valueHistory[id];
+			};
+		}
+
+	},
+	$enterKey: function(popup,list) {
+		if (list.count && list.count()){
+			if (popup.isVisible()) {
+				var value = list.getSelectedId(false, true);
+				if(value){
+					this._toggleOption(value);
+				}
+				popup.hide(true);
+			} else {
+				popup.show(this._last_input_target);
+			}
+		} else {
+			if (popup.isVisible())
+				popup.hide(true);
+		}
+	},
+	_show_selection: function(){
+		var list = this.getList();
+		if( list.select)
+			list.unselect();
+	},
+	setValue:function(value){
+		var i,
+			list = this.getList(),
+			text = [],
+			values = {},
+			changed = [];
+
+		value = value || [];
+
+		if (typeof value == "string")
+			value = value.split(this.config.separator);
+		else if(list.config.dataFeed)
+			value = this._toMultiValue(value);
+
+		for ( i = 0; i < value.length; i++){
+			values[value[i]] = 1;
+			if(list.getItem(value[i])){
+				if( this._valueHistory)
+					this._valueHistory[value[i]] = webix.copy(list.getItem(value[i]));
+				text.push(this.getItemText(value[i]));
+			}
+		}
+
+
+		list.data.each(function(item){
+			if(item.$checked){
+				if(!values[item.id]){
+					item.$checked = 0;
+					changed.push(item.id);
+				}
+			}
+			else{
+				if(values[item.id]){
+					item.$checked = 1;
+					changed.push(item.id);
+				}
+			}
+
+		},this,true);
+
+		for( i=0; i < changed.length; i++ ){
+			list.refresh(changed[i]);
+		}
+		this._settings.value = value.length?value.join(this.config.separator):"";
+		return text;
+	},
+	getValue:function(){
+		return this._settings.value;
+	},
+	_preselectMasterOption: function(){
+		var node, master;
+		if (this._settings.master){
+			master = webix.$$(this._settings.master);
+			node = master.getInputNode();
+		}
+		node = node || this._last_input_target;
+		if(node)
+			node.focus();
+	},
+	_toMultiValue: function(value){
+		if(value && webix.isArray(value)){
+			var values = [];
+			for(var i =0; i < value.length; i++){
+				if(value[i].id){
+					this._valueHistory[value[i].id] = webix.copy(value[i]);
+					values.push(value[i].id);
+				}
+				else{
+					values.push(value[i]);
+				}
+			}
+			value = values;
+		}
+		return value;
+	}
+}, webix.ui.multisuggest);
+
+webix.protoUI({
+	name:"multicombo",
+	$cssName:"text",
+	defaults:{
+		keepText: true,
+		separator:",",
+		icon: false,
+		iconWidth: 0,
+		tagMode: true,
+		tagTemplate: function(values){
+			return (values.length?values.length+" item(s)":"");
+		},
+		template:function(obj,common){
+			return common._render_value_block(obj, common);
+		}
+	},
+	$init:function(){
+		this.$view.className += " webix_multicombo";
+
+		this.attachEvent("onBeforeRender",function(){
+			if(!this._inputHeight)
+				this._inputHeight = webix.skin.$active.inputHeight;
+			return true;
+		});
+		this.attachEvent("onAfterRender", function(){
+			this._last_size = null;
+		});
+
+		this._renderCount = 0;
+	},
+
+	on_click: {
+		"webix_multicombo_delete": function(e,view,node){
+			var value;
+			if(!this._settings.readonly && node && (value = node.parentNode.getAttribute("optvalue")))
+				this._removeValue(value);
+			return false;
+		}
+	},
+	_onBlur:function(){
+		var value = this.getInputNode().value;
+		if(value && this._settings.newValues){
+			this._addNewValue(value);
+		}
+
+		this._inputValue = "";
+		this.refresh();
+	},
+	_removeValue: function(value){
+		var values = this._settings.value;
+		if(typeof values == "string")
+			values = values.split(this._settings.separator);
+		values = webix.toArray(webix.copy(values));
+		values.remove(value);
+
+		this.setValue(values.join(this._settings.separator));
+	},
+	_addValue: function(newValue){
+		var suggest = webix.$$(this.config.suggest);
+		var list = suggest.getList();
+		var item = list.getItem(newValue);
+
+		if(item){
+			var values = suggest.getValue();
+			if(values && typeof values == "string")
+				values = values.split(suggest.config.separator);
+			values = webix.toArray(values||[]);
+			if(values.find(newValue)<0){
+				values.push(newValue);
+				suggest.setValue(values);
+				this.setValue(suggest.getValue());
+			}
+		}
+	},
+
+	_addNewValue: function(value){
+		var suggest = webix.$$(this.config.suggest);
+		var list = suggest.getList();
+		if(!list.exists(value) && value.replace(/^\s+|\s+$/g,'')){
+			list.add({id: value, value: value});
+		}
+
+		this._addValue(value);
+	},
+	_suggest_config:function(value){
+		var isObj = !webix.isArray(value) && typeof value == "object" && !value.name,
+			suggest = { view:"checksuggest", separator:this.config.separator, buttonText: this.config.buttonText, button: this.config.button },
+			combo = this;
+
+		if (this._settings.optionWidth)
+			suggest.width = this._settings.optionWidth;
+
+		if (isObj)
+			webix.extend(suggest, value, true);
+
+		var view = webix.ui(suggest);
+		if(!this._settings.optionWidth)
+			view.$customWidth = function(node){
+				this.config.width = combo._get_input_width(combo._settings);
+			};
+		view.attachEvent("onBeforeShow",function(node,mode, point){
+			if(this._settings.master){
+				this.setValue(webix.$$(this._settings.master).config.value);
+
+				if(webix.$$(this._settings.master).getInputNode().value){
+					this.getList().refresh();
+					this._dont_unfilter = true;
+				}
+				else
+					this.getList().filter();
+
+				if(node.tagName && node.tagName.toLowerCase() == "input"){
+					webix.ui.popup.prototype.show.apply(this, [node.parentNode,mode, point]);
+					return false;
+				}
+			}
+
+		});
+		var list = view.getList();
+		if (typeof value == "string")
+			list.load(value);
+		else if (!isObj)
+			list.parse(value);
+
+		return view;
+	},
+	_render_value_block:function(obj, common){
+		var id, input, inputAlign,inputStyle, inputValue, inputWidth,
+			height, html, label, list, message, padding, readOnly,  width,
+			bottomLabel = "",
+			top =  this._settings.labelPosition == "top";
+
+		id = "x"+webix.uid();
+		width = common._get_input_width(obj);
+		inputAlign = obj.inputAlign || "left";
+
+		height = this._inputHeight - 2*webix.skin.$active.inputPadding -2;
+
+		inputValue = (this._inputValue||"");
+		list = "<ul class='webix_multicombo_listbox' style='line-height:"+height+"px'></ul>";
+
+		inputWidth = Math.min(width,(common._inputWidth||7));
+
+		inputStyle = "width: "+inputWidth+"px;height:"+height+"px;max-width:"+(width-20)+"px";
+
+		readOnly = obj.readonly?" readonly ":"";
+		input = "<input id='"+id+"' role='combobox' aria-multiline='true' aria-label='"+webix.template.escape(obj.label)+"' tabindex='0' type='text' class='webix_multicombo_input' "+readOnly+" style='"+inputStyle+"' value='"+inputValue+"'/>";
+		html = "<div class='webix_inp_static' onclick='' style='line-height:"+height+"px;width: " + width + "px;  text-align: " + inputAlign + ";height:auto' >"+list+input +"</div>";
+
+		label = common.$renderLabel(obj,id);
+
+		padding = this._settings.awidth - width - webix.skin.$active.inputPadding*2;
+		message = (obj.invalid ? obj.invalidMessage : "") || obj.bottomLabel;
+		if (message)
+			bottomLabel =  "<div class='webix_inp_bottom_label' style='width:"+width+"px;margin-left:"+Math.max(padding,webix.skin.$active.inputPadding)+"px;'>"+message+"</div>";
+
+		if (top)
+			return label+"<div class='webix_el_box' style='width:"+this._settings.awidth+"px; '>"+html+bottomLabel+"</div>";
+		else
+			return "<div class='webix_el_box' style='width:"+this._settings.awidth+"px; min-height:"+this._settings.aheight+"px;'>"+label+html+bottomLabel+"</div>";
+	},
+	_getValueListBox: function(){
+		return this._getBox().getElementsByTagName("UL")[0];
+	},
+
+	_set_inner_size: function(){
+		var popup = this.getPopup();
+		if(popup){
+
+			var textArr = (popup ? popup.setValue(this._settings.value) : null);
+			if(popup._toMultiValue)
+				this._settings.value = popup._toMultiValue(this._settings.value);
+			var html = "";
+			var listbox = this._getValueListBox();
+			var text = textArr && textArr.length;
+			if(text){
+				var height = this._inputHeight - 2*webix.skin.$active.inputPadding - 8;
+				var values = this._settings.value;
+				if(typeof values == "string")
+					values = values.split(this._settings.separator);
+
+				if(this._settings.tagMode){
+					for(var i=0; i < textArr.length;i++){
+						var content = "<span>"+textArr[i]+"</span><span class='webix_multicombo_delete' role='button' aria-label='"+webix.i18n.aria.removeItem+"'>x</span>";
+						html += "<li class='webix_multicombo_value' style='line-height:"+height+"px;' optvalue='"+ values[i]+"'>"+content+"</li>";
+					}
+				}
+				else{
+					html += "<li class='webix_multicombo_tag' style='line-height:"+height+"px;'>"+this._settings.tagTemplate(values)+"</li>";
+				}
+
+			}
+			listbox.innerHTML = html;
+			// reset placeholder
+			var inp = this.getInputNode();
+			if(this._settings.placeholder){
+				if(text){
+					inp.placeholder = "";
+					if(!inp.value && inp.offsetWidth > 20)
+						inp.style.width = "20px";
+				}
+				else if(!inp.value){
+					inp.placeholder = this._settings.placeholder;
+					inp.style.width = this._get_input_width(this._settings)+"px";
+				}
+			}
+
+			if(!this._settings.tagMode && listbox.firstChild)
+				inp.style.width = this._getMultiComboInputWidth() +"px";
+		}
+		this._resizeToContent();
+	},
+	_focusAtEnd: function(inputEl){
+		inputEl = inputEl||this.getInputNode();
+		if (inputEl){
+			if(inputEl.value.length){
+				if (inputEl.createTextRange){
+					var FieldRange = inputEl.createTextRange();
+					FieldRange.moveStart('character',inputEl.value.length);
+					FieldRange.collapse();
+					FieldRange.select();
+				}else if (inputEl.selectionStart || inputEl.selectionStart == '0') {
+					var elemLen = inputEl.value.length;
+					inputEl.selectionStart = elemLen;
+					inputEl.selectionEnd = elemLen;
+					inputEl.focus();
+				}
+			}else{
+				inputEl.focus();
+			}
+		}
+	},
+	_resizeToContent: function(){
+		var top = this._settings.labelPosition == "top";
+		var inputDiv = this._getInputDiv();
+		var inputHeight = Math.max(inputDiv.offsetHeight+ 2*webix.skin.$active.inputPadding, this._inputHeight);
+
+		if(top)
+			inputHeight += this._labelTopHeight;
+
+		inputHeight += this._settings.bottomPadding ||0;
+
+		var sizes = this.$getSize(0,0);
+
+		if(inputHeight != sizes[2]){
+			var cHeight = inputDiv.offsetHeight + (top?this._labelTopHeight:0);
+
+			// workaround for potential rendering loop
+			if(cHeight == this._calcHeight)
+				this._renderCount++;
+			else
+				this._renderCount = 0;
+
+			if(this._renderCount > 10)
+				return false;
+
+			this._calcHeight = cHeight;
+
+			var topView =this.getTopParentView();
+			clearTimeout(topView._template_resize_timer);
+			topView._template_resize_timer = webix.delay(function(){
+				this.config.height = this._calcHeight + 2*webix.skin.$active.inputPadding;
+				this.resize();
+
+				if(this._typing){
+					this._focusAtEnd(this.getInputNode());
+					this._typing = false;
+				}
+				if(this._enter){
+					if(!this._settings.keepText)
+						this.getInputNode().value = "";
+					else
+						this.getInputNode().select();
+					this._enter = false;
+				}
+				if(this.getPopup().isVisible()||this._typing){
+					this.getPopup().show(this._getInputDiv());
+				}
+
+			}, this);
+		}
+		if(this._enter){
+			this.getInputNode().select();
+		}
+	},
+	_getInputDiv: function(){
+		var parentNode = this._getBox();
+		var nodes = parentNode.childNodes;
+		for(var i=0; i < nodes.length; i++){
+			if(nodes[i].className && nodes[i].className.indexOf("webix_inp_static")!=-1)
+				return nodes[i];
+		}
+		return parentNode;
+	},
+	getInputNode: function(){
+		return this._getBox().getElementsByTagName("INPUT")[0];
+	},
+	$setValue:function(){
+		if (this._rendered_input)
+			this._set_inner_size();
+	},
+	getValue:function(config){
+		if(typeof config == "object" && config.options)
+			return this._getSelectedOptions();
+
+		var value = this._settings.value;
+		if (!value) return "";
+		return (typeof value != "string"?value.join(this._settings.separator):value);
+	},
+	_getSelectedOptions: function(){
+		var i, item, popup,
+			options = [],
+			value = this._settings.value;
+
+		if (!value) return [];
+
+		if(typeof value == "string")
+			value = value.split(this._settings.separator);
+
+		popup = this.getPopup();
+
+		for(i = 0; i < value.length; i++){
+			item = popup.getList().getItem(value[i]) || (popup._valueHistory?popup._valueHistory[value[i]]:null);
+			if(item)
+				options.push(item);
+		}
+
+		return options;
+	},
+	$setSize:function(x,y){
+		var config = this._settings;
+		if(webix.ui.view.prototype.$setSize.call(this,x,y)){
+			if (!x || !y) return;
+			if (config.labelPosition == "top"){
+				config.labelWidth = 0;
+			}
+			this.render();
+		}
+	},
+	_calcInputWidth: function(value){
+		var tmp = document.createElement("span");
+		tmp.className = "webix_multicombo_input";
+		tmp.style.visibility = "visible";
+		tmp.style.height = "0px";
+		tmp.innerHTML = value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+		document.body.appendChild(tmp);
+		var width = tmp.offsetWidth+10;
+		document.body.removeChild(tmp);
+		return width;
+	},
+	_getMultiComboInputWidth: function(){
+		var listbox = this._getValueListBox();
+		return listbox.offsetWidth - listbox.firstChild.offsetWidth - 17;
+	},
+	_init_onchange:function(){
+		// input focus and focus styling
+		webix._event(this._getBox(),"click",function(){
+			this.getInputNode().focus();
+		},{bind:this});
+		webix._event(this.getInputNode(),"focus",function(){
+			if(this._getBox().className.indexOf("webix_focused") == -1)
+				this._getBox().className += " webix_focused";
+
+		},{bind:this});
+		webix._event(this.getInputNode(),"blur",function(){
+			this._getBox().className = this._getBox().className.replace(" webix_focused","");
+		},{bind:this});
+
+		// need for clear click ("x") in IE
+		webix._event(this.getInputNode(),"input",function(){
+			if(!this.getInputNode().value && this._inputValue){
+				this.getInputNode().style.width = "20px";
+				this._inputWidth = 20;
+
+				this._inputValue = "";
+				this._typing = true;
+
+				this.getPopup().show(this._getInputDiv());
+				this._resizeToContent();
+			}
+		},{bind:this});
+		// resize
+		webix._event(this.getInputNode(),"keyup",function(e){
+			var inp = this.getInputNode();
+			var calcWidth, width;
+			e = (e||event);
+			// to show placeholder
+			if(this._settings.placeholder && !this._settings.value && !inp.value)
+				width = this._get_input_width(this._settings);
+			else{
+				width = calcWidth = this._calcInputWidth(inp.value)+10;
+				if(!this._settings.tagMode && this._getValueListBox().firstChild)
+					width = this._getMultiComboInputWidth();
+			}
+
+			inp.style.width = width +"px";
+
+			if(calcWidth!=this._inputWidth){
+				if(this._settings.keepText || e.keyCode !=13){
+					this._inputValue = inp.value;
+				}
+				else{
+					this._inputValue = false;
+				}
+				this._typing = true;
+
+				if(this._inputWidth)
+					this.getPopup().show(this._getInputDiv());
+
+				this._inputWidth = calcWidth||width;
+				this._resizeToContent();
+			}
+			else if(this._windowHeight != this.getPopup().$height){
+				this.getPopup().show(this._getInputDiv());
+			}
+		},{bind:this});
+
+		// remove the last value on Backspace click
+		webix._event(this.getInputNode(),"keydown",function(e){
+			this._enter = false;
+			if (this.isVisible()){
+				e = (e||event);
+				var node = this._getValueListBox().lastChild;
+				this._windowHeight = this.getPopup().$height;
+				if(e.keyCode == 8 && node){
+					if(!this.getInputNode().value && ((new Date()).valueOf() - (this._backspaceTime||0) > 800)){
+						this._typing = true;
+						this._removeValue(node.getAttribute("value"));
+					}
+					else{
+						this._backspaceTime = (new Date()).valueOf();
+					}
+				}
+
+				if(e.keyCode == 13 || e.keyCode == 9){
+					var input = this.getInputNode();
+					var id = "";
+					var suggest = webix.$$(this._settings.suggest);
+					var list = suggest.getList();
+					// if no selected options
+
+					if(!list.getSelectedId()){
+						if (input.value)
+							id = suggest.getSuggestion();
+
+						if(this._settings.newValues){
+							if(e.keyCode == 13)
+								this._enter = true;
+							this._addNewValue(input.value);
+						}
+						else if(id){
+							if(e.keyCode == 9){
+								this._typing = false;
+								this._inputValue = "";
+								this._inputWidth = 10;
+								input.value = "";
+								this._addValue(id);
+							}
+							else{
+								this._enter = true;
+								this._addValue(id);
+								if(this._settings.keepText)
+									this._inputValue = input.value;
+								else
+									input.value = "";
+							}
+						}
+
+					}
+					if(e.keyCode == 13){
+						this._enter = true;
+						this._typing = true;
+					}
+
+				}
+			}
+		},{bind:this});
+		webix.$$(this._settings.suggest).linkInput(this);
+	}
+}, webix.ui.richselect);
 
 
 
@@ -35165,6 +37486,170 @@ webix.protoUI({
 }, webix.ui.text);
 
 
+webix.protoUI({
+	name:"rangeslider",
+	$cssName:"slider webix_rangeslider",
+	defaults:{
+		separator: ",",
+		value: "20,80",
+		template:function(obj, common){
+			var id = "x" + webix.uid();
+			common._handle_id = [id+"_0",id+"_1"];
+
+			var aria = "role='slider' aria-label='"+obj.label+(obj.title?(" "+obj.title(obj)):"")+"' aria-valuemax='"+obj.max+"' aria-valuemin='"+obj.min+"' tabindex='0'";
+			var handles = "<div class='webix_slider_handle webix_slider_handle_0' id='"+common._handle_id[0]+"' "+aria+" aria-valuenow='"+obj.value[0]+"'>&nbsp;</div>";
+			handles += "<div class='webix_slider_handle webix_slider_handle_1' id='"+common._handle_id[1]+"' "+aria+" aria-valuenow='"+obj.value[1]+"'>&nbsp;</div>";
+			var html = "<div class='webix_slider_title'></div><div class='webix_slider_box'><div class='webix_slider_right'>&nbsp;</div><div class='webix_slider_left'></div>"+handles+"</div>";
+			return common.$renderInput(obj, html, id);
+		}
+	},
+	value_setter: function(value){
+
+		if(!webix.isArray(value)){
+			value = value.toString().split(this._settings.separator);
+		}
+		if(value.length <2)
+			value[1] = value[0];
+		value[0] = parseFloat(value[0]);
+		value[1] = parseFloat(value[1]);
+		return value;
+	},
+	_get_slider_handle:function(index){
+		index = index && index>=0?index:0;
+		return this.$view.querySelector(".webix_slider_handle_"+(index||0));
+	},
+	_get_left_pos: function(width,index){
+		var config, max, value;
+
+		config = this._settings;
+		max = config.max - config.min;
+		value = config.value[index]%config.step?(Math.round(config.value[index]/config.step)*config.step):config.value[index];
+		value =  Math.max(Math.min(value,config.max),config.min);
+		return Math.ceil((width - 20) * (value-config.min) / max);
+	},
+	_set_inner_size:function(){
+		var config, handle0,  handle1,
+			left0, left1, parentBox, width;
+
+		handle0 =this._get_slider_handle(0);
+		handle1 = this._get_slider_handle(1);
+		config = this._settings;
+
+		if(!webix.isArray(config.value)){
+			this.define("value",config.value);
+		}
+		//10 - padding of webix_slider_box ( 20 = 10*2 )
+		//8 - width of handle / 2
+
+		if (handle0){
+
+			width = this._get_input_width(config);
+
+			parentBox = handle0.parentNode;
+			parentBox.style.width =  width+"px";
+
+			left0 = this._get_left_pos(width, 0);
+			left1 = this._get_left_pos(width, 1);
+
+			handle0.style.left = 10 + left0 - 8 + "px";
+			handle1.style.left = 10 + left1 - 8 + "px";
+
+			parentBox.firstChild.style.width = width - 22+ "px";
+
+			parentBox.childNodes[1].style.width = left1 - left0 + "px";
+			parentBox.childNodes[1].style.left = left0+12 + "px";
+
+
+			if (this._settings.title){
+				handle0.parentNode.previousSibling.innerHTML = this._settings.title(this._settings, this);
+			}
+		}
+	},
+	_set_value_now:function(){
+		for(var i=0; i<2; i++){
+			this._get_slider_handle(i).setAttribute("aria-valuenow", this._settings.value[i]);
+		}
+    },
+	_mouse_down_process: function(e){
+		var trg = e.target || e.srcElement;
+		var match =  /webix_slider_handle_(\d)/.exec(trg.className);
+		this._activeIndex = match?parseInt(match[1],10):-1;
+
+		if(match)
+			this._set_handle_active(this._activeIndex);
+	},
+	setValue:function(value){
+		var oldvalue = this._settings.value;
+
+		var temp = (typeof value == "object"?value.join(this._settings.separator):value);
+
+		if (oldvalue.join(this._settings.separator) == temp) return false;
+
+		this._settings.value = value;
+		if (this._rendered_input)
+			this.$setValue(value);
+
+		this.callEvent("onChange", [value, oldvalue]);
+	},
+	$getValue:function(){
+		var value = this._settings.value;
+		return this._settings.stringResult?value.join(this._settings.separator):value;
+	},
+	_set_handle_active: function(index){
+		var hActive = this._get_slider_handle(index);
+		var h = this._get_slider_handle(1-index);
+		if(hActive.className.indexOf("webix_slider_active") == -1)
+			hActive.className += " webix_slider_active";
+		h.className = h.className.replace(" webix_slider_active","");
+	},
+	_get_value_from_pos:function(pos){
+		var config = this._settings;
+		var value = config.value;
+		//10 - padding of slider box
+		var max = config.max - config.min;
+
+		var left = webix.html.offset(this._get_slider_handle().parentNode).x;
+		var newvalue = Math.ceil((pos-left) * max / this._get_input_width(config));
+		newvalue = Math.round((newvalue+config.min)/config.step) * config.step;
+
+		var index = null;
+
+		var pos0 = webix.html.offset(this._get_slider_handle(0)).x;
+		var pos1 = webix.html.offset(this._get_slider_handle(1)).x;
+
+		if(pos0==pos1 && (config.value[0] == config.min || config.value[0] == config.max) ){
+			index = (config.value[0] == config.min?1:0);
+			this._set_handle_active(index);
+		}
+		else{
+			if(this._activeIndex >=0){
+				index = this._activeIndex;
+			}else{
+				if(pos0==pos1){
+					index = (pos < pos0?0:1);
+				}
+				else{
+					var dist0 = Math.abs(pos0-pos);
+					var dist1 = Math.abs(pos1-pos);
+					index = dist0<dist1?0:1;
+					this._activeIndex = index;
+				}
+			}
+		}
+
+
+		if(index){
+			value[index] = Math.max(Math.min(newvalue, config.max), value[0]);
+		}
+		else{
+			value[index] = Math.max(Math.min(newvalue, value[1]), config.min);
+		}
+
+		return value;
+	}
+}, webix.ui.slider);
+
+
 
 
 /*
@@ -35546,6 +38031,969 @@ webix.ProgressBar = {
 		}
 	}
 };
+webix.protoUI({
+	name:"multitext",
+	$cssName:"text",
+	defaults:{
+		icon:"plus-circle",
+		iconWidth:25,
+		separator:", "
+	},
+	getValueHere:function(){
+		return webix.ui.text.prototype.getValue.call(this);
+	},
+	setValueHere:function(value){
+		return webix.ui.text.prototype.$setValue.call(this, value);
+	},
+	getValue:function(){
+		if (this.config.mode == "extra") return this.getValueHere();
+
+		var values = [ this.getValueHere(this) ];
+		for (var i=0; i<this._subs.length; i++){
+			var seg = webix.$$(this._subs[i]).getValueHere();
+			if (seg) values.push(seg);
+		}
+		return values.join(this.config.separator);
+	},
+	$setValue:function(value){
+		value = value || "";
+		if (this._known_value == value) return;
+
+		this._known_value = value;
+
+		if (this.config.mode == "extra") return this.setValueHere(value);
+
+		this.removeSection();
+		var parts = value.split(this.config.separator);
+		this.setValueHere.call(this, parts[0]);
+		for (var i = 1; i<parts.length; i++){
+			var next = this.addSection();
+			webix.$$(next).setValueHere(parts[i]);
+		}
+	},
+	_subOnChange:function(call){
+		var parent = this.config.master ? webix.$$(this.config.master) : this;
+		var newvalue = parent.getValue();
+		var oldvalue = parent._settings.value;
+		if (newvalue !== oldvalue){
+			parent._settings.value = newvalue;
+			parent.callEvent("onChange", [newvalue, oldvalue]);
+		}
+	},
+	addSection:function(){
+		var config = this.config,
+			newConfig = {
+				labelWidth: config.labelWidth,
+				inputWidth: config.inputWidth,
+				width: config.width,
+				label: config.label ? "&nbsp;" : "",
+				view: this.name,
+				mode: "extra",
+				value: "",
+				icon: "minus-circle",
+				suggest: config.suggest || null,
+				master: config.id
+			};
+
+		webix.extend(newConfig, config.subConfig||{},true);
+
+		var newone = this.getParentView().addView(newConfig);
+		webix.$$(newone).attachEvent("onChange", this._subOnChange);
+
+		this._subs.push(newone);
+		return newone;
+	},
+	removeSection:function(id){
+		var parent = this.config.master ? webix.$$(this.config.master) : this;
+		for (var i = parent._subs.length - 1; i >= 0; i--){
+			var section = parent._subs[i];
+			if (!id || section == id){
+				parent._subs.removeAt(i);
+				this.getParentView().removeView(section);
+			}
+		}
+	},
+	on_click:{
+		"webix_input_icon":function(ev, id, html){
+			if (this.config.mode == "extra"){
+				this.removeSection(this.config.id);
+				var childs = this.getParentView().getChildViews();
+				childs[childs.length - 1].focus();
+				this._subOnChange();
+			} else
+				webix.$$( this.addSection() ).focus();
+
+			return false;
+		}
+	},
+	$init:function(){
+		this._subs = webix.toArray([]);
+		this.attachEvent("onKeyPress", this._onKeyPress);
+	},
+	$render:function(obj){
+		this.$setValue(obj.value);
+	},
+}, webix.ui.text);
+/*
+	UI:Organogram
+*/
+
+
+
+
+webix.protoUI({
+	name:"organogram",
+	defaults:{
+		scroll: "auto",
+		ariaLabel:"lines"
+	},
+	$init:function(){
+		this._viewobj.className += " webix_organogram";
+		//map API of DataStore on self
+		this._html = document.createElement("DIV");
+
+		this.$ready.push(this._afterInit);
+		webix.extend(this.data, webix.TreeStore, true);
+		this.data.provideApi(this,true);
+	},
+	//attribute , which will be used for ID storing
+	_id:"webix_dg_id",
+	//supports custom context menu
+	on_click:{
+		webix_organogram_item:function(e,id){
+			if (this._settings.select){
+				if (this._settings.select=="multiselect"  || this._settings.multiselect)
+					this.select(id, false, (e.ctrlKey || e.metaKey || (this._settings.multiselect == "touch")), e.shiftKey); 	//multiselection
+				else
+					this.select(id);
+				this._no_animation = false;
+			}
+		}
+	},
+	on_context:{},
+	on_dblclick:{},
+	_afterInit:function(){
+		this._dataobj.style.position = "relative";
+		this.data.attachEvent("onStoreUpdated",webix.bind(this.render,this));
+	},
+	_toHTMLItem:function(obj){
+		var mark = this.data._marks[obj.id];
+
+		this.callEvent("onItemRender",[obj]);
+		return this.type.templateStart.call(this,obj,this.type,mark)+(obj.$template?this.type["template"+obj.$template].call(this,obj,this.type,mark):this.type.template.call(this,obj,this.type,mark))+this.type.templateEnd.call(this);
+	},
+	_toHTML:function(obj){
+		//check if related template exist
+		var html=this._toHTMLItem(obj);
+
+		if (this.data.branch[obj.id])
+			html += this._renderBranch(obj.id);
+
+		return html;
+	},
+	_isListBlocks: function(){
+		return 	this.type.listMarginX || this.type.listMarginY;
+	},
+	_renderBranch: function(pId){
+		var elem, i, id,
+			html = "",
+			leaves = this.data.branch[pId],
+			marks = this.data._marks[pId],
+			pItem = this.getItem(pId),
+			sizes, totalWidth,
+			type = (pItem?pItem.$type:false);
+
+
+
+		if(!pId){
+			this._colHeight = [];
+			this.$xy = {};
+			totalWidth = this.$width - this.type.padding*2;
+
+			this.$xy[0] = {
+				totalWidth: totalWidth,
+				start: this.type.padding,
+				width: 0,
+				height: 0,
+				left: totalWidth/2,
+				top: this.type.padding||0
+			};
+		}
+
+		if(leaves){
+			sizes = this.$xy[pId];
+
+			// draw items inside list container
+			if(type == "list" && !this._isListBlocks()){
+				html += this.type.templateListStart.call(this,pItem, this.type, marks);
+			}
+			// render items and calculate heights
+			var sumTotalWidth = 0;
+
+
+			for( i=0; i < leaves.length; i++){
+				id = leaves[i];
+				totalWidth = this._tw[id];
+				var obj = this.getItem(id);
+
+				if(obj.open == webix.undefined)
+					obj.open = true;
+
+				if(type == "list")
+					this.data.addMark(id, "list_item","", 1, true);
+
+				var height = this._getItemHeight(id);
+				if(type == "list"){
+					var leftOffset = (type == "list"&&this._isListBlocks()?this.type.listMarginX:0);
+					var itemMargin = 0;
+					if(this._isListBlocks())
+						itemMargin = this.type.listMarginY;
+					else if(!i)
+						itemMargin = this.type.marginY;
+
+					this.$xy[id] = {
+						totalWidth: totalWidth,
+						start: sizes.start,
+						width: this.type.width,
+						height: height,
+						left: sizes.start + totalWidth/2 -  this.type.width/2+ leftOffset,
+						top: i?(this.$xy[leaves[i-1]].top+this.$xy[leaves[i-1]].height+itemMargin):(sizes.top+sizes.height+itemMargin)
+					};
+				}
+				else{
+					this.$xy[id] = {
+						totalWidth: totalWidth,
+						start: sizes.start + sumTotalWidth,
+						width: this.type.width,
+						height: height,
+						left: sizes.start + sumTotalWidth  + totalWidth/2 -  this.type.width/2 ,
+						top: sizes.top + sizes.height + (pId?this.type.marginY:0)
+					};
+
+				}
+				html += this._toHTMLItem(obj);
+				sumTotalWidth += totalWidth;
+
+			}
+			if(!pId && sumTotalWidth){
+				this._dataobj.style.width = sumTotalWidth+this.type.padding*2+"px";
+			}
+			// draw child branches
+			for( i=0; i < leaves.length; i++){
+				id = leaves[i];
+
+				if (this.data.branch[id] && this.getItem(id).open)
+					html += this._renderBranch(id);
+				else if(pItem){
+					if(pItem.$type != "list")
+						this._colHeight.push(this.$xy[id].top+this.$xy[id].height);
+					else if(i == (leaves.length-1)){
+						this._colHeight.push(this.$xy[id].top+this.$xy[id].height);
+					}
+				}
+			}
+
+			if(type == "list" && !this._isListBlocks())
+				html += this.type.templateListEnd(pItem, this.type, marks);
+		}
+
+		return html;
+	},
+
+
+	_getItemHeight: function(id){
+		var item = this.getItem(id);
+		var height = this.type.height;
+		if( typeof height == "function"){
+			height = height.call(item, this.type, this.data._marks[id]);
+		}
+
+
+		if(!this._hDiv){
+			this._hDiv = webix.html.create("div");
+			this._dataobj.appendChild(this._hDiv);
+
+		}
+
+		this._hDiv.className = this.type.classname(item,this.type,this.data._marks[id]);
+		this._hDiv.style.cssText="width:"+this.type.width+"px;height:"+height+(height=="auto"?"":"px")+";";
+		this._hDiv.innerHTML = this.type.template.call(this,item,this.type,this.data._marks[id]);
+		return this._hDiv.scrollHeight;
+	},
+	_calcTotalWidth: function(){
+		var tw = {};
+		var width = this.type.width;
+		var margin = this.type.marginX;
+		this.data.each(function(obj){
+			tw[obj.id] = width + margin;
+
+			var parentId = this.getParentId(obj.id);
+			if(parentId && this.getItem(parentId).$type != "list")
+				while(parentId){
+					var leaves = this.branch[parentId];
+					tw[parentId] = 0;
+
+					for( var i =0; i < leaves.length; i++){
+						tw[parentId] += tw[leaves[i]]||0;
+					}
+					parentId = this.getParentId(parentId);
+				}
+		});
+		this._tw = tw;
+		return tw;
+
+	},
+	getItemNode:function(searchId){
+		if (this._htmlmap)
+			return this._htmlmap[searchId];
+
+		//fill map if it doesn't created yet
+		this._htmlmap={};
+
+		var t = this._dataobj.childNodes;
+		for (var i=0; i < t.length; i++){
+			var id = t[i].getAttribute(this._id); //get item's
+			if (id)
+				this._htmlmap[id]=t[i];
+			if(t[i].className.indexOf("webix_organogram_list")!=-1 && !this._isListBlocks()){
+				var listNodes = t[i].childNodes;
+				for (var j=0; j < listNodes.length; j++){
+					id = listNodes[j].getAttribute(this._id); //get item's
+					if (id)
+						this._htmlmap[id]=listNodes[j];
+				}
+			}
+
+		}
+
+		//call locator again, when map is filled
+		return this.getItemNode(searchId);
+	},
+	_toHTMLObject:function(obj){
+		this._html.innerHTML = this._toHTMLItem(obj);
+		return this._html.firstChild;
+	},
+	render:function(id,data,type){
+		if (!this.isVisible(this._settings.id) || this.$blockRender)
+			return;
+		if (webix.debug_render)
+			webix.log("Render: "+this.name+"@"+this._settings.id);
+
+		if(type == "update"){
+			var cont = this.getItemNode(id); //get html element of updated item
+
+			var t = this._htmlmap[id] = this._toHTMLObject(data);
+			webix.html.insertBefore(t, cont);
+			webix.html.remove(cont);
+			return true;
+		}
+		else{
+			//full reset
+			if (this.callEvent("onBeforeRender",[this.data])){
+				this._calcTotalWidth();
+				this._htmlmap = null;
+				this._dataobj.innerHTML = this._renderBranch(0);
+				this._hDiv = null;
+
+				this._dataobj.style.height = Math.max.apply(Math, this._colHeight)+this.type.padding+"px";
+				this._renderCanvas();
+				this.resize();
+				this.callEvent("onAfterRender",[]);
+			}
+		}
+		return true;
+	},
+	_renderCanvas: function(){
+		if(this.canvas)
+			this.canvas.clearCanvas(true);
+
+		this.canvas = new webix.Canvas({
+			container:this._dataobj,
+			name:this._settings.ariaLabel,
+			width: this._dataobj.offsetWidth,
+			height:this._dataobj.offsetHeight
+		});
+
+		this._drawLines(0);
+	},
+	_drawLine:function(ctx,x1,y1,x2,y2,color,width){
+		ctx.strokeStyle = color;
+		ctx.lineCap='square';
+		ctx.lineWidth = width;
+		ctx.beginPath();
+		ctx.moveTo(x1,y1);
+		ctx.lineTo(x2,y2);
+		ctx.stroke();
+		ctx.lineWidth = 1;
+	},
+	_drawLines: function(id,ctx){
+		var i, item, leaves, p, s,
+			x12,y1,y2,
+			start, end;
+
+		var layout = this.config.layout;
+		if(!ctx)
+			ctx = this.canvas.getCanvas();
+		if(!this.$xy){
+			return;
+		}
+		id = id||0;
+		leaves = this.data.branch[id];
+		item = this.getItem(id);
+		if(leaves && leaves.length){
+			p = this.$xy[id];
+			// draw a vertical line between parent and nodes
+			if(id){
+
+				x12 = parseInt(p.left+ p.width/2,10) +0.5;
+				y1 = parseInt(p.top + p.height,10);
+				y2 = parseInt(p.top + p.height+ this.type.marginY/2,10);
+
+				if(item.$type == "list"){
+					if(!this._isListBlocks()){
+						y2 = parseInt(p.top + p.height+ this.type.marginY,10);
+						this._drawLine(ctx,x12, y1, x12, y2, this.type.lineColor);
+						return;
+					}
+
+				}
+				else
+					this._drawLine(ctx,x12, y1, x12, y2, this.type.lineColor);
+			}
+
+
+			y1 =  parseInt(p.top + p.height+ this.type.marginY/2,10)+0.5;
+			for(i = 0; i < leaves.length; i++){
+				if(id){
+					s = this.$xy[leaves[i]];
+					if(item.$type == "list" && this._isListBlocks()){
+						x12 = parseInt(p.left + this.type.listMarginX/2,10) + 0.5;
+						if(!i)
+							start = x12;
+						else if(i == (leaves.length - 1))
+							end = x12;
+						y2 = parseInt(s.top + s.height/2,10);
+						this._drawLine(ctx,x12, y1 - this.type.marginY/2, x12, y2, this.type.lineColor);
+						this._drawLine(ctx,x12, y2, x12+this.type.listMarginX/2, y2, this.type.lineColor);
+					}
+					else{
+						x12 = parseInt(s.left+ s.width/2,10) + 0.5;
+						if(!i)
+							start = x12;
+						else if(i == (leaves.length - 1))
+							end = x12;
+						y2 = parseInt(s.top ,10);
+						this._drawLine(ctx,x12, y1, x12, y2, this.type.lineColor);
+					}
+
+				}
+				if(this.getItem(leaves[i]).open)
+					this._drawLines(leaves[i],ctx);
+			}
+			if(id)
+				this._drawLine(ctx,start, y1, end, y1,this.type.lineColor);
+		}
+	},
+	//autowidth, autoheight - no inner scroll
+	//scrollable - width, height, auto, with scroll
+	$getSize:function(dx,dy){
+		var aW = this._settings.autowidth;
+		var aH = this._settings.autoheight;
+		if(aW){
+			dx = this._dataobj.offsetWidth+(this._dataobj.offsetHeight>dy && !aH?webix.ui.scrollSize:0);
+		}
+		if(aH){
+			dy = this._dataobj.offsetHeight + (this._dataobj.offsetWidth>dx && !aW?webix.ui.scrollSize:0);
+		}
+
+		return webix.ui.view.prototype.$getSize.call(this, dx, dy);
+	},
+	$setSize:function(x,y){
+		if(webix.ui.view.prototype.$setSize.call(this,x,y)){
+			this._dataobj.style.width = this.$width+"px";
+			this._dataobj.style.height = this.$height+"px";
+			this.render();
+		}
+	},
+	//css class to action map, for dblclick event
+	type:{
+		width: 120,
+		height: "auto",
+		padding: 20,
+		marginX: 20,
+		marginY: 20,
+		listMarginX: 0,
+		listMarginY: 0,
+		lineColor: "#90caf9",
+		classname:function(obj, common, marks){
+			var css = "webix_organogram_item ";
+			if (obj.$css){
+				if (typeof obj.$css == "object")
+					obj.$css = webix.html.createCss(obj.$css);
+				css += " "+obj.$css;
+			}
+
+			if(marks && marks.list_item)
+				css += " webix_organogram_list_item ";
+			if(marks && marks.$css)
+				css += marks.$css;
+			css += " webix_organogram_level_"+obj.$level;
+			return css;
+		},
+		listClassName: function(obj){
+			var css =  "webix_organogram_list webix_organogram_list_"+obj.$level;
+			if (obj.$listCss){
+				if (typeof obj.$listCss == "object")
+					obj.$listCss = webix.html.createCss(obj.$listCss);
+				css += " "+obj.$listCss;
+			}
+			return css;
+		},
+		template:webix.template("#value#"),
+		templateStart:function(obj,type,marks){
+			var style="";
+			if((!(marks && marks.list_item) || type.listMarginX || type.listMarginY) && this.$xy){
+				var xy = this.$xy[obj.id];
+				style += "width: "+ xy.width+"px; height: " + xy.height+"px;";
+				style += "top: "+ xy.top+"px; left: " + xy.left+"px;";
+			}
+			return '<div webix_dg_id="'+obj.id+'" class="'+type.classname.call(this,obj,type,marks)+'"'+(style?'style="'+style+'"':'')+'">';
+		},
+		templateEnd:webix.template("</div>"),
+		templateListStart:function(obj,type,marks){
+			var style="";
+			if(this.$xy){
+				var xy = this.$xy[obj.id];
+				style += "width: "+ xy.width+"px;";
+				style += "top: "+ (xy.top+xy.height+type.marginY)+"px; left: " + xy.left+"px;";
+			}
+			return '<div class="'+type.listClassName.call(this,obj,type,marks)+'"'+(style?'style="'+style+'"':'')+'">';
+		},
+		templateListEnd:webix.template("</div>")
+	}
+}, webix.AutoTooltip, webix.Group, webix.TreeAPI, webix.DataMarks, webix.SelectionModel, webix.MouseEvents, webix.Scrollable, webix.RenderStack, webix.TreeDataLoader, webix.DataLoader, webix.ui.view, webix.EventSystem);
+
+
+
+
+webix.protoUI({
+	name: "barcode",
+	defaults:{
+		type: "ean13",
+		height: 160,
+		width: 220,
+		paddingY: 10,
+		paddingX: 20,
+		textHeight: 20,
+		color: "#000",
+		ariaLabel:"bars"
+	},
+	$init: function(){
+		this.$view.className += " webix_barcode";
+		if (!this.types){
+			this.types = { "default" : this.type };
+			this.type.name = "default";
+		}
+	},
+	type:{},
+	render: function(){
+		if(this.isVisible(this._settings.id)){
+			if(this.canvas)
+				this.canvas.clearCanvas(true);
+			this.$view.innerHTML = "";
+			this._renderCanvas();
+		}
+	},
+	_renderCanvas: function(){
+		this.canvas = new webix.Canvas({
+			container:this.$view,
+			name:this._settings.ariaLabel,
+			width: this.$width,
+			height:this.$height
+		});
+		this._drawBars();
+	},
+	_drawBars: function(){
+		var code, ctx, i, len,
+			value = this._settings.value,
+			type = this._settings.type;
+
+		if(!type || !this.types[type] || !value)
+			return false;
+
+		code = this.type.encode(value);
+		len = code.length;
+
+		ctx = this.canvas.getCanvas();
+		if(len){
+			var unitWidth = (this.$width - this.config.paddingX*2)/len;
+			var unitNum = 0;
+
+			for( i = 0; i < len ; i++ ){
+				var ch1 = parseInt(code.charAt(i),10);
+				if(ch1){
+					unitNum++;
+					if(i == (len-1)){
+						this._drawBar(ctx,i+1,unitWidth,unitNum,len);
+					}
+				}
+				else if(unitNum){
+					this._drawBar(ctx,i,unitWidth,unitNum,len);
+					unitNum=0;
+				}
+			}
+
+			// add text
+			this._addText(value, unitWidth);
+		}
+	},
+	_drawBar: function(ctx,i,unitWidth,unitNum,num){
+		var x0, x1, y0, y1;
+
+		x1 = parseInt(i*unitWidth+this.config.paddingX,10);
+		x0 = parseInt(x1 - unitNum*unitWidth,10);
+		y0 = this.config.paddingY;
+		y1 = this.$height - this.config.paddingY - this.config.textHeight;
+
+		if(this._isEAN() && ( i<4 || i>(num-4) || (i < (num/2+2) && i>(num/2-2)))){
+			y1 += this.config.textHeight/2;
+		}
+		ctx.fillStyle = this.config.color;
+		ctx.beginPath();
+		ctx.moveTo(x0,y0);
+		ctx.lineTo(x1,y0);
+		ctx.lineTo(x1,y1);
+		ctx.lineTo(x0,y1);
+		ctx.lineTo(x0,y0);
+		ctx.fill();
+	},
+	_addText: function(value, barWidth){
+		var i, len, x;
+
+		if(this.type.template)
+			value = this.type.template(value);
+
+		if(this._isEAN()){
+			if(this.type.firstDigit){
+				this.canvas.renderTextAt(true,"left", this.config.paddingX,this.$height-this.config.paddingY, value.charAt(0));
+				value = value.slice(1);
+			}
+
+			len = value.length;
+
+			if(this.type.lastDigit)
+				len--;
+
+			if(len){
+				var tUnitWidth = (this.$width - this.config.paddingX*2 - barWidth*11)/len;
+
+				for( i = 0; i < len; i++ ){
+					x = this.config.paddingX + i*tUnitWidth + (i<len/2?3:8)*barWidth +tUnitWidth/2;
+					this.canvas.renderTextAt(true, true, x, this.$height - this.config.paddingY, value.charAt(i));
+				}
+
+				if(this.type.lastDigit){
+					x = this.config.paddingX + len*tUnitWidth + 11*barWidth;
+					this.canvas.renderTextAt(true, false, x, this.$height-this.config.paddingY, value.charAt(len));
+				}
+			}
+		}
+		else{
+			this.canvas.renderTextAt( true, true, this.$width/2, this.$height - this.config.paddingY, value );
+		}
+	},
+	setValue: function(value){
+		this._settings.value = value;
+		this.render();
+		return value;
+	},
+	getValue: function(){
+		var value = this._settings.value;
+		return this.type.template?this.type.template(value):value;
+	},
+	type_setter:function(value){
+		if(!this.types[value])
+			this.customize(value);
+		else {
+			this.type = webix.clone(this.types[value]);
+			if (this.type.css)
+				this._contentobj.className+=" "+this.type.css;
+		}
+		return value;
+	},
+	_isEAN: function(){
+		var type = this.config.type;
+		return (type.indexOf("ean")===0 || type.indexOf("upcA")!=-1);
+	},
+	$setSize:function(x,y){
+		if(webix.ui.view.prototype.$setSize.call(this,x,y)){
+			this.render();
+		}
+	}
+},webix.ui.view);
+
+/*
+ * EAN8
+ * */
+webix.type(webix.ui.barcode, {
+	name:"ean8",
+	encodings: [
+		["0001101", "1110010"],
+		["0011001", "1100110"],
+		["0010011", "1101100"],
+		["0111101", "1000010"],
+		["0100011", "1011100"],
+		["0110001", "1001110"],
+		["0101111", "1010000"],
+		["0111011", "1000100"],
+		["0110111", "1001000"],
+		["0001011", "1110100"]
+	],
+	encode: function(value){
+		var code, i;
+		value = value.replace(/[^0-9]/g,"").substring(0, 7);
+		if(value.length != 7)
+			return "";
+
+		value = value + this.checksum(value);
+
+		code = "101";
+
+		for(i=0; i<4; i++){
+			code += this.encodings[parseInt(value.charAt(i),10)][0];
+		}
+
+		code += "01010";
+
+		for(i=4; i<8; i++){
+			code += this.encodings[parseInt(value.charAt(i),10)][1];
+		}
+
+		code += "101";
+		return code;
+	},
+	template: function(value){
+		return value.replace(/[^0-9]/g,"").substring(0, 7) + this.checksum(value);
+	},
+	checksum: function (value){
+		value = value.substring(0, 7);
+		var i,
+			odd = true,
+			sum = 0;
+
+		for(i=0; i<7; i++){
+			sum += (odd ? 3 : 1) * parseInt(value.charAt(i),10);
+			odd = !odd;
+		}
+		return ((10 - sum % 10) % 10).toString();
+	}
+});
+
+/*
+ * EAN13
+ * */
+webix.type(webix.ui.barcode, {
+	name:"ean13",
+	firstDigit: true,
+	encodings: [
+		["0001101", "0100111", "1110010", "000000"],
+		["0011001", "0110011", "1100110", "001011"],
+		["0010011", "0011011", "1101100", "001101"],
+		["0111101", "0100001", "1000010", "001110"],
+		["0100011", "0011101", "1011100", "010011"],
+		["0110001", "0111001", "1001110", "011001"],
+		["0101111", "0000101", "1010000", "011100"],
+		["0111011", "0010001", "1000100", "010101"],
+		["0110111", "0001001", "1001000", "010110"],
+		["0001011", "0010111", "1110100", "011010"]
+	],
+	encode: function(value){
+		var code, columnIndexes, i;
+
+		value = value.replace(/[^0-9]/g,"").substring(0, 12);
+
+		if (value.length != 12)
+			return "";
+
+		value += this.checksum(value);
+
+		code = "101";
+
+		columnIndexes = this.encodings[parseInt(value.charAt(0),10) ][3];
+
+		for(i=1; i<7; i++){
+			code += this.encodings[parseInt(value.charAt(i),10)][ parseInt(columnIndexes.charAt(i-1),10)];
+		}
+
+		code += "01010";
+
+		for(i=7; i<13; i++){
+			code += this.encodings[parseInt(value.charAt(i),10)][2];
+		}
+
+		code += "101";
+		return code;
+	},
+	template: function(value){
+		return value.replace(/[^0-9]/g,"").substring(0, 12)  + this.checksum(value);
+	},
+	checksum: function (value){
+		var i,
+			odd = false,
+			sum = 0;
+
+		value = value.substring(0, 12);
+		for(i=0; i<12; i++){
+			sum += (odd ? 3 : 1) * parseInt(value.charAt(i),10);
+			odd = !odd;
+		}
+		return ((10 - sum % 10) % 10).toString();
+	}
+});
+
+/*
+* UPC-A
+* */
+webix.type(webix.ui.barcode, {
+	name:"upcA",
+	firstDigit: true,
+	lastDigit: true,
+	encode: function(value){
+		if (value.length < 12) {
+			value = '0' + value;
+		}
+		return webix.ui.barcode.prototype.types.ean13.encode(value);
+	},
+	template: function(value){
+		return value.replace(/[^0-9]/g,"").substring(0, 11)  + this.checksum(value);
+	},
+	checksum: function (value){
+		if (value.length < 12) {
+			value = '0' + value;
+		}
+		return webix.ui.barcode.prototype.types.ean13.checksum(value);
+	}
+});
+
+webix.protoUI({
+   name:"abslayout",
+   $init:function(){
+      this.$view.className += " webix_abslayout";
+      delete this.rows_setter;
+      delete this.cols_setter;
+   },
+   cells_setter:function(cells){
+      this._collection = cells;
+   },
+   _parse_cells:function(){
+      webix.ui.baselayout.prototype._parse_cells.call(this, this._collection);
+   },
+   $getSize:function(dx, dy){
+      return webix.ui.baseview.prototype.$getSize.call(this, 0, 0);
+   },
+   $setSize:function(x,y){
+      this._layout_sizes = [x,y];
+      webix.debug_size_box_start(this);
+
+      webix.ui.baseview.prototype.$setSize.call(this,x,y);
+      this._set_child_size(x,y);
+
+      webix.debug_size_box_end(this, [x,y]);
+   },
+   _set_child_size:function(x,y){
+      for (var i=0; i<this._cells.length; i++){
+         var view = this._cells[i];
+         var sizes = view.$getSize(0,0);
+         view.$setSize(sizes[0], sizes[2]);
+
+         var node = view.$view;
+         node.style.left = view._settings.left + "px";
+         node.style.top  = view._settings.top  + "px";
+      }
+   }
+}, webix.ui.baselayout);
+
+webix.protoUI({
+	name:"datalayout",
+	$init:function(){
+		this.data.provideApi(this, true);
+		this.data.attachEvent("onStoreUpdated", webix.bind(this.render, this));
+	},
+	_parse_cells:function(cells){
+		if (!this._origin_cells){
+			this._origin_cells = this._collection;
+			this._collection = [{}];
+		}
+
+		return webix.ui.layout.prototype._parse_cells.call(this, this._collection);
+	},
+	_fill_data:function(view, prop){
+		var obj, name = view._settings.name;
+		if (name){
+			if (name == "$value")
+				obj = prop;
+			else
+				obj = prop[name];
+
+			if (view.setValues) view.setValues(obj);
+			else if (view.setValue) view.setValue(obj);
+			else if (view.parse){
+				//make copy of data for treestore parsers
+				if (view.openAll)
+					obj = webix.copy(obj);
+				view.parse(obj);
+			}
+		} else {
+			var collection = view._cells;
+			if (collection)
+				for (var i = 0; i < collection.length; i++)
+					this._fill_data(collection[i], prop);
+		}
+	},
+	render:function(id, obj, mode){
+		if (id && mode === "update"){
+			//update mode, change only part of layout
+			var obj = this.getItem(id);
+			var index = this.getIndexById(id);
+
+			this._fill_data(this._cells[index], obj);
+			return;
+		}
+
+		//full repainting
+		var cells = this._collection = [];
+		var order = this.data.order;
+		var subcount = this._origin_cells.length;
+
+		for (var i = 0; i < order.length; i++) {
+		if (subcount)
+				for (var j = 0; j < subcount; j++)
+					cells.push(webix.copy(this._origin_cells[j]));
+			else
+				cells.push(this.getItem(order[i]));
+		}
+
+		if (!cells.length) cells.push({});
+
+		this.reconstruct();
+
+		if (subcount)
+			for (var i = 0; i < order.length; i++) {
+				var prop = this.getItem(order[i]);
+				for (var j = 0; j < subcount; j++) {
+					var view = this._cells[i*subcount + j];
+					this._fill_data(view, prop);
+				}
+			}
+	}
+}, webix.DataLoader, webix.ui.layout);
+
+webix.protoUI({
+	$init:function(){
+		webix.extend(this, webix.FlexLayout, true);
+	},
+	name:"flexdatalayout"
+}, webix.ui.datalayout);
 
 /*
 	UI:Video
@@ -35588,34 +39036,6 @@ webix.protoUI({
 		controls: true
 	}
 }, webix.ui.view);
-
-webix.protoUI({
-	name:"NonGPL",
-	$init:function(){
-		webix.message("GPL version does not support '"+this.name+"'","error",-1);
-	}
-},webix.ui.view);
-
-webix.protoUI({	name:"organogram" },webix.ui.NonGPL);
-webix.protoUI({	name:"barcode" },webix.ui.NonGPL);
-webix.protoUI({ name:"portlet" },webix.ui.NonGPL);
-webix.protoUI({ name:"pdfviewer" },webix.ui.NonGPL);
-webix.protoUI({ name:"pdfbar" },webix.ui.NonGPL);
-webix.protoUI({ name:"excelviewer" },webix.ui.NonGPL);
-webix.protoUI({ name:"excelbar" },webix.ui.NonGPL);
-webix.protoUI({ name:"datasuggest" },webix.ui.NonGPL);
-webix.protoUI({ name:"gridsuggest" },webix.ui.NonGPL);
-webix.protoUI({ name:"multitext" },webix.ui.NonGPL);
-webix.protoUI({ name:"multiselect" },webix.ui.NonGPL);
-webix.protoUI({ name:"multicombo" },webix.ui.NonGPL);
-webix.protoUI({ name:"multisuggest" },webix.ui.NonGPL);
-webix.protoUI({ name:"checksuggest" },webix.ui.NonGPL);
-webix.protoUI({ name:"treemap" },webix.ui.NonGPL);
-webix.protoUI({ name:"rangeslider" },webix.ui.NonGPL);
-webix.protoUI({ name:"rangechart" },webix.ui.NonGPL);
-webix.protoUI({ name:"datalayout" },webix.ui.NonGPL);
-webix.protoUI({ name:"abslayout" },webix.ui.NonGPL);
-
 
 webix.protoUI({
 	name:"sidemenu",
@@ -35844,6 +39264,550 @@ webix.protoUI({
 
 }, webix.ui.popup);
 
+(function(){
+
+	var webixCustomScroll = webix.CustomScroll = {
+		scrollStep:40,
+		init:function(){
+			this._init_once();
+			webix.env.$customScroll = true;
+			webix.ui.scrollSize = 0;
+			webix.destructors.push({
+				obj:{
+					destructor:function(){
+						this._last_active_node = null;
+					}
+				}
+			});
+			webix.attachEvent("onReconstruct", webixCustomScroll._on_reconstruct);
+			webix.attachEvent("onResize", webixCustomScroll._on_reconstruct);
+
+			//adjusts scroll after view repainting
+			//for example, opening a branch in the tree
+			//it will be better to handle onAfterRender of the related view
+			webix.attachEvent("onClick", webixCustomScroll._on_reconstruct);
+		},
+		resize:function(){
+			this._on_reconstruct();
+		},
+		_enable_datatable:function(view){
+			view._body._custom_scroll_view = view._settings.id;
+			view.attachEvent("onAfterRender", function(){
+				var scroll = webixCustomScroll._get_datatable_sizes(this);
+				var y = Math.max(scroll.dy - scroll.py, 0);
+				var x = Math.max(scroll.dx - scroll.px, 0);
+
+				if (this._y_scroll && this._scrollTop > y){
+					this._y_scroll.scrollTo(y);
+				}
+				else if (this._x_scroll && this._scrollLeft > x){
+					this._x_scroll.scrollTo(x);
+				}
+
+				if ( webixCustomScroll._last_active_node == this._body)
+				 	webixCustomScroll._on_reconstruct();
+			});
+			webix._event(view._body, "mouseover", 	webixCustomScroll._mouse_in 		);
+			webix._event(view._body, "mouseout", 	webixCustomScroll._mouse_out		);
+		},
+		enable:function(view, mode){ 
+			webixCustomScroll._init_once();
+			if (view.mapCells)
+				return this._enable_datatable(view);
+
+			var node = view;
+			if (view._dataobj)
+				node = view._dataobj.parentNode;
+			
+			node._custom_scroll_mode = mode||"xy";
+			webix._event(node, "mouseover", 	webixCustomScroll._mouse_in 		);
+			webix._event(node, "mouseout", 	webixCustomScroll._mouse_out		);
+			webix._event(node, "mousewheel", 	webixCustomScroll._mouse_wheel	);
+			webix._event(node, "DOMMouseScroll", 	webixCustomScroll._mouse_wheel	);
+
+			// update scroll on data change
+			this._setDataHandler(view);
+		},
+		_on_reconstruct:function(){
+			var last = webixCustomScroll._last_active_node;
+			if (last && last._custom_scroll_size){
+				webixCustomScroll._mouse_out_timed.call(last);
+				webixCustomScroll._mouse_in.call(last);
+			}			
+		},
+		_init_once:function(e){
+			webix.event(document.body, "mousemove", 	function(e){
+				if (webixCustomScroll._active_drag_area)
+					webixCustomScroll._adjust_scroll(webixCustomScroll._active_drag_area, webixCustomScroll._active_drag_area._scroll_drag_pos, webix.html.pos(e));
+			});
+			webixCustomScroll._init_once = function(){};
+		},
+		_mouse_in:function(e){
+			webixCustomScroll._last_active_node  = this;
+
+			clearTimeout(this._mouse_out_timer);
+			if (this._custom_scroll_size || webixCustomScroll._active_drag_area) return;
+			
+			var sizes;
+			if (this._custom_scroll_view){
+				//ger related view
+				var view = webix.$$(this._custom_scroll_view);
+				//if view was removed, we need not scroll anymore
+				if (!view) return;
+				sizes = webixCustomScroll._get_datatable_sizes(view);
+			} else{
+				sizes = {
+					dx:this.scrollWidth,
+					dy:this.scrollHeight,
+					px:this.clientWidth,
+					py:this.clientHeight
+				};
+				sizes._scroll_x = sizes.dx > sizes.px && this._custom_scroll_mode.indexOf("x") != -1;
+				sizes._scroll_y = sizes.dy > sizes.py && this._custom_scroll_mode.indexOf("y") != -1;
+			}
+
+			this._custom_scroll_size = sizes;
+			if (sizes._scroll_x){
+				sizes._scroll_x_node = webixCustomScroll._create_scroll(this, "x", sizes.dx, sizes.px, "width", "height");
+				sizes._sx = (sizes.px - sizes._scroll_x_node.offsetWidth - 4);
+				sizes._vx = sizes.dx - sizes.px;
+				if(webixCustomScroll.trackBar)
+					sizes._bar_x = webixCustomScroll._create_bar(this,"x");
+			}
+			if (sizes._scroll_y){
+				sizes._scroll_y_node = webixCustomScroll._create_scroll(this, "y", sizes.dy, sizes.py, "height", "width");
+				sizes._sy = (sizes.py - sizes._scroll_y_node.offsetHeight - 4);
+				sizes._vy = sizes.dy - sizes.py;
+
+				if(webixCustomScroll.trackBar)
+					sizes._bar_y = webixCustomScroll._create_bar(this,"y");
+			}
+
+			webixCustomScroll._update_scroll(this);
+		},
+		_create_bar: function(node, mode){
+			var bar = webix.html.create("DIV", {
+				"webixignore":"1",
+				"class":"webix_c_scroll_bar_"+mode
+			},"");
+
+			node.appendChild(bar);
+			return bar;
+		},
+		_adjust_scroll:function(node, old, pos){
+			var config = node._custom_scroll_size;
+			var view = node._custom_scroll_view;
+			if (view) view = webix.$$(view);
+
+			if (config._scroll_x_node == node._scroll_drag_enabled){
+				var next = (pos.x - old.x)*config._vx/config._sx;
+				if (view)
+					view._x_scroll.scrollTo(view._scrollLeft+next);
+				else
+					webixCustomScroll._set_scroll_value(node, "scrollLeft", next);
+			}
+			if (config._scroll_y_node == node._scroll_drag_enabled){
+				var next = (pos.y - old.y)*config._vy/config._sy;
+				if (view)
+					view._y_scroll.scrollTo(view._scrollTop+next);
+				else
+					webixCustomScroll._set_scroll_value(node, "scrollTop", next);
+			}
+
+			node._scroll_drag_pos = pos;
+			webixCustomScroll._update_scroll(node);
+		},
+		_get_datatable_sizes:function(view){
+			var sizes = {};
+			if (view._x_scroll && view._settings.scrollX){
+				sizes.dx = view._x_scroll._settings.scrollWidth;
+				sizes.px = view._x_scroll._last_set_size || 1;
+				sizes._scroll_x = sizes.dx - sizes.px > 1;
+			}
+			if (view._y_scroll && view._settings.scrollY){
+				sizes.dy = view._y_scroll._settings.scrollHeight;
+				sizes.py = view._y_scroll._last_set_size || 1;
+				sizes._scroll_y = sizes.dy - sizes.py > 1;
+			}
+			return sizes;
+		},
+		_mouse_out:function(){
+			clearTimeout(this._mouse_out_timer);
+			this._mouse_out_timer = webix.delay(webixCustomScroll._mouse_out_timed, this, [], 200);
+		},
+		_removeScroll:function(scroll){
+			if (scroll){
+				webix.html.remove(scroll);
+				if (scroll._webix_event_sc1){
+					webix.eventRemove(scroll._webix_event_sc1);
+					webix.eventRemove(scroll._webix_event_sc2);
+				}
+			}
+		},
+		_mouse_out_timed:function(){
+			if (this._custom_scroll_size){
+				if (this._scroll_drag_enabled){
+					this._scroll_drag_released = true;
+					return;
+				}
+				var sizes = this._custom_scroll_size;
+				webixCustomScroll._removeScroll(sizes._scroll_x_node);
+				webixCustomScroll._removeScroll(sizes._scroll_y_node);
+				webix.html.removeCss(document.body,"webix_noselect");
+				if(sizes._bar_x){
+					webix.html.remove(sizes._bar_x);
+				}
+				if(sizes._bar_y){
+					webix.html.remove(sizes._bar_y);
+				}
+				this._custom_scroll_size = null;
+			}
+		},
+		_mouse_wheel:function(e){
+			var sizes = this._custom_scroll_size;
+			var delta = e.wheelDelta/-40;
+			var toblock = true;
+			if (!delta && e.detail && webix.isUndefined(e.wheelDelta))
+				delta = e.detail;
+			if (sizes){
+				if (sizes._scroll_x_node && (e.wheelDeltaX || ( delta && !sizes._scroll_y_node ))){
+					var x_dir  = (e.wheelDeltaX/-40)||delta;
+					//see below
+					toblock = webixCustomScroll._set_scroll_value(this, "scrollLeft", x_dir*webixCustomScroll.scrollStep);
+				} else if (delta && sizes._scroll_y_node){
+					
+					//lesser flickering of scroll in IE
+					//also prevent scrolling outside of borders because of scroll-html-elements
+					toblock = webixCustomScroll._set_scroll_value(this, "scrollTop", delta*webixCustomScroll.scrollStep);
+				}
+			}
+
+			
+			webixCustomScroll._update_scroll(this);
+			if (toblock !== false)
+				return webix.html.preventEvent(e);
+		},
+		_set_scroll_value:function(node, pose, value){
+			var sizes = node._custom_scroll_size;
+			var max_scroll = (pose == "scrollLeft") ? (sizes.dx - sizes.px) : (sizes.dy - sizes.py);
+			var now = node[pose];
+
+			if (now+value > max_scroll)
+				value = max_scroll - now;
+			if (!value || (now+value < 0 && now === 0))
+				return false;
+			
+			
+			if (webix.env.isIE){
+				webixCustomScroll._update_scroll(node, pose, value + now);
+				node[pose] += value;
+			} else
+				node[pose] += value;
+
+			return true;
+		},
+		_create_scroll:function(node, mode, dy, py, dim, pos){
+			var scroll = webix.html.create("DIV", {
+				"webixignore":"1",
+				"class":"webix_c_scroll_"+mode
+			},"<div></div>");
+
+			scroll.style[dim] = Math.max((py*py/dy-7),40)+"px";
+			node.style.position = "relative";
+			node.appendChild(scroll);
+			node._webix_event_sc1 = webix.event(scroll, "mousedown", webixCustomScroll._scroll_drag(node));
+			node._webix_event_sc2 = webix.event(document.body, "mouseup", webix.bind(webixCustomScroll._scroll_drop, node));
+			return scroll;
+		},
+		_scroll_drag:function(node){
+			return function(e){
+				webix.html.addCss(document.body,"webix_noselect",1);
+				this.className += " webix_scroll_active";
+				webixCustomScroll._active_drag_area = node;
+				node._scroll_drag_enabled = this;
+				node._scroll_drag_pos = webix.html.pos(e);
+			};
+		},
+		_scroll_drop:function(node){
+			if (this._scroll_drag_enabled){
+				webix.html.removeCss(document.body,"webix_noselect");
+				this._scroll_drag_enabled.className = this._scroll_drag_enabled.className.toString().replace(" webix_scroll_active","");
+				this._scroll_drag_enabled = false;
+				webixCustomScroll._active_drag_area = 0;
+				if (this._scroll_drag_released){
+					webixCustomScroll._mouse_out_timed.call(this);
+					this._scroll_drag_released = false;
+				}
+			}
+		},
+		_update_scroll:function(node, pose, value){
+			var sizes = node._custom_scroll_size;
+			if (sizes && (sizes._scroll_x_node||sizes._scroll_y_node)){
+				var view = node._custom_scroll_view;
+
+				var left_scroll = pose == "scrollLeft" ? value : node.scrollLeft;
+				var left = view?webix.$$(view)._scrollLeft:left_scroll;
+				var shift_left = view?0:left;
+
+				var top_scroll = pose == "scrollTop" ? value : node.scrollTop;
+				var top = view?(webix.$$(view)._scrollTop):top_scroll;
+				var shift_top = view?0:top;
+
+				if (sizes._scroll_x_node){
+					sizes._scroll_x_node.style.bottom = 1 - shift_top + "px";
+					sizes._scroll_x_node.style.left = Math.round(sizes._sx*left/(sizes.dx-sizes.px)) + shift_left + 1 +"px";
+					if(sizes._bar_x){
+						sizes._bar_x.style.bottom = 1 - shift_top + "px";
+						sizes._bar_x.style.left = shift_left + "px";
+					}
+				}
+				if (sizes._scroll_y_node){
+					sizes._scroll_y_node.style.right = 0 - shift_left + "px";
+					sizes._scroll_y_node.style.top = Math.round(sizes._sy*top/(sizes.dy-sizes.py)) + shift_top + 1 + "px";
+					if(sizes._bar_y){
+						sizes._bar_y.style.right = 0 - shift_left + "px";
+						sizes._bar_y.style.top = shift_top + "px";
+					}
+
+				}
+					
+			}
+		},
+		_setDataHandler: function(view){
+			if(view.data && view.data.attachEvent)
+				view.data.attachEvent("onStoreUpdated", function(){
+					var node = webixCustomScroll._last_active_node;
+					if(node && view.$view.contains(node))
+						webixCustomScroll.resize();
+				});
+		}
+	};
+
+})();
+webix.protoUI({
+	name:"portlet",
+	defaults:{
+		layoutType:"wide",
+	},
+	$init:function(config){
+		this._viewobj.style.position = "relative";
+
+		if (config.header && config.body)
+			config.body = [ { template:config.header, type:"header" }, config.body ];
+
+		this.$ready.push(this._init_drag_area);
+		// refresh scroll state of datatables
+		webix.attachEvent("onAfterPortletMove", this._refreshChildScrolls);
+	},
+	_refreshChildScrolls: function(source){
+		webix.ui.each(source, function(view){
+			if(view._restore_scroll_state)
+				view._restore_scroll_state();
+		});
+	},
+	_init_drag_area:function(){
+		var childs = this.getChildViews();
+
+		if (childs.length > 1)
+			webix.DragControl.addDrag(childs[0].$view, this);
+		else {
+			var drag = webix.html.create("div", { "class":"portlet_drag" }, "<span class='webix_icon fa-bars'></span>");
+			this._viewobj.appendChild(drag);
+			webix.DragControl.addDrag(drag, this);
+		}
+	},
+	body_setter:function(value){
+		return this.rows_setter(webix.isArray(value) ? value:[value]);
+	},
+	markDropArea:function(target, mode){
+		if (!target)
+			return webix.html.remove(this._markerbox);
+
+		target = webix.$$(target);
+
+		if (!this._markerbox)
+			this._markerbox = webix.html.create("div",null,"&nbsp;");
+
+		target.$view.appendChild(this._markerbox);
+		this._markerbox.className = "portlet_marker"+mode;
+	},
+	movePortlet:function(target, mode){
+		var parent = target.getParentView();
+		var source = this.getParentView();
+
+		var tindex = parent.index(target);
+		var sindex = source.index(this);
+
+		if (!webix.callEvent("onBeforePortletMove", [source, parent, this, target, mode])) return;
+
+		webix.ui.$freeze = true;
+
+		var shift = (source != parent ? 1 : 0);
+		var isv = parent._vertical_orientation;		
+		if ((mode == "top" || mode == "bottom")){
+			if (isv !== 1){
+				parent = webix.ui({ type:target._settings.layoutType, rows:[] }, parent, tindex+shift);
+				webix.ui(target, parent, 0);
+				tindex = 0; shift = 1;
+			}
+			if (mode == "bottom") shift+=1;
+		} else if ((mode == "left" || mode == "right")){
+			if (isv !== 0){
+				parent = webix.ui({ type:target._settings.layoutType, cols:[] }, parent, tindex+shift);
+				webix.ui(target, parent, 0);
+				tindex = 0; shift = 1;
+			}
+			if (mode == "right") shift+=1;
+		}
+
+		if (sindex < tindex) shift -= 1;
+		webix.ui(this, parent, tindex+shift );
+		if (mode == "replace")
+			webix.ui(target, source, sindex);
+
+		this._removeEmptySource(source);
+
+		webix.ui.$freeze = false;
+
+		var tops = source.getTopParentView();
+		var topt = target.getTopParentView();
+		topt.resize();
+		if (tops != topt)
+			tops.resize();
+
+		// //fix issue in Chrome [TEMP-FIX]
+		// var topparent = parent && parent.$view.parentNode;
+		// if (topparent && topparent.style.position != "absolute")
+		// 	topparent.style.position = "relative";
+		
+		
+
+		webix.callEvent("onAfterPortletMove", [source, parent, this, target, mode]);
+	},
+	_removeEmptySource:function(view){
+		var childview;
+		var maxcount = 0;
+
+		while (view.getChildViews().length <= maxcount){
+			childview = view;
+			view = view.getParentView();
+
+			maxcount = 1;
+		}
+
+		if (maxcount)
+			view.removeView(childview);
+	},
+	$drag:function(object, e){
+		webix.html.addCss(this._viewobj, "portlet_in_drag");
+		webix.DragControl._drag_context = {source:object, from:object};
+		return this._viewobj.innerHTML;
+	},
+	$dragDestroy:function(target, html, e){
+		webix.html.removeCss(this._viewobj, "portlet_in_drag");
+		webix.html.remove(html);
+		if (this._portlet_drop_target){
+			this.movePortlet(this._portlet_drop_target, this._portlet_drop_mode);
+			this.markDropArea();
+			this._portlet_drop_target = null;
+		}
+	},
+	_getDragItemPos: function(){
+		return webix.html.offset(this.$view);
+	},
+	$dragPos: function(pos, e, html){
+		html.style.left = "-10000px";
+		var evObj = webix.env.mouse.context(e);
+		var node = document.elementFromPoint(evObj.x, evObj.y);
+
+		var view = null;
+		if (node)
+			view = webix.$$(node);
+
+		this._portlet_drop_target = this._getPortletTarget(view);
+		this._portlet_drop_mode = this._markPortletDrag(this._portlet_drop_target, e);
+
+		pos.x = pos.x - this._content_width + 10;
+		pos.y = pos.y - 20;
+
+		webix.DragControl._skip = true;
+	},
+	_markPortletDrag:function(view, ev){
+		var drop = "";
+		var mode = "";
+
+		if (ev && view){
+			var box = webix.html.offset(view.$view);
+			var pos = webix.html.pos(ev);
+			var erx = (pos.x-box.x) - box.width/2;
+			var ery = (pos.y-box.y) - box.height/2;
+
+			mode = view._settings.mode;
+			if (!mode)
+				mode = Math.abs(erx)*(box.height/box.width) > Math.abs(ery) ? "cols" : "rows";
+
+			if (mode == "cols"){
+				drop = erx >=0 ? "right" :"left";
+			} else if (mode == "rows"){
+				drop = ery >=0 ? "bottom" : "top";
+			}
+
+			this.markDropArea(view, drop);
+		}
+
+		this.markDropArea(view, drop);
+		return drop || mode;
+	},
+	_getPortletTarget:function(view){
+		while(view){
+			if (view.movePortlet)
+				return view;
+			else
+				view = view.getParentView();
+		}
+	}
+}, webix.ui.layout);
+
+webix.UIManager.getState = function(node, children) {
+	children = (children||false);
+	node = webix.$$(node);
+	var state = {
+		id: node.config.id,
+		width: node.config.width,
+		height: node.config.height,
+		gravity: node.config.gravity
+	};
+	if (!webix.isUndefined(node.config.collapsed)) state.collapsed = node.config.collapsed;
+	if (node.name === 'tabs' || node.name === 'tabbar') state.activeCell = node.getValue();
+	
+	if (children) {
+		state = [state];
+		if (node._cells) {
+			for (var i = 0; i < node._cells.length; i++)
+				state = state.concat(this.getState(node._cells[i], children));
+		}
+	}
+	return state;
+};
+
+webix.UIManager.setState = function(states) {
+	if (!webix.isArray(states)) states = [states];
+
+	for (var i = 0; i < states.length; i++) {
+		var state = states[i];
+		var node = webix.$$(state.id);
+		if (!node) continue;
+
+		if (!webix.isUndefined(state.collapsed)) node.define('collapsed', state.collapsed);
+		if (!webix.isUndefined(state.activeCell)) node.setValue(state.activeCell);
+
+		node.define('width', state.width);
+		node.define('height', state.height);
+		node.define('gravity', state.gravity);
+	}
+	var top = webix.$$(states[0].id);
+	if (top) top.resize();
+};
 
 
 (function(){
@@ -36328,6 +40292,1638 @@ function getPdfData(scheme, data, options, callback){
 })();
 
 webix.protoUI({
+	name:"pdfviewer",
+	defaults:{
+		scale:"auto"
+	},
+	$init:function(config){
+		this.$view.className += " webix_pdf";
+
+		var elm_wrapper = document.createElement("DIV");
+		elm_wrapper.className="canvas_wrapper";
+
+		var elm = document.createElement("canvas");
+
+		this._currentPage = this.$view;
+		this._container = this.$view.appendChild(elm_wrapper);
+        this._canvas = this._container.appendChild(elm);
+        
+        this.$pdfDoc = null;
+		this.$pageNum = 0;
+		this.$numPages = 0;
+		this._pageRendering = false;
+		this._pageNumPending = null;
+		this._ctx = this._canvas.getContext('2d');
+
+        this._init_scale_value = 0.1;
+		this._default_scale_delta = config.scaleDelta || 1.1;
+		this._min_scale = config.minScale || 0.25;
+		this._max_scale = config.maxScale || 10.0;
+		this._max_auto_scale = 1.25;
+
+		this._hPadding = 40;
+		this._vPadding = 10;
+
+		this.$ready.push(this._attachHandlers);
+	},
+	toolbar_setter:function(toolbar){
+		if (typeof toolbar == "string"){
+			var ui_toolbar = webix.$$(toolbar);
+			if (ui_toolbar){
+				ui_toolbar.$master = this;
+				ui_toolbar.refresh();
+			}
+			this.attachEvent("onDocumentReady", function(){
+				if(ui_toolbar){
+					ui_toolbar.setPage(this.$pageNum);
+					ui_toolbar.setValues(this.$numPages, this._settings.scale);
+				}
+				else
+					this.toolbar_setter(toolbar);
+			});
+			return toolbar;
+		}
+	},
+	_attachHandlers:function(){
+		delete this._settings.datatype; // cheat(
+
+		this.attachEvent("onScaleChange", function(scale, update){
+			if(update && this._settings.toolbar && webix.$$(this._settings.toolbar).setScale)
+				webix.$$(this._settings.toolbar).setScale(scale);
+		});
+
+		if(webix.env.touch){
+			this._touchDelta = false;
+
+			webix._event(this._viewobj, "touchstart", webix.bind(function(e){
+				var touches = e.targetTouches;
+				if(touches.length === 2){
+					webix.html.preventEvent(e);
+					this._touchDelta = Math.abs(touches[0].pageY - touches[1].pageY);
+				}
+			}, this));
+
+			webix._event(this.$view, "touchmove", webix.bind(function(e){
+				var touches = e.targetTouches;
+
+				if(touches.length === 2 && this._touchDelta !== false){
+					webix.html.preventEvent(e);
+
+					if(Math.abs(touches[0].pageY - touches[1].pageY)>this._touchDelta)
+						this.zoomIn();
+					else
+						this.zoomOut();
+					this._touchDelta = false;
+				}
+			}, this));
+
+			this.attachEvent("onSwipeX", function(start, end){
+				this.$view.scrollLeft = this.$view.scrollLeft - (end.x-start.x);
+			});
+
+			this.attachEvent("onSwipeY", function(start, end){
+				var ch = this.$view.clientHeight,
+					sh = this.$view.scrollHeight,
+					oh = this.$view.offsetHeight,
+					stop = this.$view.scrollTop,
+					delta = end.y-start.y;
+
+				if(ch === sh || (delta<0 && stop > (sh - oh)) || (delta>0 && stop === 0)){
+					var page = this.$pageNum + (delta > 0 ? -1 :1);
+					if(page>0 && page <=this.$numPages){
+						this.$pageNum = page;
+						this._queueRenderPage(this.$pageNum);
+						this.$view.scrollTop = delta > 0 ? sh : 0;
+					}
+				}
+				else
+					this.$view.scrollTop = stop - delta;
+			});
+		}
+		else{
+			var evt = webix.env.isFF?"DOMMouseScroll":"mousewheel";
+			webix.event(window, evt, webix.bind(function(e){
+				var ticks = (e.type === 'DOMMouseScroll') ? -e.detail :e.wheelDelta;
+				var dir = (ticks < 0) ? 'out' : 'in';
+				if (e.ctrlKey) { // Only zoom the pages, not the entire viewer
+					webix.html.preventEvent(e);
+				if(dir == "in")
+					this.zoomIn();
+				else
+					this.zoomOut();
+				}
+			}, this));
+		}
+	},
+	_getDocument:function(data){
+		if(data.name){ //File structure
+			var reader = new FileReader();
+			reader.onload = webix.bind(function (e) {
+				this._getDocument({data:e.target.result});
+			}, this);
+			reader.readAsArrayBuffer(data);
+		}
+		else{
+			PDFJS.getDocument({data:data.data}).then(webix.bind(function (pdfDoc_) {
+				this.clear();
+				this.$pdfDoc = pdfDoc_;
+				this.$numPages = this.$pdfDoc.numPages;
+				this.$pageNum = 1;
+
+				this._renderPage(this.$pageNum).then(webix.bind(function(){
+					this.callEvent("onDocumentReady");
+				}, this));
+			}, this));
+		}
+	},
+	$onLoad:function(data){
+		if(!window.PDFJS){
+			//for cross browser and compatibility
+			webix.require([webix.cdn + "/extras/pdfjs/compatibility.min.js", webix.cdn + "/extras/pdfjs/pdf.min.js"], function(){
+				PDFJS.workerSrc = webix.cdn + "/extras/pdfjs/pdf.worker.min.js";
+				this._getDocument(data);
+			}, this);
+		}
+		else
+			this._getDocument(data);
+		return true;
+	},
+	_getViewPort:function(page, scale){
+		var viewport = page.getViewport(scale);
+		this._canvas.height = viewport.height;
+		this._canvas.width = viewport.width;
+		this._container.style.width = viewport.width+"px";
+		this._container.style.height = viewport.height+"px";
+
+		return viewport;
+	},
+	_renderPage:function(num) {
+		var viewer = this;
+		viewer._pageRendering = true;
+		// Using promise to fetch the page
+		return this.$pdfDoc.getPage(num).then(function(page) {
+			//Getting 'safe' scale value
+			var scale = isNaN(parseFloat(viewer._settings.scale))?viewer._init_scale_value:viewer._settings.scale;
+            
+            var viewport = viewer._getViewPort(page, scale);
+            //recalc viewport if "string" scale is set
+			if(scale !== viewer._settings.scale){
+                scale =  viewer._getScale(viewer._settings.scale);
+				viewport = viewer._getViewPort(page, scale);
+                viewer._settings.scale = scale;
+            }
+
+			// Render PDF page into canvas context
+			var renderContext = {
+				canvasContext: viewer._ctx,
+				viewport: viewport
+			};
+
+			page.cleanupAfterRender = true;
+
+			// Wait for rendering to finish
+			return page.render(renderContext).promise.then(function () {
+				viewer.callEvent("onPageRender", [viewer.$pageNum]);
+				viewer._pageRendering = false;
+				
+				if (viewer._pageNumPending !== null) {
+					// New page rendering is pending
+					viewer._renderPage(viewer._pageNumPending);
+					viewer._pageNumPending = null;
+				}
+			});
+		});
+	},
+	_queueRenderPage:function(num) {
+		if (this._pageRendering)
+			this._pageNumPending = num;
+		else
+			this._renderPage(num);
+	},
+	renderPage:function(num){
+		if(!this.$pdfDoc || num<0 || num>this.$numPages)
+			return;
+
+		this.$pageNum = num;
+		this._queueRenderPage(this.$pageNum);
+	},
+	prevPage:function() {
+		if (this.$pageNum <= 1)
+			return;
+		this.$pageNum--;
+		this._queueRenderPage(this.$pageNum);
+	},
+	nextPage:function() {
+		if(this.$pageNum >= this.$numPages)
+			return;
+		this.$pageNum++;
+		this._queueRenderPage(this.$pageNum);
+	},
+	zoomIn: function (){
+		var newScale = this._settings.scale;
+
+        newScale = (newScale * this._default_scale_delta).toFixed(2);
+        newScale = Math.ceil(newScale * 10) / 10;
+        newScale = Math.min(this._max_scale, newScale);
+        this.setScale(newScale, true);
+	},
+	zoomOut: function (){
+		var newScale = this._settings.scale;
+
+        newScale = (newScale / this._default_scale_delta).toFixed(2);
+        newScale = Math.floor(newScale * 10) / 10;
+        newScale = Math.max(this._min_scale, newScale);
+
+        this.setScale(newScale, true);
+	},
+    _getScale:function(value){
+        if(!isNaN(parseFloat(value)))
+            return value;
+        if(isNaN(parseFloat(this._settings.scale)))
+            this._settings.scale = this._init_scale_value;
+
+        var scale = 1; //default value
+        var pageWidthScale = ((this._currentPage.clientWidth - this._hPadding) * this._settings.scale/this._canvas.clientWidth).toFixed(2);
+        var pageHeightScale = ((this._currentPage.clientHeight - this._vPadding) * this._settings.scale/this._canvas.clientHeight).toFixed(2);
+        switch (value) {
+            case 'page-actual':
+                scale = 1;
+                break;
+            case 'page-width':
+                scale = pageWidthScale;
+                break;
+            case 'page-height':
+                scale = pageHeightScale;
+                break;
+            case 'page-fit':
+                scale = Math.min(pageWidthScale, pageHeightScale);
+                break;
+            case 'auto':
+                var isLandscape = (this._currentPage.clientWidth > this._currentPage.clientHeight);
+                var horizontalScale = isLandscape ?  Math.min(pageHeightScale, pageWidthScale) : pageWidthScale;
+                scale = Math.min(this._max_auto_scale, horizontalScale);
+                break;
+        }
+        return scale;
+    },
+    setScale: function(value, update) {
+		if (!isNaN(parseFloat(value))) {
+			this._setScale(value, update);
+		} else {
+			var scale = this._getScale(value);
+            this._setScale(scale, update);
+        }
+    },
+    _setScale:function(newScale, update){
+		this._settings.scale = newScale;
+		this.renderPage(this.$pageNum);
+
+		this.callEvent("onScaleChange", [newScale, update]);
+    },
+    download:function(){
+		if(!this.$pdfDoc) return;
+		
+		var filename = (this._settings.downloadName || "document")+".pdf";
+		this.$pdfDoc.getData().then(function(data){
+			var blob = PDFJS.createBlob(data, 'application/pdf');
+			webix.html.download(blob, filename);
+		});
+    },
+    clear:function(){
+		if(this.$pdfDoc){
+			this._ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+			this._container.style.height = this._container.style.width = this._canvas.width = this._canvas.height = 0;
+			this._settings.scale = "auto";
+			this.$pageNum = this.$numPages = 0;
+			this.$pdfDoc.transport.startCleanup();
+			this.$pdfDoc.destroy();
+			this.$pdfDoc = null;
+
+			if(this._settings.toolbar && webix.$$(this._settings.toolbar))
+				webix.$$(this._settings.toolbar).reset();
+		}
+    }
+}, webix.EventSystem, webix.AtomDataLoader, webix.ui.view);
+
+webix.protoUI({
+	name: "pdfbar",
+	reset:function(){
+		this.setPage(0);
+		this.setValues(0, "auto");
+	},
+	$init:function(config){
+		this.$view.className +=" pdf_bar";
+		
+		config.cols = [
+			{ view:"button", type:"icon", icon:"arrow-left", width:35, click:function(){ this.getParentView()._navigate("prev");}},
+			{ view:"text", width:70, value:"0", on:{
+				onBlur:function(){ this.getParentView()._navigate(this.getValue());},
+				onKeyPress:function(code){ if(code === 13) this.getParentView()._navigate(this.getValue());}
+			}},
+			{ template:webix.i18n.PDFviewer.of+" #limit#", width:70, data:{limit:0}, borderless:true },
+			{ view:"button", type:"icon", icon:"arrow-right", width:35, click:function(){ this.getParentView()._navigate("next");}},
+			{},
+			{view:"button", type:"icon", icon:"minus", width:35, click:function(){ this.getParentView().zoom("out");}},
+			{view:"richselect", options:[], maxWidth:195, suggest:{
+				padding:0, css:"pdf_opt_list", borderless:true, body:{
+					type:{ height:25}, scroll:false, yCount:13 }
+				},
+				on:{ onChange:function(){ this.getParentView().setMasterScale(this.getValue());}}
+			},
+			{view:"button", type:"icon", icon:"plus", width:35, click:function(){ this.getParentView().zoom("in");}},
+			{view:"button", type:"icon", icon:"download", width:35, click:function(){ this.getParentView().download();}}
+		];
+		this.$ready.push(this._setScaleOptions);
+	},
+	_setScaleOptions:function(){
+		var list = this.getChildViews()[6].getPopup().getBody();
+		list.clearAll();
+		list.parse([
+			{ id:"auto", value:webix.i18n.PDFviewer.automaticZoom}, { id:"page-actual", value:webix.i18n.PDFviewer.actualSize},
+			{ id:"page-fit", value:webix.i18n.PDFviewer.pageFit}, { id:"page-width", value:webix.i18n.PDFviewer.pageWidth},
+			{ id:"page-height", value:webix.i18n.PDFviewer.pageHeight},
+			{ id:"0.5", value:"50%"}, { id:"0.75", value:"75%"},
+			{ id:"1", value:"100%"}, { id:"1.25", value:"125%"},
+			{ id:"1.5", value:"150%"}, { id:"2", value:"200%"},
+			{ id:"3", value:"300%"}, { id:"4", value:"400%"}
+		]);
+		var width = 0;
+		list.data.each(function(obj){
+			width = Math.max(webix.html.getTextSize(obj.value, "webixbutton").width, width);
+		});
+		this.getChildViews()[6].define("width", width+20);
+		this.getChildViews()[6].resize();
+	},
+	_navigate:function(num){
+		this.setMasterPage(num);
+		this.setPage(this.$master.$pageNum);
+	},
+	setScale:function(scale){
+		var sel = this.getChildViews()[6];
+		sel.blockEvent();
+		if(sel.getPopup().getList().exists(scale))
+			sel.setValue(scale);
+		else{
+			sel.setValue("");
+			sel.getInputNode().innerHTML = (scale*100).toFixed(0)+"%";
+		}
+		sel.unblockEvent();
+	},
+	setMasterScale:function(value){
+		if(!this.$master) return;
+		this.$master.setScale(value);
+	},
+	setMasterPage:function(num){
+		if(!this.$master) return;
+		if(num === "prev")
+			this.$master.prevPage();
+		else if(num==="next")
+			this.$master.nextPage();
+		else if(!isNaN(parseInt(num)))
+			this.$master.renderPage(parseInt(num));
+	},
+	zoom:function(dir){
+		if(!this.$master) return;
+		if(dir === "out")
+			this.$master.zoomOut();
+		else if(dir === "in")
+			this.$master.zoomIn();
+
+	},
+	setPage:function(num){
+		this.getChildViews()[1].setValue(num);
+	},
+	setValues:function(num, scale){
+		this.getChildViews()[2].data.limit = num;
+		this.getChildViews()[2].refresh();
+
+		this.setScale(scale);
+	},
+	download:function(){
+		if(!this.$master) return;
+		this.$master.download();
+	}
+}, webix.ui.toolbar);
+webix.protoUI({
+	name: "excelbar",
+	defaults:{
+		padding:0,
+		type:"line"
+	},
+	$init:function(config){
+		config.cols = [
+			{ view:"tabbar", options:[""], optionWidth:200, on:{
+				onaftertabclick:function(){
+					this.getParentView().callEvent("onExcelSheetSelect", [this.getValue()]);
+				}
+			}}
+		];
+	},
+	getValue:function(){
+		return this.getInput().getValue();
+	},
+	setValue:function(value){
+		return this.getInput().setValue(value);
+	},
+	getInput:function(){
+		return this.getChildViews()[0];
+	},
+	setSheets:function(sheets){
+		var input = this.getInput();
+		input.config.options = sheets;
+		input.refresh();
+	}
+}, webix.ui.toolbar);
+
+webix.protoUI({
+	name:"excelviewer",
+	$init:function(){
+		this.$ready.push(function(){
+			if (this._settings.toolbar)
+				webix.$$(this._settings.toolbar).attachEvent("onExcelSheetSelect", webix.bind(this.showSheet, this));
+		});
+	},
+	defaults:{
+		datatype:"excel"
+	},
+	$onLoad:function(data){
+		if(data.sheets){
+			this._excel_data = data;
+			if (this._settings.toolbar)
+				webix.$$(this._settings.toolbar).setSheets(data.names);
+			var now = data.names[0];
+			this.showSheet(now.id || now);
+			return true;
+		}
+		return false;
+	},
+	showSheet:function(name){
+		this.clearAll();
+
+		var obj = this.data.driver.sheetToArray(this._excel_data.sheets[name], {
+			spans:this._settings.spans
+		});
+
+		var header = this._settings.excelHeader;
+		var letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+		if (!header){
+			header = webix.copy(obj.data[0]);
+			for (var i = 0; i < header.length; i++)
+				header[i] = { header:letters[i], id:"data"+i, adjust:true, editor:"text", sort:"string" };
+		} else if (header === true) {
+			header = obj.data.splice(0,1)[0];
+			for (var i = 0; i < header.length; i++)
+				header[i] = { header:header[i], id:"data"+i, adjust:true, editor:"text", sort:"string" };
+		} else
+			header = webix.copy(header);
+
+		this.config.columns = header;
+		this.refreshColumns();
+
+		this.parse(obj.data, this._settings.datatype);
+	}
+}, webix.ui.datatable);
+
+webix.DataDriver.excel = webix.extend({
+	toObject:function(data){
+		if(!data.length){
+			var opts = data.options || {};
+			if (opts.dataurl) 
+				webix.extend(opts, this._urlToOptions(opts.dataurl));
+
+			data = data.data || data;
+			var promise = webix.promise.defer();
+			
+			if(data.name){ //file
+				opts.ext = data.name.split(".").pop();
+				var reader = new FileReader();
+				
+				reader.onload = webix.bind(function (e) {
+					promise.resolve(this.parseData(e.target.result, opts));
+				}, this);
+				reader.readAsArrayBuffer(data);
+			}
+			else //arraybuffer
+				promise.resolve(this.parseData(data, opts));
+				
+			return promise;
+		}
+		//plain jsarray
+		return data;
+	},
+	parseData:function(data, options){
+		data = new Uint8Array(data);
+        var arr = [];
+        for(var i = 0; i != data.length; ++i)
+			arr[i] = String.fromCharCode(data[i]);
+
+		var ext = (options.ext || options).toLowerCase();
+		if (ext != "xls") ext = "xlsx";
+
+		return webix.require(webix.cdn + "/extras/"+ext+".core.min.js").then(webix.bind(function(){
+			var workbook = (ext == "xls") ?
+				XLS.read(arr.join(""), {type: 'binary'}) :
+				XLSX.read(arr.join(""), {type: 'binary'});
+
+			var res = {
+				sheets: workbook.Sheets,
+				names: workbook.SheetNames,
+				options:options
+			};
+			return webix.extend(this.getSheet(res, options), res);
+		}, this));
+	},
+	getSheet:function(data, options){
+		var name = options.name || data.names[0];
+		data = this.sheetToArray(data.sheets[name], options);
+		if(options.rows && options.rows.length)
+			data.data = data.data.splice(options.rows[0], Math.min(options.rows[1], data.data.length)-options.rows[0]);
+		return data;
+	},
+	sheetToArray:function(sheet, options){
+        var all = [];
+        var spans = [];
+
+        if(sheet["!ref"]){
+            var range = XLS.utils.decode_range(sheet["!ref"]), row, col, cellCoord, cell;
+            for (row = range.s.r; row <= range.e.r; row++) {
+                var nrow = [];
+                for (col = range.s.c; col <= range.e.c; col++) {
+                    cellCoord = XLS.utils.encode_cell({ r: row, c: col });
+                    cell = sheet[cellCoord];
+                    if(!cell)
+                        nrow.push("");
+                    else
+						nrow.push(options.math&&cell.f ? (cell.f.charAt(0)=="="?cell.f:"="+cell.f) : cell.v);
+                }
+                all.push(nrow);
+            }
+        }
+
+        if(sheet["!merges"]){
+			var merges = sheet["!merges"];
+			var full = {data:all, spans:[]};
+
+			for(var i = 0; i<merges.length; i++){
+				var s = merges[i].s;
+				var e = merges[i].e;
+				var sl  = options.rows?options.rows[0]:0;
+
+				spans.push([s.r+sl, s.c, e.c-s.c+1, e.r-s.r+1]);
+			}
+		}
+
+        return { data:all, spans: spans, excel: true };
+	},
+	_urlToOptions:function(details){
+		var parts = details.split("[");
+		var options = {};
+		options.name = parts[0];
+		if(parts[1]){
+			var rows = parts[1].split(/[^0-9]+/g);
+			rows[0] = rows[0]*1 || 0;
+			rows[1] = rows[1] || 9999999;
+			options.rows = rows;
+		}
+		return options;
+	},
+}, webix.DataDriver.jsarray);
+webix.protoUI({
+	name: "treemap",
+	defaults: {
+		activeItem: false,
+		subRender: true,
+		header: true,
+		headerHeight: 35,
+		value: webix.template("#value#"),
+		headerTemplate: "",
+		navigation:true
+	},
+	value_setter: webix.template,
+	headerTemplate_setter: webix.template,
+	header_setter: function(value){
+		if(value && value !== true){
+			this.type.header = value;
+		}
+		return value;
+	},
+	$init: function(config){
+		this.$view.className += " webix_treemap";
+		this._viewobj.setAttribute("role", "tree");
+
+		this._htmlElement = document.createElement("DIV");
+
+		webix.extend(this.data, webix.TreeStore, true);
+		this.data.provideApi(this,true);
+
+		this.data.attachEvent("onClearAll", webix.bind(function(){
+			this._html = "";
+			this.$values = {};
+			this.$xy = {};
+		},this));
+
+		this.attachEvent("onKeyPress", this._onKeyPress);
+	},
+	_toHTMLItem:function(obj){
+		var mark = this.data._marks[obj.id];
+		this.callEvent("onItemRender",[obj]);
+		var template = (obj.$template?this.type["template"+obj.$template].call(this,obj,this.type,mark):this.type.template.call(this,obj,this.type,mark));
+		return this.type.templateStart.call(this,obj,this.type,mark) + template + this.type.templateEnd.call(this);
+	},
+	_renderHeader: function(id){
+		var item = this.getItem(id);
+		var height = this._settings.headerHeight;
+		var html = "<div class='webix_treemap_header' style='height:"+height+"px;line-height:"+height+"px;'>";
+		html += this.type.header.call(this, item, this.type);
+		html += "</div>";
+		return html;
+	},
+	_renderBranch:function(pId){
+		var i, id, item, sizes, row, value, sum,
+			leaves = [];
+
+		if(!this.$width || !this.count()){
+			this._html = "";
+			return false;
+		}
+
+		if(!pId){
+			pId = this.config.branch||0;
+			this._html = "";
+			this.$values = {};
+			this.$xy = {};
+			this.$xy[pId] = {
+				width: this.$width,
+				height: this.$height,
+				top: 0,
+				left: 0
+			};
+			// header
+			if(pId && this._settings.header){
+				this.$xy[pId].height -= this._settings.headerHeight;
+				this.$xy[pId].top = this._settings.headerHeight;
+				this._html += this._renderHeader(pId);
+			}
+
+			// values calculation
+			sum = 0;
+			this.data.each(function(item){
+				var parentId = this.getParentId(item.id);
+				if(!this.data.branch[item.id]){
+					value = this.config.value.call(this,item)*1;
+					if(!isNaN(value) && value){
+						this.$values[item.id] = value;
+						sum += value;
+						while(parentId){
+							if(!this.$values[parentId])
+								this.$values[parentId] = 0;
+							this.$values[parentId] +=  value;
+							parentId = this.getParentId(parentId);
+						}
+
+					}
+				}
+			}, this, false, pId);
+		}
+
+		this.data.eachChild(pId, function(item){
+			if(this.$values[item.id])
+				leaves.push(webix.copy(item));
+		}, this);
+
+		sum = sum || this.$values[pId];
+
+		if(leaves.length && sum){
+			sizes = this.$xy[pId];
+			row ={ top: sizes.top, left:sizes.left, dx: sizes.width, dy: sizes.height, set:[], sum:0 };
+			row.dim = Math.min(row.dx,row.dy);
+			var delta = row.dx*row.dy/sum; //total area
+			for ( i=0; i< leaves.length; i++)
+				leaves[i].$value = this.$values[leaves[i].id]*delta; //normalized value
+
+
+			leaves.sort(function(a,b){
+				return a.$value >b.$value?-1:1;
+			});
+
+			var bad = Infinity;
+			var i = 0;
+			while(leaves[i]){
+				var check=this._worst(row, leaves[i]);
+				if (check<bad){
+					row.sum += leaves[i].$value;
+					row.set.push(leaves[i]);
+					bad=check;
+					i++;
+				} else {
+					this._renderRow(row);
+					var r = { top:row.top, left:row.left, dx:row.dx, dy:row.dy, set:[], sum:0 };
+					var delta = row.sum/row.dim;
+					if (row.dx > row.dy){
+						r.left += delta;
+						r.dx -= delta;
+					} else {
+						r.top += delta;
+						r.dy -= delta;
+					}
+					row=r;
+					row.dim = Math.min(row.dx,row.dy);
+					bad=Infinity;
+				}
+			}
+		}
+		if(row)
+			this._renderRow(row);
+	},
+	_renderRow:function(row){
+		var i, id, item, x, y,
+			top=row.top,
+			left=row.left;
+
+		row.mode=(row.dy<row.dx);
+		row.contra=(row.sum/row.dim);
+
+		for (i=0; i<row.set.length; i++){
+			id=row.set[i].id;
+			if (row.mode){
+				x=row.contra;
+				y=row.set[i].$value/row.contra;
+			} else {
+				x=row.set[i].$value/row.contra;
+				y=row.contra;
+			}
+			this.$xy[id] = {};
+			this.$xy[id].top = top;
+			this.$xy[id].left = left;
+			if (row.mode)
+				top += y;
+			else
+				left += x;
+
+			this.$xy[id].width = x;
+			this.$xy[id].height = y;
+
+			this._html += this._toHTMLItem(this.getItem(id));
+			if(this._settings.subRender && this.data.branch[id])
+				this._renderBranch(id);
+		}
+	},
+	_worst:function(row, add){
+		var s = row.sum + add.$value;
+		var a = (s*s) /( row.dim*row.dim*add.$value);
+		if (row.set.length){
+			a=Math.max(row.dim*row.dim*row.set[0].$value/(s*s),a);
+		}
+		return a>1?a:(1/a);
+	},
+	_toHTMLObject:function(obj){
+		this._htmlElement.innerHTML = this._toHTMLItem(obj);
+		return this._htmlElement.firstChild;
+	},
+	showBranch: function(id){
+		this._settings.branch = id;
+		this.refresh();
+	},
+	render:function(id,data,type){
+		if (!this.isVisible(this._settings.id) || this.$blockRender)
+			return;
+
+		if(type == "update"){
+			var cont = this.getItemNode(id); //get html element of updated item
+			if(cont){
+				var t = this._htmlmap[id] = this._toHTMLObject(data);
+				webix.html.insertBefore(t, cont);
+				webix.html.remove(cont);
+			}
+		}
+		else if(this.data.branch && (!this._settings.branch || this.data.branch[this._settings.branch])){
+				this._htmlmap = null;
+				this.callEvent("onBeforeRender",[]);
+				this._renderBranch();
+				this._dataobj.innerHTML = this._html;
+				this.callEvent("onAfterRender",[]);
+		}
+		return true;
+	},
+	_id:"webix_dm_id",
+	on_click:{
+		webix_treemap_item:function(e,id){
+			if (this._settings.select){
+				if (this._settings.select=="multiselect"  || this._settings.multiselect)
+					this.select(id, false, (e.ctrlKey || e.metaKey || (this._settings.multiselect == "touch")), e.shiftKey);
+				else
+					this.select(id);
+			}
+			if(this._settings.activeItem && this.isBranch(id)){
+				this.showBranch(id);
+			}
+		},
+		webix_treemap_header_item: function(e){
+			var id = webix.html.locate(e, "webix_dm_header_id");
+			this.define("branch", id);
+			this.refresh();
+		},
+		webix_treemap_reset: function(e){
+			this.define("branch", 0);
+			this.refresh();
+		}
+	},
+	on_dblclick:{
+	},
+	on_mouse_move:{
+	},
+	_getCssText: function(style){
+		var css = "";
+		for(var property in style){
+			css += property+":"+style[property]+";";
+		}
+		return css;
+	},
+	type:{
+		//normal state of item
+		template:webix.template("#value#"),
+		header: function(obj, common){
+			var id = obj.id;
+			var resetIcon = "<div role='button' tabindex='0' aria-label='"+webix.i18n.aria.resetTreeMap+"' class='webix_treemap_reset'></div>";
+			var arr = [];
+			while(id){
+				obj = this.getItem(id);
+				arr.push(common.headerItem.call(this, obj, common));
+				id = this.getParentId(id);
+			}
+			arr.reverse();
+			return resetIcon + arr.join("<span class='webix_icon fa-angle-right webix_treemap_path_icon'></span>");
+		},
+		headerItem: function(obj){
+			var template = this.config.headerTemplate(obj);
+			var html = '<a role="button" tabindex="0" aria-label="'+template+'" webix_dm_header_id="'+obj.id+'" class="webix_treemap_header_item">';
+			html += template;
+			html += '</a>';
+			return html;
+		},
+		classname:function(obj, common, marks){
+			var css = "webix_treemap_item";
+
+			if (common.css) css +=common.css+" ";
+
+			if (obj.$css){
+				if (typeof obj.$css == "object")
+					obj.$css = webix.html.createCss(obj.$css);
+				css +=" "+obj.$css;
+			}
+
+			var xy = this.$xy[obj.id];
+
+			if (marks && marks.$css) css +=" "+marks.$css;
+
+			css += " webix_treemap_level_" + this.getItem(obj.id).$level;
+
+			var parentId = this.getParentId(obj.id);
+
+			if(!parentId || parentId == this._settings.branch)
+				css += " webix_treemap_level_top";
+
+			if(this.$height - xy.top - xy.height < 1)
+				css += " webix_treemap_item_bottom";
+
+			if(this.$width - xy.left - xy.width   < 1)
+				css += " webix_treemap_item_right";
+
+			if(common.cssClass){
+				var cssClass = common.cssClass.call(this, obj, common, marks);
+				if(cssClass){
+					if(typeof cssClass == "object"){
+						css += " "+ webix.html.createCss(cssClass);
+					}
+					else
+						css += " "+cssClass;
+				}
+			}
+			return css;
+		},
+		templateStart:function(obj,type,marks){
+			var className = "", style="";
+			if(this.$xy){
+				var xy = this.$xy[obj.id];
+				style += "width: "+ xy.width +"px; height: " + xy.height+"px;";
+				style += "top: "+ xy.top+"px; left: " + xy.left+"px;";
+			}
+			return '<div role="treeitem" aria-level="'+obj.$level+'" '+(marks && marks.webix_selected?'aria-selected="true" tabindex="0"':'')+' webix_dm_id="'+obj.id+'" class="'+type.classname.call(this,obj,type,marks)+'" style="'+style+'">';
+		},
+		templateEnd:webix.template("</div>")
+	}
+},webix.AutoTooltip, webix.Group, webix.TreeAPI, webix.SelectionModel, webix.KeysNavigation, webix.MouseEvents, webix.Scrollable, webix.TreeDataLoader, webix.ui.proto, webix.TreeRenderStack, webix.CopyPaste, webix.EventSystem);
+
+webix.extend(webix.ui.datatable, {
+	_init_areaselect: function(){
+		this._arSelCheckKeys = true;
+		this._areaSelStorage = {};
+		this.define("select","area");
+		this.attachEvent("onAfterScroll", function(){
+			this.refreshSelectArea();
+		});
+		this.attachEvent("onAfterRender", function(){
+			this.refreshSelectArea();
+		});
+		this.attachEvent("onBeforeColumnHide", function(column){
+			this._areaSelHiddenIndex = this.getColumnIndex(column);
+		});
+		this.attachEvent("onAfterColumnHide", function(){
+			this._excludeColumnFromAreas(this._areaSelHiddenIndex);
+		});
+
+		this._bs_do_select = function(start, end, stopped, ev){
+			if(start.row && end.row){
+				if(stopped){
+					this.addSelectArea(start, end, true);
+					this._arSelCheckKeys = true;
+					return false;
+				}
+				else{
+					if(this.callEvent("onAreaDrag",[start, end, ev])){
+						if(!this._activeAreaSName){
+							if(this._arSelCheckKeys && !(this._settings.multiselect && ev && ev.ctrlKey) ){
+								this.removeSelectArea();
+								this._arSelCheckKeys = false;
+							}
+
+						}else{
+							this._removeAreaNodes(this._activeAreaSName);
+						}
+					}
+					else
+						return false;
+				}
+			}
+		};
+		this.attachEvent("onBeforeAreaAdd", this._span_correct_range);
+		webix._event(this._body, "mousedown", this._ars_down, {bind:this});
+	},
+	_block_sel_flag: true,
+	_excludeColumnFromAreas: function(index){
+		var areas = this._areaSelStorage;
+		for(var a in areas){
+			var area = areas[a];
+			if(this.getColumnIndex(area.start.column) <0 ){
+				if(area.start.column == area.end.column)
+					this.removeSelectArea(area.name);
+				else{
+					var id = this.columnId(index+1);
+					if(id)
+						this._updateSelectArea(area.name,{row: area.start.row,column: id},null);
+				}
+			}
+			else if(this.getColumnIndex(area.end.column) <0 ){
+				var id = this.columnId(index-1);
+				if(id)
+					this._updateSelectArea(area.name,null,{row: area.end.row,column: id});
+			}
+		}
+	},
+	_extendAreaRange: function(id, area, mode){
+		var sci, eci, sri, eri, ci, ri, iri, ici;
+
+		if (area){
+			sci = this.getColumnIndex(area.start.column);
+			eci = this.getColumnIndex(area.end.column);
+			sri = this.getIndexById(area.start.row);
+			eri = this.getIndexById(area.end.row);
+			ci = this.getColumnIndex(id.column);
+			ri = this.getIndexById(id.row);
+			//start cell of area
+			iri = this.getIndexById(area.init.row);
+			ici = this.getColumnIndex(area.init.column);
+
+			if(sci > ci || mode == "left"){
+				if(mode === "left" && eci > ici) eci--;
+				else sci = ci;
+			}
+			else if(eci <= ci || mode == "right"){
+				if(mode == "right" && sci <ici) sci ++;
+				else eci = ci;
+			}
+
+			if(sri > ri || mode =="up"){
+				if(mode =="up" && eri > iri ) eri--;
+				else sri = ri;
+			}
+			else if(eri < ri || mode =="down"){
+				if( mode == "down" && sri <iri) sri++;
+				else eri = ri;
+			}
+
+			var start = { row: this.getIdByIndex(sri), column: this.columnId(sci) };
+			var end = { row: this.getIdByIndex(eri), column: this.columnId(eci) };
+
+			if(this.callEvent("onBeforeBlockSelect", [start, end, true])){
+				this._updateSelectArea(area.name, start, end);
+				this.callEvent("onSelectChange", []);
+				this.callEvent("onAfterBlockSelect", [start, end]);
+			}
+		}
+	},
+	_updateSelectArea: function(name, start, end){
+		var area = this._areaSelStorage[name];
+		if(!area)
+			return false;
+
+		var range = { start:  start||area.start, end: end||area.end};
+		this._span_correct_range(range);
+		webix.extend(area, range, true);
+
+		this.refreshSelectArea();
+	},
+	areaselect_setter:function(value){
+		if(value){
+			this._init_areaselect();
+			this._init_areaselect = function(){};
+		}
+		this.define("blockselect",value);
+		return value;
+	},
+	addSelectArea: function(start, end, preserve, name, css, handle){
+		var i0, i1, j0, j1, temp;
+		i0 = this.getIndexById(start.row);
+		i1 = this.getIndexById(end.row);
+
+		j0 = this.getColumnIndex(start.column);
+		j1 = this.getColumnIndex(end.column);
+
+
+		if (i0>i1){
+			temp = i0;
+			i0 = i1;
+			i1 = temp;
+		}
+
+		if (j0>j1){
+			temp = j0;
+			j0 = j1;
+			j1 = temp;
+		}
+
+		name = name || this._activeAreaSName || webix.uid();
+
+		this._activeAreaSName= null;
+
+		var area = {
+			start: { row: this.getIdByIndex(i0), column: this.columnId(j0)},
+			end:{ row: this.getIdByIndex(i1), column: this.columnId(j1)}
+		};
+
+		if(css)
+			area.css = css;
+		if(handle || handle === false)
+			area.handle = handle;
+
+		if(this._areaSelStorage[name]){
+			return this._updateSelectArea(name,area.start,area.end);
+		}
+		else{
+			area.handle = true;
+		}
+
+		area.name = name;
+
+		area.init = area.start;
+
+		if(this.callEvent("onBeforeAreaAdd",[area])){
+			this._lastDefArea = name;
+			if(!preserve)
+				this.removeSelectArea();
+			this._areaSelStorage[area.name] = area;
+			this._selected_areas.push(area);
+			this.refreshSelectArea();
+			this.callEvent("onAfterAreaAdd",[area]);
+			this.callEvent("onSelectChange",[]);
+		}
+	},
+	_renderSelectAreaBox: function(){
+		var box = webix.html.create("DIV");
+		box.className = "webix_area_selection_layer";
+		box.style.top = this._render_scroll_shift+"px";
+		return box;
+	},
+	refreshSelectArea: function(){
+		var xr, yr, name, range,
+			r0, r1, c0, c1,
+			center = null, left=null, right = null,
+			prerender = this._settings.prerender;
+
+		if(!this._render_full_rows)
+			return;
+		// indexes of visible cols
+		xr = this._get_x_range(prerender);
+		// indexes of visible rows
+		yr = this._get_y_range(prerender === true);
+
+		if (!this._rselect_box){
+			this._rselect_box = this._renderSelectAreaBox();
+			this._body.childNodes[1].appendChild(this._rselect_box);
+			this._rselect_box_left = this._renderSelectAreaBox();
+			this._body.childNodes[0].appendChild(this._rselect_box_left);
+			this._rselect_box_right = this._renderSelectAreaBox();
+			this._body.childNodes[2].appendChild(this._rselect_box_right);
+		}
+
+		this._rselect_box.innerHTML = "";
+		this._rselect_box_left.innerHTML = "";
+		this._rselect_box_right.innerHTML = "";
+
+		var leftSplit = this._settings.leftSplit;
+		var rightSplit = this._settings.rightSplit;
+
+		for(name in this._areaSelStorage){
+			range = this._areaSelStorage[name];
+			var ind = this._calcAreaSelectIndexes(range,xr,yr);
+			if (ind === null){
+				this.removeSelectArea(name);
+				continue;
+			}
+			var startIndex = this.getColumnIndex(range.start.column);
+			var endIndex = this.getColumnIndex(range.end.column);
+			if(ind.r0 <= ind.r1){
+				if(this._settings.topSplit && r0>=this._settings.topSplit && r1< this._render_scroll_top)
+					return false;
+				if(startIndex < leftSplit)
+					left = this._getSelectAreaCellPositions(ind.r0, startIndex, ind.r1, Math.min(endIndex,leftSplit-1));
+				if(ind.c0<=ind.c1)
+					center = this._getSelectAreaCellPositions(ind.r0, ind.c0, ind.r1, ind.c1);
+				if(rightSplit && endIndex >= this._rightSplit)
+					right = this._getSelectAreaCellPositions(ind.r0, Math.max(startIndex,this._rightSplit), ind.r1, endIndex);
+
+				if(left || center || right)
+					this._setSelectAreaBorders(left,center,right, name, range.css, range.handle);
+			}
+		}
+	},
+	_calcAreaSelectIndexes: function(range, xr, yr){
+		var r0, r1, c0, c1;
+
+		var startIndex = this.getIndexById(range.start.row);
+		var endIndex = this.getIndexById(range.end.row);
+
+		var startColumn = this.getColumnIndex(range.start.column);
+		var endColumn = this.getColumnIndex(range.end.column);
+
+		//return null for broken select areas
+		if (startColumn === -1 || endColumn === -1)
+			return null;
+		if (startIndex === -1 || endIndex === -1)
+			return null;
+
+		r1 = Math.min(yr[1],endIndex);
+		if(this._settings.topSplit){
+			r0 = startIndex;
+			if(r0 >= this._settings.topSplit)
+				r0 = Math.max(yr[0]-this._settings.topSplit,startIndex);
+			if(r1 >= this._settings.topSplit){
+				var endPos = this._cellPosition(this.getIdByIndex(endIndex),range.end.column);
+				var splitPos = this._cellPosition(this.getIdByIndex(this._settings.topSplit-1),range.end.column);
+				if(splitPos.top+splitPos.height > (endPos.top+endPos.height))
+					r1 = this._settings.topSplit-1;
+			}
+		}
+		else
+			r0 = Math.max(yr[0],this.getIndexById(range.start.row));
+
+		c0 = Math.max(xr[0],startColumn);
+		c1 = Math.min(this._rightSplit?xr[1]-1:xr[1],endColumn);
+
+		return {r0: r0, r1: r1, c0: c0, c1: c1};
+	},
+	_getSelectAreaCellPositions: function(i0, j0, i1, j1){
+		var start = this._cellPosition(this.getIdByIndex(i0),this.columnId(j0));
+		var end = this._cellPosition(this.getIdByIndex(i1),this.columnId(j1));
+		return [start, end];
+	},
+	_setSelectAreaBorders: function(left, center, right, name,  css, handle){
+
+		var handleBox, handlePos,
+			area = this._areaSelStorage[name],
+			offset = 0;
+
+		if(this._settings.topSplit)
+			offset = this._getTopSplitOffset(area.start, true);
+
+		//include split in calcs
+		var renderArea = function(parentNode, start, end, skipLeft, skipRight){
+			var bName, height, width, top, left, hor,
+				borders = {"top": 1, "right":1, "bottom": 1, "left": 1};
+			if(skipLeft)
+				delete borders.left;
+			if(skipRight)
+				delete borders.right;
+			height = end.top - start.top + end.height-1;
+			width = end.left - start.left + end.width;
+
+			for(bName in borders){
+				top = start.top + offset;
+
+				if(bName == "bottom")
+					top = end.top + end.height;
+
+				left = start.left;
+				if(bName == "right"){
+					left = end.left+end.width;
+				}
+
+				hor = (bName=="top"||bName =="bottom");
+
+				parentNode.appendChild(webix.html.create("DIV", {
+					"class":"webix_area_selection webix_area_selection_"+bName+(css?" "+css:"") ,
+					"style": "left:"+left+"px;top:"+top+"px;"+(hor?("width:"+width+"px;"):("height:"+(height-offset)+"px;")),
+					"webix_area_name": name
+				}, ""));
+				var elem = parentNode.lastChild;
+				if(bName == "right")
+					elem.style.left = left-elem.offsetWidth+"px";
+				if(bName == "bottom")
+					elem.style.top = top-elem.offsetHeight+"px";
+			}
+		};
+
+		if(right)
+			renderArea(this._rselect_box_right, right[0], right[1],!!center,false);
+		if(center)
+			renderArea(this._rselect_box, center[0], center[1],!!left,!!right);
+		if(left)
+			renderArea(this._rselect_box_left, left[0], left[1],false,!!center);
+		
+		if(handle){
+			handlePos = right?right[1]:(center?center[1]:left[1]);
+			handleBox = right?this._rselect_box_right:(center?this._rselect_box:this._rselect_box_left);
+			handleBox.appendChild(webix.html.create("DIV", {
+				"class":"webix_area_selection_handle"+(css?" "+css:"") ,
+				"style": "left:"+(handlePos.left+handlePos.width)+"px;top:"+(handlePos.top +handlePos.height)+"px;",
+				"webix_area_name": name
+			}, ""));
+		}
+
+	},
+	_removeAreaNodes: function(name){
+		if(name){
+			var removeNodes = function(parentNode){
+				var nodes = parentNode.childNodes;
+				for(var i = nodes.length-1; i>=0; i--){
+					if(nodes[i].getAttribute("webix_area_name") == name){
+						parentNode.removeChild(nodes[i]);
+					}
+				}
+			};
+			removeNodes(this._rselect_box);
+			removeNodes(this._rselect_box_left);
+			removeNodes(this._rselect_box_right);
+		}
+	},
+	removeSelectArea: function(name){
+		if(name){
+			if(this.callEvent("onBeforeAreaRemove", [name])){
+				delete this._areaSelStorage[name];
+				this._removeAreaNodes(name);
+				//reconstruct selected areas
+				this._selected_areas = [];
+				for (var key in this._areaSelStorage)
+					this._selected_areas.push(this._areaSelStorage[key]);
+
+				this.callEvent("onAfterAreaRemove", [name]);
+			}
+		}
+		else {
+			for(var n in this._areaSelStorage)
+				this.removeSelectArea(n);
+		}
+	},
+	_ars_down: function(e){
+		var src = e.target||e.srcElement;
+		var css = webix.html._getClassName(src);
+		if(css && css.indexOf("webix_area_selection_handle")!=-1){
+			var name = src.getAttribute("webix_area_name");
+			this._activeAreaSName = name;
+			// show block selection
+			var area = this._areaSelStorage[name];
+			var pos0 = this._cellPosition(area.start.row,area.start.column);
+			var pos1 = this._cellPosition(area.end.row,area.end.column);
+
+			var prerender = this._settings.prerender;
+
+			var xCorrStart = this.getColumnIndex(area.start.column) < this._settings.leftSplit?0:this._left_width;
+			var xCorrEnd = this.getColumnIndex(area.end.column) < this._settings.leftSplit?0:this._left_width;
+
+			this._bs_ready = [pos0.left+1+xCorrStart-this._scrollLeft, pos0.top +1-(prerender?this._scrollTop:0),{
+				row:area.start.row, column:area.start.column
+			} ];
+
+			this._bs_start(e);
+			this._bs_progress = [pos1.left+1+xCorrEnd-this._scrollLeft, pos1.top +1-(prerender?this._scrollTop:0)];
+			this._bs_select(false, false);
+			return webix.html.preventEvent(e);
+		}
+	},
+	getSelectArea: function(name){
+		return this._areaSelStorage[name||this._lastDefArea];
+	},
+	getAllSelectAreas: function(){
+		return this._areaSelStorage;
+	},
+	_span_correct_range: function(range){
+		if (!this.config.spans) return true;
+		var i, j, c0, c1, r0, r1,
+			span, spanR0,spanC0,
+			minR0, minC0,maxR1, maxC1,
+			changed = false,
+			start = range.start,
+			end = range.end;
+
+		minR0 = r0 = this.getIndexById(start.row);
+		minC0 = c0 = this.getColumnIndex(start.column);
+		maxR1 = r1 = this.getIndexById(end.row);
+		maxC1 = c1 = this.getColumnIndex(end.column);
+
+		for(i = r0; i <= r1; i++){
+			for(j = c0; j <= c1; j++){
+				span = this.getSpan(this.getIdByIndex(i), this.columnId(j));
+				if(span){
+					spanR0 = this.getIndexById(span[0]);
+					spanC0 = this.getColumnIndex(span[1]);
+					if(spanR0 < minR0){
+						minR0 = spanR0;
+						changed = true;
+					}
+					if(spanC0 < minC0){
+						changed = true;
+						minC0 = spanC0;
+					}
+					if(spanR0 + span[3]-1 > maxR1){
+						changed = true;
+						maxR1 = spanR0 + span[3]-1;
+					}
+					if(spanC0 + span[2]-1 > maxC1){
+						changed = true;
+						maxC1 = spanC0 + span[2]-1;
+					}
+				}
+			}
+		}
+		if(changed){
+			range.start = {row: this.getIdByIndex(minR0), column:this.columnId(minC0)};
+			range.end = {row: this.getIdByIndex(maxR1), column:this.columnId(maxC1)};
+			this._span_correct_range(range);
+		}
+	}
+});
+webix.protoUI({
+	name:"rangechart",
+	$init:function(){
+		this.attachEvent("onAfterRender", this._init_frame);
+		this._set_full_range();
+	},
+	_init_frame:function(){
+		webix.assert((this._settings.type.indexOf("pie") ===-1 && this._settings.type !=="radar" &&
+			this._settings.type !=="donut"), "Not suppored chart type");
+		
+		if(!this._map._areas.length || this._frame){
+			this._setHandle(true);
+			return;
+		}
+
+		this._setMap();
+		this._item_radius = (this._map._areas[0].points[2]-this._map._areas[0].points[0])/2;
+		this._rHandle = webix.html.create("div", {"class":"webix_chart_resizer right", "tabindex":"0", "role":"button", "aria-label":webix.i18n.aria.resizeChart });
+		this._lHandle = webix.html.create("div", {"class":"webix_chart_resizer left", "tabindex":"0", "role":"button", "aria-label":webix.i18n.aria.resizeChart });
+		this._frame = webix.html.create("div",{ "class":"webix_chart_frame"});
+
+		this._viewobj.appendChild(this._lHandle);
+		this._viewobj.appendChild(this._frame);
+		this._viewobj.appendChild(this._rHandle);
+
+		this._setHandle();
+
+		webix._event(this._rHandle, webix.env.mouse.down, this._frDown, {bind:this});
+		webix._event(this._lHandle, webix.env.mouse.down, this._frDown, {bind:this});
+		webix._event(this._frame, webix.env.mouse.down, this._frDown, {bind:this});
+
+		webix._event(webix.toNode(this._rHandle), "keydown", this._keyShift, {bind:this});
+		webix._event(webix.toNode(this._lHandle), "keydown", this._keyShift, {bind:this});
+
+		if (this._value)
+			this._settings.range = this._set_full_range(this._value);
+
+		this._refresh_range();
+		this.callEvent("onAfterRangeChange", [this._value]);
+		this.data.attachEvent("onStoreUpdated", webix.bind(this._refresh_range, this));
+	},
+	$setSize:function(x, y){
+		if (webix.ui.chart.prototype.$setSize.call(this, x, y))
+			this._setMap();
+	},
+	_setHandle:function(update){
+		if(this._rHandle && !this._handle_radius){
+			this._handle_radius = this._rHandle.clientWidth/2;
+			if(update)
+				this._refresh_range();
+		}
+	},
+	_setMap:function(){
+		var bounds = this._getChartBounds(this._content_width,this._content_height);
+		this._mapStart = bounds.start;
+		this._mapEnd = bounds.end;
+	},
+	removeAllSeries: function(){
+		this._frame = this._rHandle = this._lHandle = null;
+		webix.ui.chart.prototype.removeAllSeries.apply(this,arguments);
+	},
+	_keyShift:function(e){
+		var code = e.which || e.keyCode;
+		if(code === 37 || code ===39){
+			webix.html.preventEvent(e);
+			
+			var index = e.target.className.indexOf("right")!==-1?"eindex":"sindex";
+			var id = e.target.className.indexOf("right")!==-1?"end":"start";
+			var range = this._value;
+			
+			range[index] = range[index] + (code === 37?-1:1);
+			if(this._map._areas[range[index]]){
+				range[id] = this._get_id_by_index(range[index]);
+				this.setFrameRange(range);
+			}
+		}
+	},
+	_frDown:function(e){
+		if(e.target.className.indexOf("webix_chart_resizer") !==-1)
+			this._activeHandle = e.target;
+		else if(this._map._areas.length){
+			var spos = this._map._areas[this._value.sindex].points[2]-this._item_radius;
+			var epos = this._map._areas[this._value.eindex].points[2];
+
+			this._activeFrame = {
+				ex:webix.html.pos(e).x,
+				fx:spos+this._mapStart.x,
+				fw:epos-spos
+			};
+		}
+
+		webix.html.addCss(this._viewobj,"webix_noselect webix_wresize_cursor");
+
+		this._frClear();
+		this._resizeHandlerMove = webix.event(document.body, webix.env.mouse.move, this._frMove, {bind:this});
+		this._resizeHandlerUp   = webix.event(document.body, webix.env.mouse.up, this._frUp, {bind:this});
+	},
+	_frClear:function(){
+		if(webix._events[this._resizeHandlerMove]){
+			webix.eventRemove(this._resizeHandlerMove);
+			webix.eventRemove(this._resizeHandlerUp);
+		}
+	},
+	_frMove:function(e){
+		if(this._activeHandle){
+			var pos_x = webix.html.pos(e).x-webix.html.offset(this.$view).x;
+			if(pos_x>=this._mapStart.x && pos_x<=this._mapEnd.x){
+				if(this._activeHandle.className.indexOf("left")!==-1){
+					if(pos_x<this._rHandle.offsetLeft){
+						this._activeHandle.style.left = pos_x-this._handle_radius+"px";
+						this._frame.style.left = pos_x+"px";
+						this._frame.style.width = this._rHandle.offsetLeft-this._lHandle.offsetLeft-1+"px";
+					}
+				}
+				else if(pos_x>this._lHandle.offsetLeft+this._handle_radius){
+					this._activeHandle.style.left = pos_x-this._handle_radius+"px";
+					this._frame.style.width = this._rHandle.offsetLeft-this._lHandle.offsetLeft-1+"px";
+				}
+			}
+		}
+		else if(this._activeFrame){
+			var shift = webix.html.pos(e).x - this._activeFrame.ex;
+			var lx = this._activeFrame.fx+shift;
+			var rx = lx+this._activeFrame.fw;
+
+			if(this._mapStart.x<=lx && this._mapEnd.x>=rx){
+				webix.extend(this._activeFrame, {lx:lx, rx:rx}, true);
+				
+				this._lHandle.style.left = lx-this._handle_radius+"px";
+				this._rHandle.style.left = rx-this._handle_radius+"px";
+				this._frame.style.left = lx+"px";
+			}
+		}
+	},
+	_frUp:function(e){
+		this._frClear();
+
+		webix.html.removeCss(this._viewobj,"webix_noselect");
+		webix.html.removeCss(this._viewobj,"webix_wresize_cursor");
+
+		if(!this.count()) return;
+		
+		if(this._activeHandle){
+			var pos_x = webix.env.touch?e.changedTouches[0].pageX:webix.html.pos(e).x;
+			pos_x -= webix.html.offset(this.$view).x+this._mapStart.x;
+
+			var ind = this._get_index_by_pos(pos_x);
+			var id = this._get_id_by_index(ind);
+
+			if (this._activeHandle === this._lHandle){
+				if(ind >= this._value.eindex){
+					ind = this._value.eindex;
+					id = this._get_id_by_index(ind);
+				}
+				this._value.start = id;
+				this._value.sindex = ind;
+			} else{
+				if(ind <= this._value.sindex){
+					ind = this._value.sindex;
+					id = this._get_id_by_index(ind);
+				}
+				this._value.end = id;
+				this._value.eindex = ind;
+			}
+
+			this._activeHandle = null;
+		}
+		else if(this._activeFrame && this._activeFrame.lx){
+			var lind = this._value.sindex = this._get_index_by_pos(this._activeFrame.lx-this._mapStart.x);
+			var rind = this._value.eindex = this._get_index_by_pos(this._activeFrame.rx-this._mapStart.x);
+			this._value.start = this._get_id_by_index(lind);
+			this._value.end = this._get_id_by_index(rind);
+			
+			this._activeFrame = null;
+		}
+
+		this._refresh_range();
+		this.callEvent("onAfterRangeChange", [this._value.start, this._value.end]);
+	},
+	_get_id_by_index:function(ind){
+		if (ind >= this.data.order.length)
+			ind = this.data.order.length-1;
+		return this.getItem(this.data.order[ind])[this._settings.frameId || "id"];
+	},
+	_get_index_by_pos:function(pos){
+		var areas = this._map._areas;
+		for(var i = 0; i<areas.length; i++)
+			if(pos <= areas[i].points[2]-this._item_radius)
+				return i;
+
+		return areas.length-1;
+	},
+	_get_frame_index:function(value){
+		var key = this._settings.frameId || "id";
+		
+		for (var i=0; i<this.data.order.length; i++)
+			if (this.getItem(this.data.order[i])[key]==value)
+				return i;
+
+		return -1;
+	},
+	_set_full_range:function(value){
+		if(!value)
+			value =  { start:0, end:0, sindex:0, eindex: 0 };
+		else{
+			if(value.start) value.sindex = this._get_frame_index(value.start);
+			if(value.end) value.eindex = this._get_frame_index(value.end);
+			value.start = value.start || this._get_id_by_index(value.sindex);
+			value.end = value.end ||  this._get_id_by_index(value.eindex);
+		}
+		this._value = value;
+	},
+	range_setter:function(value){
+		this._set_full_range(value);
+		return this._value;
+	},
+	getFrameData:function(){
+		var res = [];
+		for (var i=this._value.sindex; i<=this._value.eindex; i++){
+			var item = this.getItem(this.data.order[i]);
+			if(item) res.push(item);
+		}
+		return res;
+	},
+	setFrameRange:function(range){
+		this._set_full_range(range);
+		this._refresh_range();
+
+		this.callEvent("onAfterRangeChange", [range]);
+	},
+	_refresh_range:function(){
+		if(!this._map) return;
+		var areas = this._map._areas;
+		
+		if (areas.length){
+			var	sx = areas[this._value.sindex].points[0] + this._mapStart.x+this._item_radius-1;
+			var ex = areas[this._value.eindex].points[0] + this._mapStart.x+this._item_radius-1;
+
+			this._lHandle.style.left = sx-this._handle_radius+"px";
+			this._rHandle.style.left = ex-this._handle_radius+"px";
+			this._frame.style.left = sx+"px";
+			this._frame.style.width = (ex-sx)+"px";
+
+			this._settings.range = this._value;
+		}
+	},
+	getFrameRange:function(){
+		return this._settings.range;
+	}
+}, webix.ui.chart);
+webix.protoUI({
 	name: "richtext",
 	defaults:{
 		label:"",
@@ -36510,3 +42106,361 @@ webix.protoUI({
 		return this.config.value || "";
 	}
 }, webix.IdSpace, webix.ui.layout);
+
+webix.protoUI({
+    name: "gage",
+    defaults: {
+        value: 0,
+        minRange: 0,
+        maxRange: 100,
+        minWidth:250,
+        minHeight:200,
+        smoothFlow: true,
+        scale:3,
+        stroke:7
+    },
+    $init: function() {
+        this.$ready.push(webix.bind(this._setDefaultView, this));
+        this.attachEvent("onDestruct", function(){
+            this._circleGradient = this._gageGradientPoint = this._gage = null;
+        });
+    },
+    $setSize: function(x, y) {
+        if (webix.ui.view.prototype.$setSize.call(this, x, y)){
+            this._refresh(this.config.value);
+            this._animate(this.config.value);
+        }
+    },
+    _refresh: function() {
+        var curves = this.$view.querySelector('.webix_gage_curves'),
+            gageInfo = this.$view.querySelector('.webix_gage_info'),
+            kx = this.config.scale,
+            x = this.$width;
+
+        curves.setAttribute("r", (x / kx));
+        curves.setAttribute("strokeDasharray", Math.round(Math.PI * x / kx));
+        curves.style.r = x / kx;
+        curves.style.strokeDasharray = Math.round(Math.PI * x / kx);
+
+        gageInfo.setAttribute('style', "width: "+Math.round((x / kx) * 2)+"px;");
+        this._gage.setAttribute('style', "height: "+(x / kx + 20)+"px;");
+        this._circleGradient.setAttribute("r", (x / kx));
+        this._circleGradient.setAttribute('style', "stroke-dasharray: " + Math.round(this.gradientLength * Math.PI * x / kx) + ", 1900;");
+        this._draw_line(curves.style.r);
+    },
+    _safeValue: function(value){
+        return Math.min(Math.max(value, this._settings.minRange), this._settings.maxRange);
+    },
+    _draw_line: function(radius) {
+        var svgCoord = this.$width,
+            arrowSpace = 0.05,
+            value = this.config.value;
+
+        value = this._safeValue(value);
+
+        var currentChartValue = value - this.config.minRange;
+        var degrees = Math.round(currentChartValue * 180 / (this.config.maxRange - this.config.minRange));
+
+        if(degrees === 0 || degrees === 180) {
+            this._gage.style.paddingTop = "3px";
+        }
+        this._gageGradientPoint.style.transformOrigin = (svgCoord / 2 - (0.5 + arrowSpace)) + 'px 0 0';
+        this._gageGradientPoint.setAttribute('y1', '0');
+        this._gageGradientPoint.setAttribute('x1', Math.round(svgCoord * (0.5 + arrowSpace)));
+
+        this._gageGradientPoint.setAttribute('y2', 0);
+        this._gageGradientPoint.setAttribute('x2', Math.round(svgCoord * (0.5 + arrowSpace / 2) + parseInt(radius)));
+    },
+    _animate: function(value) {
+        var webixGageValue = this.$view.querySelector('.webix_gage-value');
+        var currentChartValue = this._safeValue(value) - this.config.minRange;
+        var degrees = Math.round(currentChartValue * 180 / (this.config.maxRange - this.config.minRange));
+        var viewSize = this.$width;
+        
+        viewSize = Math.floor(viewSize/10);
+        this.$view.style.fontSize = viewSize+'px';
+        webixGageValue.innerHTML = value;
+        
+        this._circleGradient.style.stroke = this.color;
+        this._circleGradient.setAttribute("stroke", this.color);
+        this._gageGradientPoint.setAttribute("transform", "rotate(" + degrees + " "+ this.$width/2 +" 0)");
+        this._gageGradientPoint.style.transform = "rotate(" + degrees + "deg)";
+    },
+    _setDash: function() {
+        webix.assert(this.config.minRange < this.config.maxRange, "Invalid Range Values");
+        this.gradientLength = (this._safeValue(this.config.value) - this.config.minRange) / (this.config.maxRange - this.config.minRange);
+        
+        var template = this.config.color;
+        if (template){
+            if (typeof template === "function")
+                this.color = template.call(this, this.config.value);
+            else
+                this.color = template;
+        } else
+            this.color = "hsl(" + (120 - Math.round(this.gradientLength * 120)) + ", 100%, 50%)";
+
+        if (this.config.animation === true) {
+            this.defaultColor = "hsl(125, 100%, 50%)";
+        } else {
+            this.defaultColor = "hsl(" + (120 - Math.round(this.gradientLength * 120)) + ", 100%, 50%)";
+        }
+    },
+    _setDefaultView: function() {
+        this.gradientLength = 0;
+        this._setDash();
+        this.$view.innerHTML = '<div class="webix_gage_label"><span>'+(this.config.label||"")+'</span></div><svg class="webix_gage" style="height:300px; position: relative;"><circle class="webix_gage_curves" r="0" cx="50%" cy="0" stroke="#EEEEEE" stroke-width="'+this.config.stroke+'%" fill="none"></circle><circle class="webix_gage_gradient" r="0" stroke="'+this.defaultColor+'" cx="50%" cy="0" stroke-width="'+this.config.stroke+'%" fill="none" style="stroke-dasharray: 0, 1900;"></circle><line class="webix_gage_gradient_point" x1="0" x2="0" y1="0" y2="0" style="stroke:#B0B0B0; stroke-width:4;"></line></svg><div class="webix_gage_info"><div class="webix_gage_min_range">'+this.config.minRange+'</div><div class="webix_gage_max_range">'+this.config.maxRange+'</div><div class="webix_gage_placeholder"><div class="webix_gage-value">'+this.config.value+'</div><div class="webix_gage_range_info">'+(this.config.placeholder||"")+'</div></div></div>';
+        this._circleGradient = this.$view.querySelector('.webix_gage_gradient');
+        this._gageGradientPoint = this.$view.querySelector('.webix_gage_gradient_point');
+        this._gage = this.$view.querySelector('.webix_gage');
+        if (this.isVisible() === true && this.config.smoothFlow === true && (webix.env.svganimation && !webix.env.isEdge)) {
+            this._circleGradient.setAttribute('class', 'webix_gage_gradient webix_gage_animated');
+            this._gageGradientPoint.setAttribute('class', 'webix_gage_gradient_point webix_gage_gradient_point_animated');
+        }
+    },
+    setValue: function(value) {
+        this.config.value = value;
+        this._setDash();
+        this._refresh();
+        this._animate(value);
+    },
+    getValue: function() {
+        return this.config.value;
+    }
+}, webix.EventSystem, webix.ui.view);
+webix.protoUI({
+	name: "bullet",
+	defaults: {
+		color: "#394646",
+		marker: false,
+		layout: "x",
+		barWidth: 40,
+		flowTime: 500,
+		labelWidth: 150,
+		stroke: 8,
+		bands:[
+			{ value:100, color:"#5be5d6"},
+			{ value:80, color:"#fff07e" },
+			{ value:60, color:"#fd8b8c" } 
+		],
+		scale: { 
+			step:10
+		}
+	},
+	label_setter:webix.template,
+	placeholder_setter: webix.template,
+	$init:function(obj){
+		if (obj) {
+			if ((!obj.layout || obj.layout === "x") && !obj.height)
+				obj.height = obj.scale === false ? 60: 90;
+			if (obj.layout === "y" && !obj.width)
+				obj.width = obj.scale === false ? 60: 97;
+		}
+	},
+	scale_setter:function(config){
+		config.step = config.step || 10;
+		config.template = webix.template(config.template||"#value#");
+		return config;
+	},
+	$setSize: function(x, y) {
+		if (webix.ui.view.prototype.$setSize.call(this, x, y)) {
+			this._setDefaultView(this._settings.layout === "y" ? y : x);
+			if (this._settings.value)
+				this._animate(0, this._settings.value);
+		}
+	},
+	_safeValue: function(value) {
+		return Math.min(Math.max(value, this._settings.minRange), this._settings.maxRange);
+	},
+	_animateFrame: function(timestamp) {
+		this._dt = timestamp - (this._time || timestamp);
+		this._time = timestamp;
+		var fps;
+
+		if(this._settings.flowTime > this._dt) {
+			fps = this._settings.flowTime / this._dt;
+		} else {
+			fps = this._settings.flowTime;
+		}
+
+		if (fps > 1000 || fps < 5) fps = 30;
+
+		var step = (this._settings.value - this._prevValue)/fps;
+		this._nowValue += step;
+
+		if (Math.abs(this._nowValue - this._settings.value) < Math.abs(step))
+			this._nowValue = this._settings.value;
+
+		if (this._nowValue != this._settings.value){
+			this._requestId = requestAnimationFrame(this._animateFrame.bind(this));
+		} else {
+			cancelAnimationFrame(this._requestId);
+			this._requestId = null;
+		}
+		this._bulletValue.setAttribute("width", Math.floor(this._nowValue * this._scale));
+	},
+	_animate: function(from, to){
+		this._prevValue = this._nowValue = from;
+		this._settings.value = to;
+
+		var label = this._settings.label;
+		if (label)
+			this.$view.querySelector(".webix_bullet_header").textContent = label(this._settings);
+
+		var placeholder = this._settings.placeholder;
+		if (typeof  placeholder === "function")
+			this.$view.querySelector(".webix_bullet_subheader").textContent = placeholder(this._settings);
+
+		if (this.isVisible() === true && this._settings.smoothFlow === true && (window.requestAnimationFrame)) {
+			if (!this._requestId)
+				this._requestId = requestAnimationFrame(this._animateFrame.bind(this));
+		} else {
+			this._bulletValue.setAttribute("width", Math.floor(to * this._scale));
+		}
+	},
+	_setAttr: function(tag, names, values) {
+		for (var i = 0; i < names.length; i++)
+			tag.setAttribute(names[i], values[i]);
+	},
+	_createNS:function(tag, names, values){
+		var ns = "http://www.w3.org/2000/svg";
+		var el = document.createElementNS(ns, tag);
+		if (names)
+			this._setAttr(el, names, values);
+
+		return el;
+	},
+	_dom:function(data){
+		var top = this._createNS(data[0], data[1], data[2]);
+		var child = data[3];
+		if (child)
+			for (var i = 0; i < child.length; i++)
+				top.appendChild(this._dom(child[i]));
+
+		return top;
+	},
+	_setView: function() {
+		var id = "d"+webix.uid();
+		var svg 		= this._createNS("svg", 	["class"], ["webix_bullet_graph_svg"]);
+		var container 	= this._createNS('g');
+		var containerBand = this._createNS('g');
+		var value 		= this._createNS('rect', 	["x","y", "width", "height", "class", "style"], [this._leftStart, this._topStart, 100, this._settings.stroke, "webix_bullet_value","filter:url(#"+id+");fill:"+this._settings.color]);
+		
+		var valueMarker = this._createNS('rect', ["x","y", "width", "height", "fill"], [0, 5, 3, (this._settings.barWidth - 10), "rgba(0,0,0,0.5)"]);
+		var division 	= this._createNS('g', 	["stroke", "stroke-width", "fill"], ["#8b94ac", "2", "none"]);
+		var text 		= this._createNS('text', ["text-anchor", "stroke", "fill"], ["end", "none", "#8b94ac"]);
+		var left = this._settings.layout == "y" ? "50%" : this._leftStart - 10;
+		var top = this._settings.layout == "y" ? 11 : 17;
+		var textRow1 	= this._createNS('tspan',["x", "y", "class"], [left, top, "webix_bullet_header"]);
+		var textRow2 	= this._createNS('tspan',["x", "y", "class"], [left, top+17, "webix_bullet_subheader"]);
+		var range 		= this._createNS('text', ["text-anchor", "stroke", "class", "fill"], ["middle", "none", "webix_bullet_scale", "#8b94ac"]);
+
+		var filter = this._dom(
+			["filter", ["id","x","y", "width", "height"], [id, "0","-150%", "110%", "400%"], [
+				["feOffset",["in", "dx","dy"],["SourceAlpha", 0, 0 ]],
+				["feGaussianBlur",["stdDeviation"],["2"]],
+				["feComponentTransfer", 0 ,0, [
+					["feFuncA", ["type", "slope"], ["linear", "0.5"]]
+				]],
+				["feMerge", 0,0, [
+					["feMergeNode"],
+					["feMergeNode", ["in"], ["SourceGraphic"]]
+				]]
+			]]
+		);
+
+		svg.appendChild(filter);
+ 
+		var tempContainer = document.createElement('div');
+		container.appendChild(containerBand);
+
+		if(this._settings.marker !== false) {
+			valueMarker.setAttribute("x", (this._leftStart + this._safeValue(this._settings.marker)*this._scale - 2));
+			container.appendChild(valueMarker);
+		}
+
+		container.appendChild(value);
+		text.appendChild(textRow1);
+		text.appendChild(textRow2);
+		svg.appendChild(text);
+
+		var vertical = this._settings.layout === "y";
+		if (this._settings.scale){
+			for (var i = this._settings.minRange; i <= this._settings.maxRange; i+= this._settings.scale.step){
+				var label = this._settings.labelHeight || this._settings.labelWidth;
+				var left = Math.floor(label + i*this._scale-(i?0.1:-1));
+				var x = vertical ? (this.$width - this._settings.barWidth)/2 + -10 : left; 
+				var y = vertical ? this._chartWidth - left + label + 44 : this._settings.barWidth + 28;
+				var z = vertical ? -13 : this._settings.barWidth+3;
+				var align = vertical ? "end" : "middle";
+
+				var bulletRangeChild = this._createNS('tspan',
+					["x", "y", "text-anchor"], [x, y, align]);
+				var bulletDivChild = this._createNS('line', 
+					["x1", "y1", "x2", "y2", "stroke-width"], [left,z,left,z+10,1]);
+
+				tempContainer.innerHTML = this._settings.scale.template({ value: i });
+				bulletRangeChild.appendChild(tempContainer.childNodes[0]);
+				range.appendChild(bulletRangeChild);
+				division.appendChild(bulletDivChild);
+			
+			}
+
+			container.appendChild(division);
+			svg.appendChild(range);
+		}
+
+
+		for (var i = 0; i < this._settings.bands.length; i++){
+			var obj = this._settings.bands[i];
+			var band = this._createNS('path');
+			var value = this._safeValue(obj.value)*this._scale;
+			band.setAttribute("d", "M "+this._leftStart+",0 l " + value + ",0 l 0,"+this._settings.barWidth+" l -" + value + ",0 z");
+			band.setAttribute("fill", obj.color);
+			containerBand.appendChild(band);
+		}
+
+		svg.appendChild(container);
+
+		if (this._settings.layout === "y"){
+			var w = this._settings.scale?(this.$width / 2 - 10):0;
+			var h = this.$height + this._leftStart - 28;
+			container.setAttribute("transform", "translate("+w+", "+h+") rotate(270)");
+			text.setAttribute("text-anchor", "middle");
+			text.childNodes[0].setAttribute("x", "55%");
+			text.childNodes[1].setAttribute("x", "55%");
+			range.setAttribute("text-anchor", "right");
+		}
+		svg.setAttribute("viewBox", "0 0 " + this.$width  + " " + this.$height  + "");
+
+		return svg;
+	},
+	_setDefaultView: function(size) {
+		if (!size) return;
+		webix.assert(this.config.minRange < this.config.maxRange, "Invalid Range Values");
+		var _view = this.$view;
+		_view.innerHTML = "";
+		
+		var label = this._settings.labelHeight || this._settings.labelWidth;
+
+		this._leftStart = this._settings.label ? label : 7;
+		this._topStart =  Math.floor((this._settings.barWidth - this._settings.stroke)/2);
+		this._chartWidth = size - this._leftStart - 30;
+		this._scale = this._chartWidth / (this._settings.maxRange - this._settings.minRange);
+
+		var svg = this._setView();
+		// scale height fix for ie
+		svg.setAttribute("height", this.$height); 
+		svg.setAttribute("width", this.$width);
+
+		_view.appendChild(svg);
+		this._bulletValue = _view.querySelector(".webix_bullet_value");
+	},
+	setValue: function(value) {
+		if (this._settings.value != value){
+			this._animate(this._settings.value, value);
+		}
+	},
+	getValue: function() {
+		return this._settings.value;
+	}
+}, webix.ui.gage, webix.ui.view);
