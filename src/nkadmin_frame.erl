@@ -115,13 +115,13 @@ frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
 
 %% @private
 frame_user(#{srv_id:=SrvId, user_id:=UserId}=Session) ->
-    case nkdomain:get_name(SrvId, UserId) of
-        {ok, #{name:=Name, icon_id:=UserIconId}} ->
+    case nkdomain_user_obj:get_name(SrvId, UserId) of
+        {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname}, icon_id:=UserIconId}} ->
             Items = [
                 #{
                     id => admin_frame_user_name,
                     class => frameUserName,
-                    value => #{label => Name}
+                    value => #{label => <<UserName/binary, " ", UserSurname/binary>>}
                 },
                 #{
                     id => admin_frame_user_icon,
