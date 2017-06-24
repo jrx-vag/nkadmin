@@ -33,33 +33,20 @@
 
 
 %% @doc
-api(<<"find">>, Syntax) ->
-    Syntax#{
-        user_id => binary
-    };
-
+%% TODO: To REMOVE
 api(<<"create">>, Syntax) ->
     Syntax#{
-        user_id => binary,
-        domain_id => binary,
         language => binary,             %% <<"en">>, <<"es">>
-        url => binary,
-        events => {list, binary}
+        url => binary
     };
+
 
 api(<<"start">>, Syntax) ->
     Syntax#{
-        id => binary,
         domain_id => binary,
         language => binary,             %% <<"en">>, <<"es">>
         url => binary,
         events => {list, binary}
-    };
-
-api(<<"stop">>, Syntax) ->
-    Syntax#{
-        id => binary,
-        reason => binary
     };
 
 api(<<"switch_domain">>, Syntax) ->

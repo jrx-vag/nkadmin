@@ -95,22 +95,6 @@ admin_get_tree(Session) ->
     nkadmin_tree:get_tree(Session).
 
 
-%%%% @doc
-%%-spec admin_get_url(session()) ->
-%%    {ok, binary(), list(), session()} | {error, term(), session()}.
-%%
-%%admin_get_url(#{detail_path:=Path}=Session) ->
-%%    {Updates2, Session2} = nkadmin_util:update_path_absolute(Path, [], Session),
-%%    {ok, Updates2, Session2}.
-%%
-%%
-%%%% @doc Must return the detail elements
-%%-spec admin_get_detail(session()) ->
-%%    {ok, map(), session()} | {error, term(), session()}.
-%%
-%%admin_get_detail(Session) ->
-%%    nkadmin_detail:get_detail(Session).
-
 
 %% @doc Called when a registered event is received
 %% Must reply with updates for the client
@@ -122,18 +106,24 @@ admin_event(Event, Updates, Session) ->
     nkadmin_frame:event(Event, Updates, Session).
 
 
-%% @doc
+%% @doc Called when an action on an element has been received
+-spec admin_element_action(binary(), binary(), term(), list(), session()) ->
+    {ok, list(), session()} | {error, term(), session()}.
+
 admin_element_action(ElementId, Action, Value, Updates, Session) ->
     nkadmin_frame:element_action(ElementId, Action, Value, Updates, Session).
 
 
-%% @doc
+%% @doc Called when the client asks for specific table data
+-spec admin_get_data(binary(), map(), session()) ->
+    {ok, map(), session()} | {error, term(), session()}.
+
 admin_get_data(_ElementId, _Spec, Session) ->
     {error, unrecognized_element, Session}.
 
 
-
-%% @doc Must add desired categories as a map with the position (lower first)
+%% @doc Called from nkadmin_tree to get the list of categories
+%% Must return  a map with the position (lower first)
 -spec admin_tree_categories(map(), session()) ->
     {ok, map(), session()}.
 
@@ -141,7 +131,11 @@ admin_tree_categories(Map, Session) ->
     {ok, Map, Session}.
 
 
-%% @doc
+%% @doc Called from nkadmin_tree to get the data of a category
+%% Must return  a map with the position (lower first)
+-spec admin_tree_get_category(binary(), session()) ->
+    {ok, map(), session()} | {error, term()}.
+
 admin_tree_get_category(_Category, Session) ->
     {ok, #{}, Session}.
 

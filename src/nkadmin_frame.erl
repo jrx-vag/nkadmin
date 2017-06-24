@@ -66,10 +66,10 @@ event(#nkevent{type = <<"updated">>, obj_id=ObjId}, Updates, Session) ->
 event(#nkevent{type = <<"deleted">>, obj_id=ObjId}, Updates, Session) ->
     case Session of
         #{domain_id:=ObjId} ->
-            nkdomain_obj:unload(self(), domain_deleted),
+            nkdomain:unload(any, self(), domain_deleted),
             {ok, Updates, Session};
         #{user_id:=ObjId} ->
-            nkdomain_obj:unload(self(), user_deleted),
+            nkdomain:unload(any, self(), user_deleted),
             {ok, Updates, Session};
         _ ->
             {ok, Updates, Session}
