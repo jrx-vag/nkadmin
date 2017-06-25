@@ -40,7 +40,6 @@ api(<<"create">>, Syntax) ->
         url => binary
     };
 
-
 api(<<"start">>, Syntax) ->
     Syntax#{
         domain_id => binary,

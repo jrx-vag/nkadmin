@@ -96,7 +96,8 @@
 start(SrvId, DomainId, UserId, Opts) ->
     Obj = #{
         type => ?DOMAIN_ADMIN_SESSION,
-        parent_id => DomainId,
+        domain_id => DomainId,
+        parent_id => UserId,
         created_by => UserId,
         active => true,
         ?DOMAIN_SESSION => #{}
