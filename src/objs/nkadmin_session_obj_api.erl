@@ -48,33 +48,38 @@ cmd(<<"create">>, Req) ->
     cmd(<<"start">>, Req);
 
 cmd(<<"start">>, #nkreq{session_module=nkapi_server}=Req) ->
-    #nkreq{conn_id=ConnPid, data=Data, user_id=UserId, srv_id=SrvId} = Req,
-    case nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, Req) of
-        {ok, DomainId} ->
-            Opts1 = maps:with([domain_id, url, language], Data),
-            Opts2 = Opts1#{api_server_pid=>ConnPid},
-            case nkadmin_session_obj:start(SrvId, DomainId, UserId, Opts2) of
-                {ok, #{session_id:=SessId}=Reply} ->
-                    Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
-                    Subs = #{
-                        srv_id => SrvId,
-                        class => ?DOMAIN_EVENT_CLASS,
-                        subclass => ?DOMAIN_ADMIN_SESSION,
-                        type => Types,
-                        obj_id => SessId
-                    },
-                    ok = nkapi_server:subscribe(ConnPid, Subs),
-                    UserMeta1 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, SessId, Req),
-                    UserMeta2 = UserMeta1#{nkadmin_session_types=>Types},
-                    {ok, Reply, UserMeta2};
+    #nkreq{data=Data, session_module=Mod, session_pid=Pid, user_id=UserId, srv_id=SrvId} = Req,
+    case catch Mod:type() of
+        session ->
+            case nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, Req) of
+                {ok, DomainId} ->
+                    Opts1 = maps:with([domain_id, url, language], Data),
+                    Opts2 = Opts1#{monitor=>{Mod, Pid}},
+                    case nkadmin_session_obj:start(SrvId, DomainId, UserId, Opts2) of
+                        {ok, #{session_id:=SessId}=Reply} ->
+                            Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
+                            Subs = #{
+                                srv_id => SrvId,
+                                class => ?DOMAIN_EVENT_CLASS,
+                                subclass => ?DOMAIN_ADMIN_SESSION,
+                                type => Types,
+                                obj_id => SessId
+                            },
+                            ok = nkapi_server:subscribe(Pid, Subs),
+                            UserMeta1 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, SessId, Req),
+                            UserMeta2 = UserMeta1#{nkadmin_session_types=>Types},
+                            {ok, Reply, UserMeta2};
+                        {error, Error} ->
+                            {error, Error}
+                    end;
                 {error, Error} ->
                     {error, Error}
             end;
-        {error, Error} ->
-            {error, Error}
+        _ ->
+            {error, session_type_unsupported}
     end;
 
-cmd(<<"stop">>, #nkreq{conn_id=ConnPid, data=Data, srv_id=SrvId, user_meta=UserMeta}=Req) ->
+cmd(<<"stop">>, #nkreq{data=Data, session_pid=Pid, srv_id=SrvId, user_meta=UserMeta}=Req) ->
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, Req) of
         {ok, SessId} ->
             UserMeta2 = case UserMeta of
@@ -86,7 +91,7 @@ cmd(<<"stop">>, #nkreq{conn_id=ConnPid, data=Data, srv_id=SrvId, user_meta=UserM
                         type => Types,
                         obj_id => SessId
                     },
-                    nkapi_server:unsubscribe(ConnPid, Subs),
+                    nkapi_server:unsubscribe(Pid, Subs),
                     maps:remove(nkadmin_session_types, UserMeta);
                 _ ->
                     UserMeta

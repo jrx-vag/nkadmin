@@ -50,7 +50,7 @@
 
 -type start_opts() :: #{
     language => binary(),
-    api_server_pid => pid(),
+    monitor => {module(), pid()},
     domain_id => binary(),
     url => binary()
 }.
@@ -189,18 +189,18 @@ object_send_event(Event, State) ->
 
 
 %% @private When the object is loaded, we make our cache
-object_init(#?STATE{srv_id=SrvId, id=Id, obj=Obj, meta=Session}=State) ->
+object_init(#?STATE{srv_id=SrvId, id=Id, obj=Obj, meta=Meta}=State) ->
     %% TODO Link again if moved process
     #obj_id_ext{obj_id=SessId} = Id,
     #{created_by:=UserId} = Obj,
-    #{api_server_pid:=ApiPid} = Session,
-    Session2 = Session#{
+    #{monitor:={ApiMod, ApiPid}} = Meta,
+    Session2 = Meta#{
         srv_id => SrvId,
         user_id => UserId
     },
     Session3 = maps:merge(#{language => <<"en">>}, Session2),
     ok = nkdomain_user_obj:register_session(SrvId, UserId, ?DOMAIN_ADMIN_SESSION, SessId, #{}),
-    State2 = nkdomain_obj_util:link_to_api_server(?MODULE, ApiPid, State),
+    State2 = nkdomain_obj_util:link_to_api_server(?MODULE, ApiMod, ApiPid, State),
     State3 = State2#?STATE{meta=#{}, session=Session3},
     {ok, State3}.
 
