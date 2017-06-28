@@ -188,6 +188,30 @@ textarea.webix_invalid {
 /**************************************/
 
 /************** TOOLBARS **************/
+.netcomposer {
+	color: #FFF;
+	background: #303E4D;
+}
+
+.webix_layout_toolbar.webix_toolbar.netcomposer {
+	color: #FFF;
+	background: #303E4D;
+} 
+
+.netcomposer_toolbar-title {
+	color: #FFF;
+	font-weight: 500;
+	font-size: 20px;
+	cursor: pointer;
+}
+
+/* Default toolbar */
+_toolbar-title {
+	font-weight: 500;
+	font-size: 20px;
+	cursor: pointer;
+}
+
 .nopadding > .webix_template {
 	padding: 0px;
 }
@@ -361,6 +385,28 @@ textarea.webix_invalid {
   background: #f2f2f2;
 }
 */
+
+.webix_view.webix_pager{
+	text-align:center;
+}
+
+.webix_dtable .domain {
+    padding: 2px 5px;
+    font-size: 12px;
+    border-radius: 3px;
+    border: 1px solid grey;
+	text-transform: uppercase;
+}
+
+.datatable_icon {
+	border-width: 0px !important;
+	background: 0 0;
+}
+
+.master_checkbox {
+  	width: 22px;
+  	padding-left: 10px;
+}
 
 /**************************************/
 

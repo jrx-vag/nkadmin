@@ -98,7 +98,7 @@ frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
                 #{
                     id => admin_frame_domain_name,
                     class => frameDomainName,
-                    value => #{label => DomName}
+                    value => #{label => DomName, css => DomName}
                 },
                 #{
                     id => admin_frame_domain_icon,

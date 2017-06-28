@@ -54,6 +54,12 @@
             var defaultLanguage = "es";
             defaultDomain = _defaultDomain;
 
+            webix.ready(function(){
+            //enabling CustomScroll
+                if (!webix.env.touch && webix.ui.scrollSize)
+                    // Enable webix custom scroll (Pro feature)
+                    webix.CustomScroll.init();
+            });
             // Initialize an empty workspace
             webix.ui(createEmptyWorkspace());
 
@@ -216,6 +222,43 @@
                     }
                 }, webix.ui.datafilter.textFilter);
 
+                webix.ui.datafilter.customMasterCheckbox = webix.extend({
+                    getValue:function(){},
+		            setValue:function(){},
+		            getHelper:function(node, config){
+		            	return {
+		            		check:function(){ config.checked = false; node.onclick(); },
+		            		uncheck:function(){ config.checked = true; node.onclick(); },
+		            		isChecked:function(){ return config.checked; },
+                            getNode:function(){ return node },
+                            setOnClickListener:function(clickListener){ config.clickListener = clickListener; }
+                        };
+		            },
+		            refresh:function(master, node, config){
+		            	node.onclick = function(){
+		            		this.getElementsByTagName("input")[0].checked = config.checked = !config.checked;
+		            		var column = master.getColumnConfig(config.columnId);
+		            		var checked = config.checked ? column.checkValue : column.uncheckValue;
+                            if (config.clickListener) {
+                                config.clickListener(checked);
+                            }
+		            		master.data.each(function(obj){
+		            			if(obj){ //dyn loading
+		            				obj[config.columnId] = checked;
+                                    var ignore = true;
+		            				master.callEvent("onCheck", [obj.id, config.columnId, checked, ignore]);
+                                    // Prevent multiple calls to wsProxy.save()
+		            				//this.callEvent("onStoreUpdated", [obj.id, obj, "save"]);
+		            			}
+		            		});
+		            		master.refresh();
+		            	};
+		            },
+		            render:function(master, config){ 
+		            	return "<input type='checkbox' "+(config.checked?"checked='1'":"")+">"; 
+		            }
+                }, webix.ui.datafilter.masterCheckbox);
+
                 // Define a proxy template for data collections updates
                 webix.proxy.wsProxy = {
                     $proxy: true,
@@ -230,7 +273,7 @@
                             start = details.start;
                             end = start + details.count;
                         }
-                        console.log('wsProxy Load: ', 'View', view, 'Datatable: ', view.config.id);
+                        console.log('wsProxy Load: ', 'View', view, 'Datatable: ', view.config.id, 'Callback: ', callback);
                         if (details) {
                             console.log('Details:', details, 'start', details.start, 'count', details.count, 'sort', details.sort, 'filter', details.filter);
                         } else {
@@ -295,134 +338,72 @@
                                 data: []
                             }, -1);
                         });
-/*
-                        var query = {
-            				id: "/",
-            				filters: {
-            					type: "message"
-            				},
-//          				fields: [ "_all" ],
-            				from: start,
-            				size: end
-//            				simple_query: tag.query,
-//            				simple_query_opts: {
-//            					fields: [ "message.text" ]
-//            				},
-            			};
-                        if (details && details.sort && details.sort.id && details.sort.dir) {
-                            var id = "";
-                            switch(details.sort.id) {
-                                case "conversation":
-                                    id = "parent_id";
-                                    break;
-                                case "text":
-                                    id = "message.text.keyword";
-                                    break;
-                                case "hasFile":
-                                    id = "file_id";
-                                    break;
-                                case "createdBy":
-                                    id = "created_by";
-                                    break;
-                                case "createdTime":
-                                    id = "created_time";
-                                    break;
-                                default:
-                                    id = "path";
-                            }
-                            query.sort = [
-            					//"desc:created_time"
-                                details.sort.dir + ":" + id
-            				];
-                        }
-                        if (details && details.filter) {
-                            var simple_query = "";
-                            var simple_query_opts = {
-                                fields: []
-                            };
-                            var fieldName;
-                            for (key in details.filter) {
-                                fieldName = "";
-                                switch(key) {
-                                case "conversation":
-                                    fieldName = "parent_id";
-                                    break;
-                                case "text":
-                                    fieldName = "message.text.keyword";
-                                    break;
-                                case "hasFile":
-                                    fieldName = "file_id";
-                                    break;
-                                case "createdBy":
-                                    fieldName = "created_by";
-                                    break;
-                                case "createdTime":
-                                    fieldName = "created_time";
-                                    break;
-                                default:
-                                    fieldName = "path";
-                                }
-                                if (details.filter.hasOwnProperty(key)) {
-                                    if (details.filter[key] !== "") {
-                                        simple_query = details.filter[key] + "*";
-                                    }
-                                    simple_query_opts.fields.push(fieldName);
-                                }
-                            }
-                            if (simple_query !== "") {
-                                query.simple_query = simple_query;
-                                query.simple_query_opts = simple_query_opts;
-                            }
-                        }
-                        console.log('Loading: ', query);
-                        ncClient.sendMessageAsync("objects/domain/find_all", query)
-                        .then(function(response) {
-            				if (response.result === "ok") {
-                                console.log(response);
-            					if (response.data.total === 0) {
-                                    console.log("Loaded!", "total_count", response.data.total, "data", objects, "requested", end-start, "got", response.data.data.length);
-            						webix.ajax.$callback(view, callback, "", {
-                                        total_count: 0, // used to get the total number of pages
-                                        pos: start,
-                                        data: []
-                                    }, -1);
-            					} else {
-                                    var objects = response.data.data;
-                                    var length = objects.length;
-            						for (var i=0; i<length; i++) {
-                                        objects[i].pos = start + i + 1;
-            							objects[i].id = objects[i].obj_id;
-                                        objects[i].conversation = objects[i].parent_id;
-                                        objects[i]["message.text"] = objects[i].message.text;
-                                        objects[i].has_file = objects[i].hasOwnProperty('file_id');
-                                        objects[i].created_by = objects[i].created_by;
-                                        objects[i].created_time = objects[i].created_time;
-                                        objects[i].enabled_icon = true;
-            						}
-                                    console.log("Loaded!", "total_count", response.data.total, "data", objects, "requested", end-start, "got", response.data.data.length);
-            						webix.ajax.$callback(view, callback, "", {
-                                        total_count: response.data.total, // used to get the total number of pages
-                                        pos: start,
-                                        data: objects
-                                    }, -1);
-            					}
-            				}
-            			}).catch(function(response) {
-                            console.log("ERROR at load: ", response);
-                            //total.define("counter", 0);
-                            //total.refresh();
-                            webix.ajax.$callback(view, callback, "", {
-                                total_count: 0, // used to get the total number of pages
-                                pos: start,
-                                data: []
-                            }, -1);
-                        });
-*/
                     },
                     save: function (view, update, dp, callback) {
                         //your saving pattern for single records ... 
                         //webix.ajax().post(url, update, callback);
+                        var action = null;
+                        var value = {};
                         console.log('Default save', 'view', view, 'update', update, 'dp', dp, 'callback', callback);
+                        if (update.operation === 'update') {
+                            console.log('Updating ', update.id, ' in datatable ', view.config.id, ' values: ', update.data);
+                            action = "updated";
+                            value.obj_id = update.id;
+                            value.value = update.data;
+                        } else if (update.operation === 'delete') {
+                            console.log('Deleting ', update.id, ' in datatable ', view.config.id, ' values: ', update.data);
+                            action = "deleted";
+                            value.obj_id = update.id;
+                        } else {
+                            console.log('Unrecognized operation: ', update.operation);
+                            alert('Unrecognized action on wsProxy:save()');
+                        }
+                        if (action !== null) {
+                            ncClient.sendMessageAsync("objects/admin.session/element_action", {
+                                element_id: view.config.id,
+                                action: action,
+                                value: value
+                            }).then(function(response) {
+                                console.log("Action " + action + " OK: ", response);
+                                /*
+                                if (response.data && response.data.elements) {
+                                    updateView(response.data.elements);
+                                }
+                                */
+                            }).catch(function(response) {
+                                console.log("Error at action " + action + ": ", response);
+                                webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
+                                switch(action) {
+                                    case "deleted":
+                                        var grid = $$(view.config.id);
+                                        if (grid) {
+                                            // We add the deleted row in its old position
+                                            var pos = update.data.pos;
+                                            if (pos > 0) {
+                                                pos--;
+                                            }
+                                            grid.add(update.data, pos);
+                                            callback.error();
+                                        }
+                                        break;
+                                    case "updated":
+                                        var grid = $$(view.config.id);
+                                        if (grid) {
+                                            // We clear the grid data and trigger a refresh using the same loading URL
+                                            grid.clearAll();
+                                            // view.config.save has the same URL as load ("wsProxy->")
+                                            grid.load(view.config.save);
+                                            callback.error();
+                                        }
+                                        break;
+                                    default:
+                                        // Unknown action performed
+                                        callback.error();
+                                }
+                            });
+                        } else {
+                            callback.error();
+                        }
                     },
                     result: function (state, view, dp, text, data, loader) {
                         //your logic of server-side response processing ... 
@@ -1275,6 +1256,7 @@
         }
 
         function createProfile(state) {
+            var domain_css = "";
             var user_name = "";
             var user_tooltip = "";
             var user_badge = "";
@@ -1283,6 +1265,7 @@
             var user_menu_icon = "";
             
             if (state) {
+                domain_css = state[ADMIN_FRAME_DOMAIN_NAME].value.css;
                 user_name = createCounterLabel(state[ADMIN_FRAME_USER_NAME]);
                 user_tooltip = state[ADMIN_FRAME_USER_NAME].value.tooltip !== undefined? state[ADMIN_FRAME_USER_NAME].value.tooltip : "";
                 user_badge = createBadgeSpan(state[ADMIN_FRAME_USER_NAME]);
@@ -1293,10 +1276,15 @@
                 webix.ui(createProfilePopup(user_menu));
             }
 
+            // TODO: remove when unneeded
+            if (domain_css === "") {
+                domain_css = "netcomposer";
+            }
+
             return {
                 "height": 46,
                 "id": "person-template",
-                "css": "background_transparent profile-container align-center",
+                "css": "background_transparent profile-container align-center netcomposer",
                 "borderless": true,
                 "width": "100%",
                 "gravity": 0,
@@ -1582,23 +1570,32 @@
 
         function createFrame(state) {
             var domain_name = "";
+            var domain_css = "";
             var domain_icon = "";
             
             if (state) {
                 // TODO: check whether other domains start with "/"
-                domain_name = "/" + state[ADMIN_FRAME_DOMAIN_NAME].value.label;
+                domain_name = state[ADMIN_FRAME_DOMAIN_NAME].value.label;
+                domain_css = state[ADMIN_FRAME_DOMAIN_NAME].value.css;
                 domain_icon = state[ADMIN_FRAME_DOMAIN_ICON].value.icon;
+            }
+            // TODO: remove when unneeded
+            if (domain_name === "") {
+                domain_name = "NetComposer";
+                domain_css = "netcomposer";
             }
 
             return {
                 "view": "toolbar",
                 "id": ADMIN_FRAME,
                 "height": 70,
+                "css": domain_css,
                 "cols": [{
                     "id": ADMIN_FRAME_DOMAIN_ICON,
                     "view": "template",
                     "padding": 0,
                     "borderless": true,
+                    "css": domain_css,
                     "width": 60,
                     "height": 60,
                     "template": "<img src='" + domain_icon + "'>"
@@ -1606,7 +1603,7 @@
                     "id": ADMIN_FRAME_DOMAIN_NAME,
                     "view": "label",
                     "autowidth": true,
-                    "css": "toolbar-title",
+                    "css": domain_css + "_toolbar-title",
                     "click": homeLabelClick,
                     "label": domain_name
                 },

@@ -104,18 +104,82 @@ toolbar(Opts) ->
     #{
         height => 40,
         cols => [
-            toolbar_refresh(Opts),
-            toolbar_pause(Opts),
-            toolbar_new(Opts),
+            toolbar_show_subdomains(Opts),
             #{},
-            toolbar_show_subdomains(Opts)
+            toolbar_selected_elements(Opts),
+            #{},
+            toolbar_real_time(Opts),
+            toolbar_refresh(Opts),
+            toolbar_new(Opts),
+            toolbar_delete(Opts),
+            toolbar_disable(Opts)
         ]
     }.
 
+toolbar_selected_elements(#{table_id:=TableId}=_Opts) ->
+    SelectedId = <<?BIN(TableId),"_selected">>,
+    SelectedIconId = <<?BIN(SelectedId),"_icon">>,
+    SelectedLabelId = <<?BIN(SelectedId),"_label">>,
+    RealTimeButtonId = <<?BIN(TableId),"_real_time">>,
+    RefreshButtonId = <<?BIN(TableId),"_refresh">>,
+    NewButtonId = <<?BIN(TableId),"_new">>,
+    DeleteIconId = <<?BIN(TableId),"_delete">>,
+    DisableIconId = <<?BIN(TableId),"_disable">>,
+    #{
+        view => <<"layout">>,
+        id => <<?BIN(SelectedId)>>,
+        borderless => true,
+        hidden => true,
+        cols => [
+            #{
+                id => <<?BIN(SelectedIconId)>>,
+                width => 30,
+                css => <<"datatable_icon">>,
+                template => <<"
+                    <span style='cursor:pointer;' class='webix_icon fa-times'></span>
+                ">>,
+                onClick => #{
+                    <<"fa-times">> => <<"
+                        function() {
+                            // Clear datatable selection
+                            var masterCheckbox = $$('", ?BIN(TableId), "').getHeaderContent('checkbox');
+                            if (masterCheckbox) {
+                                console.log('masterCheckbox found!', masterCheckbox);
+                                masterCheckbox.uncheck();
+                            } else {
+                                console.log('masterCheckbox not found');
+                            }
+                            // There aren't any object selected
+                            // Hide possible actions
+                            $$('",?BIN(SelectedId),"').hide();
+                            $$('",?BIN(DeleteIconId),"').hide();
+                            $$('",?BIN(DisableIconId),"').hide();
+                            // Show normal buttons
+                            $$('",?BIN(RealTimeButtonId),"').show();
+                            $$('",?BIN(RefreshButtonId),"').show();
+                            $$('",?BIN(NewButtonId),"').show();
+                        }
+                    ">>
+                }
+            },
+            #{
+                view => <<"label">>,
+                id => <<?BIN(SelectedLabelId)>>,
+                autowidth => true,
+                data => #{text => " items selected"},
+                % This label is defined separately to be able to set its width to 'autowidth'
+                %label => nkadmin_util:i18n(domain_show_subdomains, Opts)
+                label => <<"
+                    0 items selected
+                ">>
+            }
+        ]
+    }.
 
-toolbar_refresh(Opts) ->
+toolbar_refresh(#{table_id:=TableId}=Opts) ->
     #{
         view => <<"button">>,
+        id => <<?BIN(TableId),"_refresh">>,
         type => <<"iconButton">>,
         icon => <<"refresh">>,
         autowidth => true,
@@ -124,19 +188,40 @@ toolbar_refresh(Opts) ->
     }.
 
 
-toolbar_pause(Opts) ->
+toolbar_real_time(#{table_id:=TableId}=Opts) ->
     #{
-        view => <<"button">>,
-        type => <<"iconButton">>,
-        icon => <<"pause">>,
-        autowidth => true,
-        label => <<"Pause">>,
-        click => fake_delay(Opts)
+        view => <<"layout">>,
+        id => <<?BIN(TableId),"_real_time">>,
+        cols => [
+            #{
+                view => <<"checkbox">>,
+                name => <<"real_time_checkbox">>,
+                width => 20,
+                value => 1,
+                on => #{
+                    onChange => <<"
+                        function() {
+                            var grid = $$(\"", TableId/binary, "\");
+                            grid.clearAll();
+                            // Subscribe/Unsubscribe to real time updates
+                        }
+                    ">>
+                }
+            },
+            #{
+                view => <<"label">>,
+                autowidth => true,
+                % This label is defined separately to be able to set its width to 'autowidth'
+                label => nkadmin_util:i18n(domain_real_time, Opts)
+                %align => <<"right">>
+            }
+        ]
     }.
 
-toolbar_new(Opts) ->
+toolbar_new(#{table_id:=TableId}=Opts) ->
     #{
         view => <<"button">>,
+        id => <<?BIN(TableId),"_new">>,
         type => <<"iconButton">>,
         icon => <<"plus">>,
         autowidth => true,
@@ -149,13 +234,6 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=Opts) 
     #{
         view => <<"layout">>,
         cols => [
-            #{
-                view => <<"label">>,
-                autowidth => true,
-                % This label is defined separately to be able to set its width to 'autowidth'
-                label => nkadmin_util:i18n(domain_show_subdomains, Opts),
-                align => <<"right">>
-            },
             #{
                 id => <<SubdomainsId/binary>>,
                 view => <<"checkbox">>,
@@ -176,40 +254,61 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=Opts) 
                         }
                     ">>
                 }
+            },
+            #{
+                view => <<"label">>,
+                autowidth => true,
+                % This label is defined separately to be able to set its width to 'autowidth'
+                label => nkadmin_util:i18n(domain_show_subdomains, Opts)
+                %align => <<"right">>
             }
         ]
     }.
 
+toolbar_delete(#{table_id:=TableId}=_Opts) ->
+    #{
+        id => <<?BIN(TableId),"_delete">>,
+        width => 30,
+        hidden => true,
+        css => <<"datatable_icon">>,
+        template => <<"
+           <span style='cursor:pointer;' class='webix_icon fa-trash'></span>
+        ">>
+    }.
+
+toolbar_disable(#{table_id:=TableId}=_Opts) ->
+    #{
+        id => <<?BIN(TableId),"_disable">>,
+        width => 30,
+        hidden => true,
+        css => <<"datatable_icon">>,
+        template => <<"
+           <span style='cursor:pointer;' class='webix_icon fa-ban'></span>
+        ">>
+    }.
 
 body_pager() ->
     #{
-        view => <<"toolbar">>,
-        css => <<"highlighted_header header6">>,
-        paddingX => 5,
-        paddingY => 5,
-        height => 40,
-        cols => [
-            #{
-                view => <<"pager">>,
-                id => <<"pagerA">>,
-                template => <<"
-                    {common.first()}{common.prev()}&nbsp; {common.pages()}&nbsp; {common.next()}{common.last()}&nbsp;Total:&nbsp;#count#
-                ">>,
-                autosize => true,
-                height => 35,
-                group => 5
-            }
-        ]
+        view => <<"pager">>,
+        id => <<"pagerA">>,
+        template => <<"
+            {common.first()}{common.prev()}&nbsp; {common.pages()}&nbsp; {common.next()}{common.last()}&nbsp;Total:&nbsp;#count#
+        ">>,
+        align => <<"center">>,
+        autosize => true,
+        height => 35,
+        group => 5
     }.
 
 
 body_data(#{table_id:=TableId}=Opts) ->
+    OnMasterCheckboxClick = on_master_checkbox_click(Opts),
     #{
         id => TableId,
         view => <<"datatable">>,
         css => <<"nk_datatable">>,
         select => <<"row">>,
-        multiselect => true,
+%        multiselect => true,
         dragColumn => true,
         resizeColumn => true,
         editable => true,
@@ -229,10 +328,45 @@ body_data(#{table_id:=TableId}=Opts) ->
         ready => <<"
             function() {
                 webix.extend(this, webix.ProgressBar);
+                var grid = $$('", ?BIN(TableId), "');
+                var masterCheckbox = grid.getHeaderContent('checkbox');
+                if (masterCheckbox) {
+                    // attach an event to customMasterCheckbox;
+                    masterCheckbox.setOnClickListener(", ?BIN(OnMasterCheckboxClick), ");
+                }
             }
         ">>,
+        type => #{
+            silentCheckbox => <<"
+                function(obj, common, value, config) {
+                    var checked = (value == config.checkValue) ? 'checked=\"true\"' : '';
+                    return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\">\";
+                }
+        ">>
+        },
+        onClick => #{
+            webix_silent_checkbox => <<"
+                function(e, id) {
+                    // same code uses the default checkbox, but the update part is removed
+                    id = this.locate(e);
+                    
+                    var item = this.getItem(id.row);
+                    var col = this.getColumnConfig(id.column);
+                    var trg = e.target|| e.srcElement;
+                    var check = (trg.type == 'checkbox')? trg.checked : (item[id.column] != col.checkValue);
+                    var value = check ? col.checkValue : col.uncheckValue;
+                    // Save this change silently into the cached data (without sending this change to the server)
+                    item[id.column] = value;
+                    this.refresh(id.row);
+                    // Call the onCheck listener
+                    this.callEvent('onCheck', [id.row, id.column, value]);
+                    return false;
+                }
+            ">>
+        },
         on => #{
             <<"onBeforeLoad">> => on_before_load(Opts),
+            <<"onCheck">> => on_check(Opts),
             <<"data->onStoreUpdated">> => on_store_updated()
         }
     }.
@@ -265,6 +399,19 @@ column(Id, pos, _Name, Column, _Opts) ->
         width => 50
     };
 
+column(Id, checkbox, _Name, _Column, _Opts) ->
+    #{
+        id => Id,
+        header => #{
+            content => <<"customMasterCheckbox">>,
+            css => <<"master_checkbox">>,
+            contentId => <<"checkbox">>
+        },
+        css => <<"center checkbox">>,
+        template => <<"{common.silentCheckbox()}">>,
+        width => 40
+    };
+
 column(Id, text, Name, Column, Opts) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
@@ -280,6 +427,7 @@ column(Id, text, Name, Column, Opts) ->
             #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
             Filter
         ],
+        template => <<"<span class=\"", ?BIN(Id), "\">#", ?BIN(Id) ,"#</span>">>,
         fillspace => Fillspace,
         minWidth => <<"100">>
     };
@@ -450,7 +598,7 @@ on_click(Id, enable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
 
 
 %% @private
-on_before_load(_Opts) ->
+on_before_load(#{table_id:=_TableId}=_Opts) ->
     <<"
         function() {
             webix.ui.datafilter.customFilter2 = {
@@ -512,6 +660,18 @@ on_before_load(_Opts) ->
     ">>.
 
 %% @private
+on_check(_Opts) ->
+    <<"
+        function(row, col, val, ignore){
+            if (ignore !== undefined || ignore) {
+                //console.log('Checkbox ignored');
+            } else {
+                console.log('Checkbox: ', row, col, val, ignore);
+            }
+        }
+    ">>.
+
+%% @private
 on_store_updated() ->
     <<"
         function() {
@@ -524,13 +684,36 @@ on_store_updated() ->
     ">>.
 
 %% @private
+on_master_checkbox_click(_Opts) ->
+    <<"
+        function(value) {
+            console.log('Master checkbox: ', value);
+        }
+    ">>.
+
+%% @private
 fake_delay(#{table_id:=TableId}=_Opts) ->
+    SelectedId = <<?BIN(TableId),"_selected">>,
+    RealTimeButtonId = <<?BIN(TableId),"_real_time">>,
+    RefreshButtonId = <<?BIN(TableId),"_refresh">>,
+    NewButtonId = <<?BIN(TableId),"_new">>,
+    DeleteIconId = <<?BIN(TableId),"_delete">>,
+    DisableIconId = <<?BIN(TableId),"_disable">>,
     <<"
         function() {
             var grid = $$(\"", TableId/binary, "\");
             grid.showProgress();
             webix.delay(function() {
                 grid.hideProgress();
+                // There are items selected
+                // Show possible actions
+                $$('",?BIN(SelectedId),"').show();
+                $$('",?BIN(DeleteIconId),"').show();
+                $$('",?BIN(DisableIconId),"').show();
+                // Hide normal buttons
+                $$('",?BIN(RealTimeButtonId),"').hide();
+                $$('",?BIN(RefreshButtonId),"').hide();
+                $$('",?BIN(NewButtonId),"').hide();
             }, null, null, 300);
         }
     ">>.
