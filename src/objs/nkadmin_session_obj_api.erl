@@ -66,9 +66,9 @@ cmd(<<"start">>, #nkreq{session_module=nkapi_server}=Req) ->
                                 obj_id => SessId
                             },
                             ok = nkapi_server:subscribe(Pid, Subs),
-                            UserMeta1 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, SessId, Req),
-                            UserMeta2 = UserMeta1#{nkadmin_session_types=>Types},
-                            {ok, Reply, UserMeta2};
+                            Req2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, SessId, Req),
+                            Req3 = nkdomain_api_util:add_meta(nkadmin_session_types, Types, Req2),
+                            {ok, Reply, Req3};
                         {error, Error} ->
                             {error, Error}
                     end;
@@ -79,10 +79,10 @@ cmd(<<"start">>, #nkreq{session_module=nkapi_server}=Req) ->
             {error, session_type_unsupported}
     end;
 
-cmd(<<"stop">>, #nkreq{data=Data, session_pid=Pid, srv_id=SrvId, user_meta=UserMeta}=Req) ->
+cmd(<<"stop">>, #nkreq{data=Data, session_pid=Pid, srv_id=SrvId, user_state=UserState}=Req) ->
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, Req) of
         {ok, SessId} ->
-            UserMeta2 = case UserMeta of
+            Req2 = case UserState of
                 #{nkadmin_session_types:=Types} ->
                     Subs = #{
                         srv_id => SrvId,
@@ -92,13 +92,13 @@ cmd(<<"stop">>, #nkreq{data=Data, session_pid=Pid, srv_id=SrvId, user_meta=UserM
                         obj_id => SessId
                     },
                     nkapi_server:unsubscribe(Pid, Subs),
-                    maps:remove(nkadmin_session_types, UserMeta);
+                    nkdomain_api_util:remove_meta(nkadmin_session_types, Req);
                 _ ->
-                    UserMeta
+                    Req
             end,
             case nkdomain:unload(SrvId, SessId, user_stop) of
                 ok ->
-                    {ok, #{}, UserMeta2};
+                    {ok, #{}, Req2};
                 {error, Error} ->
                     {error, Error}
             end;
