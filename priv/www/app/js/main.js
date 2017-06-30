@@ -55,10 +55,13 @@
             defaultDomain = _defaultDomain;
 
             webix.ready(function(){
-            //enabling CustomScroll
-                if (!webix.env.touch && webix.ui.scrollSize)
+                // This custom scroll fails if a mouse is connected
+/*
+                if (!webix.env.touch && webix.ui.scrollSize) {
                     // Enable webix custom scroll (Pro feature)
                     webix.CustomScroll.init();
+                }
+*/
             });
             // Initialize an empty workspace
             webix.ui(createEmptyWorkspace());
@@ -1260,38 +1263,40 @@
             var user_name = "";
             var user_tooltip = "";
             var user_badge = "";
+            var user_icon = "";
             var user_img = "";
             var user_menu = {};
             var user_menu_icon = "";
             
             if (state) {
-                domain_css = state[ADMIN_FRAME_DOMAIN_NAME].value.css;
+                domain_css = state[ADMIN_FRAME_DOMAIN_NAME].value.css.toLowerCase();
                 user_name = createCounterLabel(state[ADMIN_FRAME_USER_NAME]);
                 user_tooltip = state[ADMIN_FRAME_USER_NAME].value.tooltip !== undefined? state[ADMIN_FRAME_USER_NAME].value.tooltip : "";
                 user_badge = createBadgeSpan(state[ADMIN_FRAME_USER_NAME]);
-                user_img = state[ADMIN_FRAME_USER_ICON].value.icon;
+                user_icon = state[ADMIN_FRAME_USER_ICON].value.icon_id;
                 user_menu = state[ADMIN_FRAME_USER_MENU];
                 user_menu_icon = state[ADMIN_FRAME_USER_MENU].value.icon;
                 
                 webix.ui(createProfilePopup(user_menu));
             }
 
-            // TODO: remove when unneeded
-            if (domain_css === "") {
-                domain_css = "netcomposer";
+            if (user_icon !== "") {
+                user_img = "<img class='photo' src=" + getFileSrc(user_icon) + " />";
+            } else if (user_name !== "") {
+                user_img = "<img class='photo' src='img/avatar.png' />";
             }
 
             return {
                 "height": 46,
                 "id": "person-template",
-                "css": "background_transparent profile-container align-center netcomposer",
+                "css": "background_transparent profile-container align-center " + domain_css,
                 "borderless": true,
                 "width": "100%",
                 "gravity": 0,
                 "data": { "name": user_name, "tooltip": user_tooltip },
                 "template": function(obj) {
                     var html = 	"<div class='profile-layout flex' onclick='webix.$$(\""+ADMIN_FRAME_USER_MENU+"\").show(this)' title='"+obj.tooltip+"'>";
-    		        html += "<span class='webix_icon icon fa-"+user_menu_icon+" align-center'></span> <span class='profile-name align-center' id='user_logged_name'>"+obj.name+"</span> ";
+    		        html += user_img + "</span> <span class='profile-name align-center' id='user_logged_name'>"+obj.name+"</span> ";
                     html += user_badge;
     		        html += "<span class='webix_icon fa-angle-down align-center'></span></div>";
     		        return html;
@@ -1572,17 +1577,17 @@
             var domain_name = "";
             var domain_css = "";
             var domain_icon = "";
-            
+            var domain_icon_img = "";
+
             if (state) {
                 // TODO: check whether other domains start with "/"
                 domain_name = state[ADMIN_FRAME_DOMAIN_NAME].value.label;
-                domain_css = state[ADMIN_FRAME_DOMAIN_NAME].value.css;
+                domain_css = state[ADMIN_FRAME_DOMAIN_NAME].value.css.toLowerCase();
                 domain_icon = state[ADMIN_FRAME_DOMAIN_ICON].value.icon;
             }
-            // TODO: remove when unneeded
-            if (domain_name === "") {
-                domain_name = "NetComposer";
-                domain_css = "netcomposer";
+
+            if (domain_icon !== "") {
+                domain_icon_img = "<img src=" + getFileSrc(domain_icon) + " width='45' height='45'>";
             }
 
             return {
@@ -1598,7 +1603,7 @@
                     "css": domain_css,
                     "width": 60,
                     "height": 60,
-                    "template": "<img src='" + domain_icon + "'>"
+                    "template": domain_icon_img
                 }, {
                     "id": ADMIN_FRAME_DOMAIN_NAME,
                     "view": "label",
@@ -1732,6 +1737,10 @@
 			var ncEvent = new CustomEvent(event, args);
 			document.dispatchEvent(ncEvent);
 		}
+
+        function getFileSrc(fileId) {
+            return "'" + window.location.origin + window.location.pathname.split("/_admin")[0] + "/_file/" + fileId + "?auth=" + sessionId + "'";
+        }
 
         return {
             createLoginPopup: createLoginPopup,
