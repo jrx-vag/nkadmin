@@ -93,17 +93,21 @@ element_action(_ElementId, _Id, _Value, Updates, Session) ->
 %% @private
 frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
     case nkdomain:get_name(SrvId, DomainId) of
-        {ok, #{name:=DomName, icon_id:=_DomIconId}} ->
+        {ok, #{name:=DomName, description:=Description, icon_id:=DomIconId}} ->
+            case DomName of
+                <<"">> -> DomName2 = Description;
+                _ -> DomName2 = DomName
+            end,
             Items = [
                 #{
                     id => admin_frame_domain_name,
                     class => frameDomainName,
-                    value => #{label => DomName, css => DomName}
+                    value => #{label => DomName2, css => DomName2}
                 },
                 #{
                     id => admin_frame_domain_icon,
                     class => frameDomainIcon,
-                    value => #{icon => <<>>}
+                    value => #{icon => DomIconId}
                 }
             ],
             Session2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, Session),
