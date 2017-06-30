@@ -552,6 +552,20 @@ _toolbar-title {
     background: transparent;
 }
 
+.menu .file_icon {
+	width: 15px;
+	height: 15px;
+	padding-left: 5px;
+	padding-right: 10px;
+}
+
+.menu .img_icon {
+	width: 15px;
+	height: 15px;
+	padding-left: 5px;
+	padding-right: 10px;
+}
+
 /******************************************/
 
 /**************** POPUP *******************/

@@ -136,13 +136,13 @@ frame_user(#{srv_id:=SrvId, user_id:=UserId}=Session) ->
                     id => admin_frame_user_menu,
                     class => frameUserMenu,
                     value => #{
-                        icon => user,
+                        icon => 'fa-user',
                         items => [
-                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuEntry, #{icon=>gear}, Session),
+                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuEntry, #{icon=>'fa-gear'}, Session),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuEntry, #{icon=>comments}, Session),
+                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuEntry, #{icon=>'fa-comments'}, Session),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_item(logout, menuEntry, #{icon=>'sign-out'}, Session)
+                            nkadmin_util:menu_item(logout, menuEntry, #{icon=>'fa-sign-out'}, Session)
                         ]
                     }
                 }

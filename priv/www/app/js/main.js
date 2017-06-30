@@ -834,20 +834,33 @@
                         "height": (numElems * 40) + "px",
                         "type": "menuTree2",
                         "css": "menu",
-                        "template": "{common.icon()}<i class='webix_icon fa fa-#icon# #rotate#' aria-hidden='true'></i><span class='webix_tree_item_span' style='#style#'>#value#</span>#badge#",
+                        "template": "{common.icon()}<span class='webix_tree_item_span' style='#style#'>#value#</span>#badge#",
                         "activeTitle": true, // Sets if the tree should open/close a branch when clicked
                         "select": true,
                         "type": {
                             "icon": function(obj, common) {
+                                console.log('TYPE ICON:', obj, common);
+                                var template = "";
+                                var icon = obj.icon? obj.icon : "";
+                                var rotate = obj.rotate? obj.rotate : "";
                                 if (obj.$count) {
                                     if (obj.open) {
-                                        return "<div class='webix_icon fa-angle-down'></div>";
+                                        template += "<div class='webix_icon fa-angle-down'></div>";
                                     } else {
-                                        return "<div class='webix_icon fa-angle-right'></div>";
+                                        template += "<div class='webix_icon fa-angle-right'></div>";
                                     }
                                 } else {
-                                    return "<div class='webix_tree_none'></div>";
+                                    template += "<div class='webix_tree_none'></div>";
                                 }
+                                if (icon.startsWith("fa-")) {
+                                    template += "<i class='webix_icon fa " + icon + " " + rotate + "' aria-hidden='true'></i>";
+                                } else if (icon.startsWith("file-")) {
+                                    template += "<img class='file_icon' src=" + getFileSrc(icon) + " />"
+                                } else if (icon.startsWith("img/")) {
+                                    template += "<img class='img_icon' src=" + icon + " />"
+                                }
+                                console.log('Icon template: ', template);
+                                return template;
                             }
                         },
                         "tooltip": {
@@ -877,7 +890,7 @@
                         "value": createCounterLabel(element),
                         "tooltip": element.value.tooltip !== undefined? element.value.tooltip : "",
                         "badge": createBadgeSpan(element),
-                        "icon": "",
+                        "icon": element.value.icon === undefined? "" : element.value.icon,
                         "size": 1
                     };
                     break;
@@ -894,7 +907,7 @@
                         "value": createCounterLabel(element),
                         "tooltip": element.value.tooltip !== undefined? element.value.tooltip : "",
                         "badge": createBadgeSpan(element),
-                        "icon": "",
+                        "icon": element.value.icon === undefined? "" : element.value.icon,
                         "data": data,
                         "size": length+1
                     };
@@ -1244,7 +1257,7 @@
                     "template": function(obj) {
                         if (obj.type)
                             return "<div class='separator'></div>";
-                        return "<span class='webix_icon alerts fa-" + obj.icon + "'></span><span>" + obj.value + "</span>" + obj.badge;
+                        return "<span class='webix_icon alerts " + obj.icon + "'></span><span>" + obj.value + "</span>" + obj.badge;
                     }
                 },
                 "tooltip": {
