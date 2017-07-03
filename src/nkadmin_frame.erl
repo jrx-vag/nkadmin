@@ -93,7 +93,7 @@ element_action(_ElementId, _Id, _Value, Updates, Session) ->
 %% @private
 frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
     case nkdomain:get_name(SrvId, DomainId) of
-        {ok, #{name:=DomName, icon_id:=_DomIconId}} ->
+        {ok, #{name:=DomName}} ->
             Items = [
                 #{
                     id => admin_frame_domain_name,
@@ -116,7 +116,8 @@ frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
 %% @private
 frame_user(#{srv_id:=SrvId, user_id:=UserId}=Session) ->
     case nkdomain_user_obj:get_name(SrvId, UserId) of
-        {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname}, icon_id:=UserIconId}} ->
+        {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname}}=Obj} ->
+            UserIconId = maps:get(icon_id, Obj, <<>>),
             Items = [
                 #{
                     id => admin_frame_user_name,

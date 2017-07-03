@@ -107,7 +107,7 @@ start(SrvId, DomainId, UserId, Opts) ->
             AdminDomainId = maps:get(domain_id, Opts, DomainId),
             case nkdomain_obj:sync_op(any, Pid, {?MODULE, switch_domain, AdminDomainId}) of
                 {ok, Reply} ->
-                    {ok, Reply#{<<"session_id">>=>SessId}};
+                    {ok, Reply#{session_id=>SessId}};
                 {error, Error} ->
                     nkdomain:unload(any, Pid, start_error),
                     {error, Error}
