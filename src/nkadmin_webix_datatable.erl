@@ -56,6 +56,7 @@
         language => binary(),
         columns => [column()],
         on_click => [on_click()],
+        body_id => binary(),
         domain_id => binary(),
         filters => [binary()]
     }.
@@ -72,9 +73,10 @@
     map().
 
 datatable(Opts) ->
+    BodyId = maps:get(body_id, Opts, <<"body">>),
     #{
         view => <<"scrollview">>,
-        id => <<"body">>,
+        id => <<?BIN(BodyId)>>,
         borderless => true,
         type => <<"space">>,
         css => <<"flex-tmp">>,
