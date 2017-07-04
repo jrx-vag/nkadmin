@@ -168,7 +168,7 @@ toolbar_selected_elements(#{table_id:=TableId}=_Opts) ->
                 view => <<"label">>,
                 id => <<?BIN(SelectedLabelId)>>,
                 autowidth => true,
-                data => #{text => " items selected"},
+                data => #{text => <<" items selected">>},
                 % This label is defined separately to be able to set its width to 'autowidth'
                 %label => nkadmin_util:i18n(domain_show_subdomains, Opts)
                 label => <<"
@@ -429,7 +429,8 @@ column(Id, text, Name, Column, Opts) ->
             #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
             Filter
         ],
-        template => <<"<span class=\"", ?BIN(Id), "\">#", ?BIN(Id) ,"#</span>">>,
+        % #!column_id# -> the "!" enforces data escaping
+        template => <<"<span class=\"", ?BIN(Id), "\">#!", ?BIN(Id) ,"#</span>">>,
         fillspace => Fillspace,
         minWidth => <<"100">>
     };
