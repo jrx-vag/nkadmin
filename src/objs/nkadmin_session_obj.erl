@@ -50,7 +50,7 @@
 
 -type start_opts() :: #{
     language => binary(),
-    monitor => {module(), pid()},
+    session_link => {module(), pid()},
     domain_id => binary(),
     url => binary()
 }.
@@ -102,7 +102,8 @@ start(SrvId, DomainId, UserId, Opts) ->
         active => true,
         ?DOMAIN_SESSION => #{}
     },
-    case nkdomain_obj_make:create(SrvId, Obj, #{meta=>Opts}) of
+    Opts2 = maps:with([session_link], Opts),
+    case nkdomain_obj_make:create(SrvId, Obj, Opts2) of
         {ok, #obj_id_ext{obj_id=SessId, pid=Pid}, _} ->
             AdminDomainId = maps:get(domain_id, Opts, DomainId),
             case nkdomain_obj:sync_op(any, Pid, {?MODULE, switch_domain, AdminDomainId}) of
@@ -193,14 +194,13 @@ object_init(#?STATE{srv_id=SrvId, id=Id, obj=Obj, meta=Meta}=State) ->
     %% TODO Link again if moved process
     #obj_id_ext{obj_id=SessId} = Id,
     #{created_by:=UserId} = Obj,
-    #{monitor:={ApiMod, ApiPid}} = Meta,
     Session2 = Meta#{
         srv_id => SrvId,
         user_id => UserId
     },
     Session3 = maps:merge(#{language => <<"en">>}, Session2),
     ok = nkdomain_user_obj:register_session(SrvId, UserId, ?DOMAIN_ADMIN_SESSION, SessId, #{}),
-    State2 = nkdomain_obj_util:link_to_api_server(?MODULE, ApiMod, ApiPid, State),
+    State2 = nkdomain_obj_util:link_to_api_server(?MODULE, State),
     State3 = State2#?STATE{meta=#{}, session=Session3},
     {ok, State3}.
 
