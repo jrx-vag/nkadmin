@@ -33,7 +33,7 @@
 
 %% @private
 event({update_elements, List}, Session) ->
-    {event, update_elements, #{elements=>List}, Session};
+    {event, {update_elements, #{elements=>List}}, Session};
 
 event(_Event, Session) ->
     {ok, Session}.
