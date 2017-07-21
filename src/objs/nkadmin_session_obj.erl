@@ -190,7 +190,7 @@ object_send_event(Event, State) ->
 
 
 %% @private When the object is loaded, we make our cache
-object_init(#?STATE{srv_id=SrvId, id=Id, obj=Obj, meta=Meta}=State) ->
+object_init(#?STATE{srv_id=SrvId, domain_id=DomainId, id=Id, obj=Obj, meta=Meta}=State) ->
     %% TODO Link again if moved process
     #obj_id_ext{obj_id=SessId} = Id,
     #{created_by:=UserId} = Obj,
@@ -199,7 +199,7 @@ object_init(#?STATE{srv_id=SrvId, id=Id, obj=Obj, meta=Meta}=State) ->
         user_id => UserId
     },
     Session3 = maps:merge(#{language => <<"en">>}, Session2),
-    ok = nkdomain_user_obj:register_session(SrvId, UserId, ?DOMAIN_ADMIN_SESSION, SessId, #{}),
+    ok = nkdomain_user_obj:register_session(SrvId, UserId, DomainId, ?DOMAIN_ADMIN_SESSION, SessId, #{}),
     State2 = nkdomain_obj_util:link_to_api_server(?MODULE, State),
     State3 = State2#?STATE{meta=#{}, session=Session3},
     {ok, State3}.
