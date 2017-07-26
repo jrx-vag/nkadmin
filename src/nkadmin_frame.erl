@@ -116,7 +116,7 @@ frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
 %% @private
 frame_user(#{srv_id:=SrvId, user_id:=UserId}=Session) ->
     case nkdomain_user_obj:get_name(SrvId, UserId) of
-        {ok, #{<<"user">>:=#{name:=UserName, surname:=UserSurname}}=Obj} ->
+        {ok, #{name:=UserName, surname:=UserSurname}=Obj} ->
             UserIconId = maps:get(icon_id, Obj, <<>>),
             Items = [
                 #{
