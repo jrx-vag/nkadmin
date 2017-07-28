@@ -26,6 +26,7 @@
 -export([admin_event/3, admin_element_action/5, admin_get_data/3]).
 -export([admin_tree_categories/2, admin_tree_get_category/2]).
 
+-include("nkadmin.hrl").
 -include_lib("nkevent/include/nkevent.hrl").
 
 -define(LLOG(Type, Txt, Args), "NkADMIN " ++ Txt, Args).
@@ -43,20 +44,26 @@ plugin_deps() ->
 
 plugin_syntax() ->
     nkpacket_util:get_plugin_net_syntax(#{
-        admin_url => fun nkservice_webserver_util:parse_web_server/1
+        admin_url_web => fun nkservice_webserver_util:parse_web_server/1,
+        admin_url_ws => fun nkapi_util:parse_api_server/1
     }).
 
 
 plugin_listen(Config, #{id:=SrvId}) ->
-    {parsed_urls, WebSrv} = maps:get(admin_url, Config, {parsed_urls, []}),
+    {parsed_urls, WebSrv} = maps:get(admin_url_web, Config, {parsed_urls, []}),
     Priv = list_to_binary(code:priv_dir(nkadmin)),
     Path = <<Priv/binary, "/www">>,
-    nkservice_webserver_util:get_web_servers(SrvId, WebSrv, Path, Config).
+    WebSrvs = nkservice_webserver_util:get_web_servers(SrvId, WebSrv, Path, Config#{debug=>false}),
+    {nkapi_parsed, ApiSrv} = maps:get(admin_url_ws, Config, {nkapi_parsed, []}),
+    ApiSrvs = nkapi_util:get_api_sockets(SrvId, ApiSrv, Config#{manager=>nkadmin, debug=>false}),
+    WebSrvs++ApiSrvs.
 
 
 
 
-%% ===================================================================
+
+
+    %% ===================================================================
 %% Types
 %% ===================================================================
 
@@ -107,11 +114,11 @@ admin_event(Event, Updates, Session) ->
 
 
 %% @doc Called when an action on an element has been received
--spec admin_element_action(binary(), binary(), term(), list(), session()) ->
+-spec admin_element_action([binary()], binary(), term(), list(), session()) ->
     {ok, list(), session()} | {error, term(), session()}.
 
-admin_element_action(ElementId, Action, Value, Updates, Session) ->
-    nkadmin_frame:element_action(ElementId, Action, Value, Updates, Session).
+admin_element_action(ElementIdParts, Action, Value, Updates, Session) ->
+    nkadmin_frame:element_action(ElementIdParts, Action, Value, Updates, Session).
 
 
 %% @doc Called when the client asks for specific table data

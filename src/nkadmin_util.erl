@@ -21,9 +21,9 @@
 -module(nkadmin_util).
 -export([i18n/2, menu_item/4]).
 -export([get_key_data/2, set_key_data/3, remove_key_data/2]).
--export([update_path_absolute/3, update_detail/4]).
+-export([update_detail/4]).
 -export([get_url_key/2, set_url_key/3, remove_url_key/2]).
--export([get_object_tags/2, add_object_tag/3, remove_object_tag/3, add_to_session/3]).
+-export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
 
 -include("nkadmin.hrl").
 
@@ -74,33 +74,37 @@ menu_item(Id, menuEntry, Value, Session) ->
 
 
 %% @doc
-update_path_absolute(Path, Updates, Session) ->
-    Updates2 = [
-          #{
-              class => url,
-              id => url,
-              value => #{label => Path}
-          },
-          #{
-              class => breadcrumbs,
-              id => breadcrumbs,
-              value => #{items => get_parts(Path)}
-          }
-        | Updates
-    ],
-    Session2 = ?ADMIN_SESSION(detail_path, Path, Session),
-    {Updates2, Session2}.
-
-
-%% @doc
-update_detail(Path, Detail, Updates, #{domain_path:=Base}=Session) ->
-    {Updates2, Session2} = update_path_absolute(append_type(Base, Path), Updates, Session),
+update_detail(Path, Detail, Updates, Session) ->
+    {Updates2, Session2} = update_path(Path, Updates, Session),
     Item = #{
         class => detail,
         id => detail,
         value => Detail
     },
     {[Item|Updates2], Session2}.
+
+
+%% @doc
+update_path(Path, Updates, #admin_session{domain_path=Base}=Session) ->
+    Path2 = case Base of
+        <<"/">>  -> Path;
+        _ -> <<Base/binary, Path/binary>>
+    end,
+    Updates2 = [
+          #{
+              class => url,
+              id => url,
+              value => #{label => Path2}
+          },
+          #{
+              class => breadcrumbs,
+              id => breadcrumbs,
+              value => #{items => get_parts(Path2)}
+          }
+        | Updates
+    ],
+    {Updates2, Session#admin_session{detail_url=Path}}.
+
 
 
 
@@ -110,61 +114,59 @@ update_detail(Path, Detail, Updates, #{domain_path:=Base}=Session) ->
 
 
 %% @doc Keys map client Ids to data
-get_key_data(Key, #{key_data:=Keys}) ->
+get_key_data(Key, #admin_session{key_data=Keys}) ->
     maps:get(to_bin(Key), Keys, undefined).
 
 
 %% @doc
-set_key_data(Key, Value, #{key_data:=Keys} = Session) ->
+set_key_data(Key, Value, #admin_session{key_data=Keys}=Session) ->
     Keys2 = Keys#{to_bin(Key) => Value},
-    ?ADMIN_SESSION(key_data, Keys2, Session).
+    Session#admin_session{key_data=Keys2}.
 
 
 %% @doc
-remove_key_data(Key, #{key_data:=Keys} = Session) ->
+remove_key_data(Key, #admin_session{key_data=Keys}=Session) ->
     Keys2 = maps:remove(to_bin(Key), Keys),
-    ?ADMIN_SESSION(key_data, Keys2, Session).
-
+    Session#admin_session{key_data=Keys2}.
 
 
 %% @doc Maps Urls to Keys
-get_url_key(Url, #{url_key:=Urls}) ->
+get_url_key(Url, #admin_session{url_to_key=Urls}) ->
     maps:get(to_bin(Url), Urls, undefined).
 
 
 %% @doc
-set_url_key(Url, Key, #{url_key:=Urls} = Session) ->
+set_url_key(Url, Key, #admin_session{url_to_key=Urls}=Session) ->
     Urls2 = Urls#{to_bin(Url) => Key},
-    ?ADMIN_SESSION(url_key, Urls2, Session).
+    Session#admin_session{url_to_key=Urls2}.
 
 
 %% @doc
-remove_url_key(Url, #{url_key:=Urls}=Session) ->
+remove_url_key(Url, #admin_session{url_to_key=Urls}=Session) ->
     Urls2 = maps:remove(to_bin(Url), Urls),
-    ?ADMIN_SESSION(url_key, Urls2, Session).
-
+    Session#admin_session{url_to_key=Urls2}.
 
 
 %% @doc Associate a tag with an object
 %% Not yet used, we will use it to subscribe to specific objects only
-get_object_tags(ObjId, #{object_tags:=Objects}) ->
+get_object_tags(ObjId, #admin_session{object_tags=Objects}) ->
     maps:get(ObjId, Objects, []).
 
 
 %% @doc
-add_object_tag(ObjId, Tag, #{object_tags:=Objects}=Session) ->
+add_object_tag(ObjId, Tag, #admin_session{object_tags=Objects}=Session) ->
     Tags = maps:get(ObjId, Objects, []),
     case lists:member(Tag, Tags) of
         true ->
             Session;
         false ->
             Objects2 = Objects#{ObjId => [Tag|Tags]},
-            ?ADMIN_SESSION(object_tags, Objects2, Session)
+            Session#admin_session{object_tags=Objects2}
     end.
 
 
 %% @doc
-remove_object_tag(ObjId, Tag, #{object_tags:=Objects}=Session) ->
+remove_object_tag(ObjId, Tag, #admin_session{object_tags=Objects}=Session) ->
     Tags = maps:get(ObjId, Objects, []),
     case lists:member(Tag, Tags) of
         true ->
@@ -174,15 +176,10 @@ remove_object_tag(ObjId, Tag, #{object_tags:=Objects}=Session) ->
                 Tags2 ->
                     Objects#{ObjId => Tags2}
             end,
-            ?ADMIN_SESSION(object_tags, Objects2, Session);
+            Session#admin_session{object_tags=Objects2};
         false ->
             Session
     end.
-
-
-%% @doc Updates a key in the session
-add_to_session(Key, Val, Session) ->
-    ?ADMIN_SESSION(Key, Val, Session).
 
 
 %% ===================================================================
@@ -191,8 +188,8 @@ add_to_session(Key, Val, Session) ->
 
 
 %% @private
-i18n(Key, Data) ->
-    case nklib_i18n:get(Key, maps:get(language, Data, <<"en">>)) of
+i18n(Key, #admin_session{language=Lang}) ->
+    case nklib_i18n:get(Key, Lang) of
         <<>> ->
             lager:warning("Missing i18n: ~s", [Key]),
             <<>>;
@@ -223,9 +220,9 @@ add_label(Id, Value, Session) ->
     end.
 
 
-%% @doc
-append_type(<<"/">>, Type) -> <<$/, (to_bin(Type))/binary>>;
-append_type(Path, Type) -> <<(to_bin(Path))/binary, $/, (to_bin(Type))/binary>>.
+%%%% @doc
+%%append_type(<<"/">>, Type) -> <<$/, (to_bin(Type))/binary>>;
+%%append_type(Path, Type) -> <<(to_bin(Path))/binary, $/, (to_bin(Type))/binary>>.
 
 
 %% @private

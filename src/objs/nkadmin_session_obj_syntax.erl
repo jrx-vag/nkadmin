@@ -52,6 +52,7 @@ api(<<"switch_domain">>, Syntax) ->
     Syntax#{
         id => binary,
         domain_id => binary,
+        url => binary,
         '__mandatory' => [domain_id]
     };
 
