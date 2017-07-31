@@ -26,12 +26,16 @@
 
 i18n() -> #{
     en => #{
-        admin_frame_user_menu_account => "My account",
-        admin_frame_user_menu_messages => "My messages"
+        "admin_frame_user_menu_account" => "My account",
+        "admin_frame_user_menu_messages" => "My messages",
+
+        "real_time" => "Real time"
     },
     es => #{
-        admin_frame_user_menu_account => "Mi cuenta",
-        admin_frame_user_menu_messages => "Mis mensajes"
+        "admin_frame_user_menu_account" => "Mi cuenta",
+        "admin_frame_user_menu_messages" => "Mis mensajes",
+
+        "real_time" => "Tiempo real"
     }
 }.
 

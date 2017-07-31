@@ -19,7 +19,9 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_webix_datatable).
--export([datatable/1]).
+-export([datatable/2]).
+
+-include("nkadmin.hrl").
 
 %% ===================================================================
 %% Types
@@ -61,7 +63,7 @@
         filters => [binary()]
     }.
 
--define(BIN(X), (nklib_util:to_binary(X))/binary).
+-define(BIN(X), (to_bin(X))/binary).
 
 
 %% ===================================================================
@@ -69,10 +71,10 @@
 %% ===================================================================
 
 %% @doc
--spec datatable(opts()) ->
+-spec datatable(opts(), nkadmin_session_obj:session()) ->
     map().
 
-datatable(Opts) ->
+datatable(Opts, Session) ->
     BodyId = maps:get(body_id, Opts, <<"body">>),
     #{
         view => <<"scrollview">>,
@@ -88,10 +90,10 @@ datatable(Opts) ->
                     minHeight => 300,
                     minWidth => 400,
                     rows => [
-                        toolbar(Opts),
+                        toolbar(Opts, Session),
                         #{
                             rows => [
-                                body_data(Opts),
+                                body_data(Opts, Session),
                                 body_pager()
                             ]
                         }
@@ -102,23 +104,23 @@ datatable(Opts) ->
     }.
 
 
-toolbar(Opts) ->
+toolbar(Opts, Session) ->
     #{
         height => 40,
         cols => [
-            toolbar_show_subdomains(Opts),
+            toolbar_show_subdomains(Opts, Session),
             #{},
-            toolbar_selected_elements(Opts),
+            toolbar_selected_elements(Opts, Session),
             #{},
-            toolbar_real_time(Opts),
-            toolbar_refresh(Opts),
-            toolbar_new(Opts),
-            toolbar_delete(Opts),
-            toolbar_disable(Opts)
+            toolbar_real_time(Opts, Session),
+            toolbar_refresh(Opts, Session),
+            toolbar_new(Opts, Session),
+            toolbar_delete(Opts, Session),
+            toolbar_disable(Opts, Session)
         ]
     }.
 
-toolbar_selected_elements(#{table_id:=TableId}=_Opts) ->
+toolbar_selected_elements(#{table_id:=TableId}, _Session) ->
     SelectedId = <<?BIN(TableId),"_selected">>,
     SelectedIconId = <<?BIN(SelectedId),"_icon">>,
     SelectedLabelId = <<?BIN(SelectedId),"_label">>,
@@ -178,19 +180,19 @@ toolbar_selected_elements(#{table_id:=TableId}=_Opts) ->
         ]
     }.
 
-toolbar_refresh(#{table_id:=TableId}=Opts) ->
+toolbar_refresh(#{table_id:=TableId}=Opts, Session) ->
     #{
         view => <<"button">>,
         id => <<?BIN(TableId),"_refresh">>,
         type => <<"iconButton">>,
         icon => <<"refresh">>,
         autowidth => true,
-        label => nkadmin_util:i18n(domain_refresh, Opts),
+        label => nkadmin_util:i18n(domain_refresh, Session),
         click => fake_delay(Opts)
     }.
 
 
-toolbar_real_time(#{table_id:=TableId}=Opts) ->
+toolbar_real_time(#{table_id:=TableId}, Session) ->
     #{
         view => <<"layout">>,
         id => <<?BIN(TableId),"_real_time">>,
@@ -214,13 +216,13 @@ toolbar_real_time(#{table_id:=TableId}=Opts) ->
                 view => <<"label">>,
                 autowidth => true,
                 % This label is defined separately to be able to set its width to 'autowidth'
-                label => nkadmin_util:i18n(domain_real_time, Opts)
+                label => nkadmin_util:i18n(real_time, Session)
                 %align => <<"right">>
             }
         ]
     }.
 
-toolbar_new(#{table_id:=TableId}=Opts) ->
+toolbar_new(#{table_id:=TableId}=Opts, _Session) ->
     #{
         view => <<"button">>,
         id => <<?BIN(TableId),"_new">>,
@@ -232,7 +234,7 @@ toolbar_new(#{table_id:=TableId}=Opts) ->
     }.
 
 
-toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=Opts) ->
+toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}, Session) ->
     #{
         view => <<"layout">>,
         cols => [
@@ -261,13 +263,13 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=Opts) 
                 view => <<"label">>,
                 autowidth => true,
                 % This label is defined separately to be able to set its width to 'autowidth'
-                label => nkadmin_util:i18n(domain_show_subdomains, Opts)
+                label => nkadmin_util:i18n(domain_show_subdomains, Session)
                 %align => <<"right">>
             }
         ]
     }.
 
-toolbar_delete(#{table_id:=TableId}=_Opts) ->
+toolbar_delete(#{table_id:=TableId}, _Session) ->
     #{
         id => <<?BIN(TableId),"_delete">>,
         width => 30,
@@ -278,7 +280,7 @@ toolbar_delete(#{table_id:=TableId}=_Opts) ->
         ">>
     }.
 
-toolbar_disable(#{table_id:=TableId}=_Opts) ->
+toolbar_disable(#{table_id:=TableId}, _Session) ->
     #{
         id => <<?BIN(TableId),"_disable">>,
         width => 30,
@@ -303,7 +305,7 @@ body_pager() ->
     }.
 
 
-body_data(#{table_id:=TableId}=Opts) ->
+body_data(#{table_id:=TableId}=Opts, #admin_session{domain_id=DomainId}=Session) ->
     OnMasterCheckboxClick = on_master_checkbox_click(Opts),
     #{
         id => TableId,
@@ -320,8 +322,8 @@ body_data(#{table_id:=TableId}=Opts) ->
         rightSplit => maps:get(right_split, Opts, 0),
         navigation => true,
         nkFilters => maps:get(filters, Opts, []),
-        nkDomain => maps:get(domain_id, Opts),
-        columns => make_columns(Opts),
+        nkDomain => DomainId,
+        columns => make_columns(Opts, Session),
         pager => <<"pagerA">>,
         export => true,
         url => <<"wsProxy->">>,
@@ -376,24 +378,24 @@ body_data(#{table_id:=TableId}=Opts) ->
 
 
 %% @private
-make_columns(#{columns:=Columns}=Opts) ->
-    make_columns(Columns, Opts, []).
+make_columns(#{columns:=Columns}=Opts, Session) ->
+    make_columns(Columns, Opts, [], Session).
 
 
 %% @private
-make_columns([], _Opts, Acc) ->
+make_columns([], _Opts, Acc, _Session) ->
     lists:reverse(Acc);
 
-make_columns([#{id:=Id, type:=Type}=Column|Rest], Opts, Acc) ->
+make_columns([#{id:=Id, type:=Type}=Column|Rest], Opts, Acc, Session) ->
     Name = maps:get(name, Column, <<"&nbsp;">>),
-    Data1 = column(Id, Type, Name, Column, Opts),
+    Data1 = column(Id, Type, Name, Column, Session),
     Data2 = column_opts(Data1, Column),
-    make_columns(Rest, Opts, [Data2|Acc]).
+    make_columns(Rest, Opts, [Data2|Acc], Session).
 
 
 
 %% @private
-column(Id, pos, _Name, Column, _Opts) ->
+column(Id, pos, _Name, Column, _Session) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     #{
         id => Id,
@@ -401,7 +403,7 @@ column(Id, pos, _Name, Column, _Opts) ->
         width => 50
     };
 
-column(Id, checkbox, _Name, _Column, _Opts) ->
+column(Id, checkbox, _Name, _Column, _Session) ->
     #{
         id => Id,
         header => #{
@@ -414,7 +416,7 @@ column(Id, checkbox, _Name, _Column, _Opts) ->
         width => 40
     };
 
-column(Id, text, Name, Column, Opts) ->
+column(Id, text, Name, Column, Session) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
     FilterOptions = maps:get(options, Column, []),
@@ -426,7 +428,7 @@ column(Id, text, Name, Column, Opts) ->
     #{
         id => Id,
         header => [
-            #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
+            #{ text => nkadmin_util:i18n(Name, Session), colspan => HeaderColspan },
             Filter
         ],
         % #!column_id# -> the "!" enforces data escaping
@@ -435,7 +437,7 @@ column(Id, text, Name, Column, Opts) ->
         minWidth => <<"100">>
     };
 
-column(Id, date, Name, Column, Opts) ->
+column(Id, date, Name, Column, Session) ->
     HeaderColspan = maps:get(header_colspan, Column, <<"1">>),
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
     Fillspace = maps:get(fillspace, Column, <<"1">>),
@@ -450,7 +452,7 @@ column(Id, date, Name, Column, Opts) ->
     #{
         id => Id,
         header => [
-            #{ text => nkadmin_util:i18n(Name, Opts), colspan => HeaderColspan },
+            #{ text => nkadmin_util:i18n(Name, Session), colspan => HeaderColspan },
             #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => CreateOptions }
         ],
         fillspace => Fillspace,
@@ -462,7 +464,7 @@ column(Id, date, Name, Column, Opts) ->
         ">>
     };
 
-column(Id, {icon, Icon}, _Name, _Column, _Opts) ->
+column(Id, {icon, Icon}, _Name, _Column, _Session) ->
     #{
         id => Id,
         header => <<"&nbsp;">>,
@@ -472,7 +474,7 @@ column(Id, {icon, Icon}, _Name, _Column, _Opts) ->
         ">>
     };
 
-column(Id, {fixed_icon, Icon}, _Name, _Column, _Opts) ->
+column(Id, {fixed_icon, Icon}, _Name, _Column, _Session) ->
     #{
         id => Id,
         header => <<"&nbsp;">>,
@@ -710,13 +712,19 @@ fake_delay(#{table_id:=TableId}=_Opts) ->
                 grid.hideProgress();
                 // There are items selected
                 // Show possible actions
-                $$('",?BIN(SelectedId),"').show();
-                $$('",?BIN(DeleteIconId),"').show();
-                $$('",?BIN(DisableIconId),"').show();
+                $$('", ?BIN(SelectedId), "').show();
+                $$('", ?BIN(DeleteIconId), "').show();
+                $$('", ?BIN(DisableIconId), "').show();
                 // Hide normal buttons
-                $$('",?BIN(RealTimeButtonId),"').hide();
-                $$('",?BIN(RefreshButtonId),"').hide();
-                $$('",?BIN(NewButtonId),"').hide();
+                $$('", ?BIN(RealTimeButtonId), "').hide();
+                $$('", ?BIN(RefreshButtonId), "').hide();
+                $$('", ?BIN(NewButtonId), "').hide();
             }, null, null, 300);
         }
     ">>.
+
+
+
+%% @private
+to_bin(Bin) when is_binary(Bin) -> Bin;
+to_bin(Term) -> nklib_util:to_binary(Term).

@@ -21,6 +21,7 @@
 -module(nkadmin_frame).
 -export([get_frame/1, event/3, element_action/5]).
 
+-include("nkadmin.hrl").
 -include_lib("nkevent/include/nkevent.hrl").
 
 -define(LLOG(Type, Txt, Args), "NkADMIN " ++ Txt, Args).
@@ -53,10 +54,10 @@ get_frame(Session) ->
 %% @doc
 event(#nkevent{type = <<"updated">>, obj_id=ObjId}, Updates, Session) ->
     case Session of
-        #{domain_id:=ObjId} ->
+        #admin_session{domain_id=ObjId} ->
             {ok, Items, Session2} = frame_domain(Session),
             {ok, Items++Updates, Session2};
-        #{user_id:=ObjId} ->
+        #admin_session{user_id=ObjId} ->
             {ok, Items, Session2} = frame_user(Session),
             {ok, Items++Updates, Session2};
         _ ->
@@ -65,10 +66,10 @@ event(#nkevent{type = <<"updated">>, obj_id=ObjId}, Updates, Session) ->
 
 event(#nkevent{type = <<"deleted">>, obj_id=ObjId}, Updates, Session) ->
     case Session of
-        #{domain_id:=ObjId} ->
+        #admin_session{domain_id=ObjId} ->
             nkdomain:unload(any, self(), domain_deleted),
             {ok, Updates, Session};
-        #{user_id:=ObjId} ->
+        #admin_session{user_id=ObjId} ->
             nkdomain:unload(any, self(), user_deleted),
             {ok, Updates, Session};
         _ ->
@@ -80,7 +81,7 @@ event(_Event, Updates, Session) ->
 
 
 %% @doc
-element_action(_ElementId, _Id, _Value, Updates, Session) ->
+element_action(_ElementIdParts, _Id, _Value, Updates, Session) ->
     {ok, Updates, Session}.
 
 
@@ -91,9 +92,10 @@ element_action(_ElementId, _Id, _Value, Updates, Session) ->
 
 
 %% @private
-frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
+frame_domain(#admin_session{srv_id=SrvId, domain_id=DomainId}=Session) ->
     case nkdomain:get_name(SrvId, DomainId) of
-        {ok, #{name:=DomName}} ->
+        {ok, #{name:=DomName}=Obj} ->
+            Icon = maps:get(icon_id, Obj, <<>>),
             Items = [
                 #{
                     id => admin_frame_domain_name,
@@ -103,7 +105,7 @@ frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
                 #{
                     id => admin_frame_domain_icon,
                     class => frameDomainIcon,
-                    value => #{icon => DomIconId}
+                    value => #{icon => Icon}
                 }
             ],
             Session2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, Session),
@@ -114,7 +116,7 @@ frame_domain(#{srv_id:=SrvId, domain_id:=DomainId}=Session) ->
 
 
 %% @private
-frame_user(#{srv_id:=SrvId, user_id:=UserId}=Session) ->
+frame_user(#admin_session{srv_id=SrvId, user_id=UserId}=Session) ->
     case nkdomain_user_obj:get_name(SrvId, UserId) of
         {ok, #{name:=UserName, surname:=UserSurname}=Obj} ->
             UserIconId = maps:get(icon_id, Obj, <<>>),

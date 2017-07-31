@@ -23,6 +23,7 @@
 
 -export([get_tree/1]).
 
+-include("nkadmin.hrl").
 -include_lib("nkevent/include/nkevent.hrl").
 
 
@@ -57,7 +58,7 @@ get_tree(Session) ->
 %% ===================================================================
 
 %% @private
-get_categories(#{srv_id:=SrvId}=Session) ->
+get_categories(#admin_session{srv_id=SrvId}=Session) ->
     case SrvId:admin_tree_categories(#{}, Session) of
         {ok, Categories1, Session2} ->
             Categories2 = [{Weight, Key} || {Key, Weight} <- maps:to_list(Categories1)],
@@ -71,7 +72,7 @@ get_categories(#{srv_id:=SrvId}=Session) ->
 load_categories([], Acc, Session) ->
     {ok, Acc, Session};
 
-load_categories([Category|Rest], Acc, #{srv_id:=SrvId}=Session) ->
+load_categories([Category|Rest], Acc, #admin_session{srv_id=SrvId}=Session) ->
     case SrvId:admin_tree_get_category(Category, Session) of
         {ok, Map, Session2} when map_size(Map)==0 ->
             load_categories(Rest, Acc, Session2);

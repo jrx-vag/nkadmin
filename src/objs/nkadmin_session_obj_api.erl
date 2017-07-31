@@ -52,21 +52,14 @@ cmd(<<"start">>, #nkreq{session_module=nkapi_server}=Req) ->
     case nkdomain_api_util:get_id(?DOMAIN_DOMAIN, domain_id, Data, Req) of
         {ok, DomainId} ->
             Opts1 = maps:with([domain_id, url, language], Data),
-            Opts2 = Opts1#{session_link => {nkapi_server, Pid}},
+            Opts2 = Opts1#{
+                session_link => {nkapi_server, Pid},
+                session_events => maps:get(session_events, Data, ?ADMIN_DEF_EVENT_TYPES)
+            },
             case nkadmin_session_obj:start(SrvId, DomainId, UserId, Opts2) of
-                {ok, #{session_id:=SessId}=Reply} ->
-                    Types = maps:get(events, Data, ?ADMIN_DEF_EVENT_TYPES),
-                    Subs = #{
-                        srv_id => SrvId,
-                        class => ?DOMAIN_EVENT_CLASS,
-                        subclass => ?DOMAIN_ADMIN_SESSION,
-                        type => Types,
-                        obj_id => SessId
-                    },
-                    ok = nkapi_server:subscribe(Pid, Subs),
+                {ok, SessId, _Pid, Updates} ->
                     Req2 = nkdomain_api_util:add_id(?DOMAIN_ADMIN_SESSION, SessId, Req),
-                    Req3 = nkdomain_api_util:add_meta(nkadmin_session_types, Types, Req2),
-                    {ok, Reply, Req3};
+                    {ok, Updates#{obj_id=>SessId}, Req2};
                 {error, Error} ->
                     {error, Error}
             end;
@@ -74,29 +67,10 @@ cmd(<<"start">>, #nkreq{session_module=nkapi_server}=Req) ->
             {error, Error}
     end;
 
-cmd(<<"stop">>, #nkreq{data=Data, session_pid=Pid, srv_id=SrvId, user_state=UserState}=Req) ->
+cmd(<<"stop">>, #nkreq{data=Data, srv_id=SrvId}=Req) ->
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, Req) of
         {ok, SessId} ->
-            Req2 = case UserState of
-                #{nkadmin_session_types:=Types} ->
-                    Subs = #{
-                        srv_id => SrvId,
-                        class => ?DOMAIN_EVENT_CLASS,
-                        subclass => ?DOMAIN_ADMIN_SESSION,
-                        type => Types,
-                        obj_id => SessId
-                    },
-                    nkapi_server:unsubscribe(Pid, Subs),
-                    nkdomain_api_util:remove_meta(nkadmin_session_types, Req);
-                _ ->
-                    Req
-            end,
-            case nkdomain:unload(SrvId, SessId, user_stop) of
-                ok ->
-                    {ok, #{}, Req2};
-                {error, Error} ->
-                    {error, Error}
-            end;
+            nkdomain:unload(SrvId, SessId, user_stop);
         {error, Error} ->
             {error, Error}
     end;
@@ -104,7 +78,8 @@ cmd(<<"stop">>, #nkreq{data=Data, session_pid=Pid, srv_id=SrvId, user_state=User
 cmd(<<"switch_domain">>, #nkreq{data=#{domain_id:=DomId}=Data, srv_id=SrvId}=Req) ->
     case nkdomain_api_util:get_id(?DOMAIN_ADMIN_SESSION, Data, Req) of
         {ok, SessId} ->
-            case nkadmin_session_obj:switch_domain(SrvId, SessId, DomId) of
+            Url = maps:get(url, Data, <<>>),
+            case nkadmin_session_obj:switch_domain(SrvId, SessId, DomId, Url) of
                 {ok, Reply} ->
                     {ok, Reply};
                 {error, Error} ->

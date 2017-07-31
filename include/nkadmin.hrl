@@ -25,8 +25,26 @@
 %% Defines
 %% ===================================================================
 
--define(ADMIN_SESSION(Key, Val, Session), Session#{Key => Val}).
 
+-record(admin_session, {
+    srv_id :: nkservice:id(),
+    session_id :: nkdomain:obj_id(),
+    domain_id :: nkdomain:obj_id(),
+    domain_path :: nkdomain:path(),
+    user_id :: nkdomain:obj_id(),
+    language :: binary(),
+    detail_url = <<>> :: binary(),
+    detail = #{} :: map(),
+    object_tags = #{} :: #{ObjId::nkdomain:obj_id() => [Tag::term]},
+    key_data = #{} :: #{Key::binary() => term()},                         % Map client keys to data
+    url_to_key = #{} :: #{Url::binary() => Key::binary()},
+    db_types = [] :: [nkdomain:type()],                                     % Types used in db now
+    resources = [] :: [nkdomain:type()],
+    sessions = [] :: #{nkdomain:type() => integer()}
+}).
+
+
+%-define(ADMIN_SESSION(Key, Val, Session), Session#{Key => Val}).
 
 -define(DOMAIN_ADMIN_SESSION, <<"admin.session">>).
 
