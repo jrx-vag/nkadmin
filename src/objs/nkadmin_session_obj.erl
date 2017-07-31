@@ -205,20 +205,21 @@ object_sync_op({?MODULE, switch_domain, DomainId, Url}, _From, State) ->
 
 object_sync_op({?MODULE, element_action, <<"url">>, updated, Url}, _From, State) ->
     #?STATE{session=Session} = State,
-    case nkadmin_util:get_url_key(Url, Session) of
-        undefined ->
-            {reply, {error, invalid_url}, State};
-        Key ->
-            case do_element_action(Key, selected, <<>>, State) of
+    case find_url(Url, Session) of
+        {ok, Parts} ->
+            case do_element_action(Parts, selected, <<>>, State) of
                 {ok, Reply, State2} ->
                     {reply, {ok, Reply}, State2};
                 {error, Error} ->
                     {reply, {error, Error}, State}
-            end
+            end;
+        {error, Error} ->
+            {reply, {error, Error}, State}
     end;
 
 object_sync_op({?MODULE, element_action, ElementId, Action, Value}, _From, State) ->
-    case do_element_action(ElementId, Action, Value, State) of
+    Parts = binary:split(ElementId, <<"__">>, [global]),
+    case do_element_action(Parts, Action, Value, State) of
         {ok, Reply, State2} ->
             {reply, {ok, Reply}, State2};
         {error, Error} ->
@@ -328,21 +329,20 @@ do_get_domain_tree(SrvId, Updates, Session, State) ->
 
 do_get_domain_detail(SrvId, Updates, Session, State) ->
     #admin_session{detail_url=Url} = Session,
-    case nkadmin_util:get_url_key(Url, Session) of
-        undefined ->
-            % TODO set a default detail page
-            ?LLOG(notice, "detail url ~s not found", [Url], State),
-            {Updates2, Session2} = nkadmin_util:update_detail(<<"/">>, #{}, Updates, Session),
-            {ok, Updates2, Session2};
-        Key ->
-            ElementIdParts = binary:split(Key, <<"__">>, [global]),
-            case SrvId:admin_element_action(ElementIdParts, selected, <<>>, Updates, Session) of
+    case find_url(Url, Session) of
+        {ok, Parts} ->
+            case SrvId:admin_element_action(Parts, selected, <<>>, Updates, Session) of
                 {ok, Updates2, Session2} ->
                     {ok, Updates2, Session2};
                 {error, Error, Session2} ->
-                    ?LLOG(notice, "error calling element_action for ~s: ~p", [Key, Error], State),
+                    ?LLOG(notice, "error calling element_action for ~p: ~p", [Parts, Error], State),
                     {ok, Updates, Session2}
-            end
+            end;
+        {error, url_unknown} ->
+            % TODO set a default detail page
+            ?LLOG(notice, "detail url ~s not found", [Url], State),
+            {Updates2, Session2} = nkadmin_util:update_detail(<<"/">>, #{}, Updates, Session),
+            {ok, Updates2, Session2}
     end.
 
 
@@ -364,10 +364,9 @@ send_event(Event, State) ->
 
 
 %% @private
-do_element_action(ElementId, Action, Value, State) ->
+do_element_action(Parts, Action, Value, State) ->
     #?STATE{srv_id=SrvId, session=Session} = State,
-    ElementIdParts = binary:split(ElementId, <<"__">>, [global]),
-    case SrvId:admin_element_action(ElementIdParts, Action, Value, [], Session) of
+    case SrvId:admin_element_action(Parts, Action, Value, [], Session) of
         {ok, UpdList, Session2} ->
             State2 = State#?STATE{session=Session2},
             case UpdList of
@@ -393,6 +392,25 @@ do_get_data(ElementId, Spec, State) ->
             State2 = State#?STATE{session=Session2},
             {error, Error, State2}
     end.
+
+
+%% @private
+find_url(Url, Session) ->
+    case nkadmin_util:get_url_key(Url, Session) of
+        undefined ->
+            Parts = binary:split(Url, <<"/">>, [global]),
+            [Last|R1] = lists:reverse(Parts),
+            Url2 = nklib_util:bjoin(lists:reverse(R1), <<"/">>),
+            case nkadmin_util:get_url_key(Url2, Session) of
+                undefined ->
+                    {error, url_unknown};
+                Key ->
+                    {ok, binary:split(Key, <<"__">>, [global]) ++ [Last]}
+            end;
+        {ok, Key} ->
+            {ok, binary:split(Key, <<"__">>, [global])}
+    end.
+
 
 
 %% @private
