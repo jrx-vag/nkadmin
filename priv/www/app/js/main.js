@@ -88,7 +88,7 @@
 
             if (host === 'localhost' && port === '8001') {
                 // If it's a local test environment, use the default port instead
-                port = '9301';
+                port = '9304';
             }
 
             var href = window.location.href.split("/");

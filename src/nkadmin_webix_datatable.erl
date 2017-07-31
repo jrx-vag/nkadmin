@@ -37,6 +37,7 @@
         filter_colspan => integer(),
         fillspace => integer(),
         editor => text,
+        is_html => boolean(),
         sort => boolean()
     }.
 
@@ -425,14 +426,21 @@ column(Id, text, Name, Column, Session) ->
         [] -> Filter = #{ content => <<"serverFilter">>, colspan => FilterColspan };
         _ -> Filter = #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => FilterOptions }
     end,
+    IsHtml = maps:get(is_html, Column, false),
+    case IsHtml of
+        false ->
+            % #!column_id# -> the "!" enforces data escaping
+            Template = <<"<span class=\"", ?BIN(Id), "\">#!", ?BIN(Id) ,"#</span>">>;
+        true ->
+            Template = <<"<span class=\"", ?BIN(Id), "\">#", ?BIN(Id) ,"#</span>">>
+    end,
     #{
         id => Id,
         header => [
             #{ text => nkadmin_util:i18n(Name, Session), colspan => HeaderColspan },
             Filter
         ],
-        % #!column_id# -> the "!" enforces data escaping
-        template => <<"<span class=\"", ?BIN(Id), "\">#!", ?BIN(Id) ,"#</span>">>,
+        template => Template,
         fillspace => Fillspace,
         minWidth => <<"100">>
     };

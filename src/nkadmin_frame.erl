@@ -100,7 +100,7 @@ frame_domain(#admin_session{srv_id=SrvId, domain_id=DomainId}=Session) ->
                 #{
                     id => admin_frame_domain_name,
                     class => frameDomainName,
-                    value => #{label => DomName2, css => DomName2}
+                    value => #{label => DomName, css => DomName}
                 },
                 #{
                     id => admin_frame_domain_icon,

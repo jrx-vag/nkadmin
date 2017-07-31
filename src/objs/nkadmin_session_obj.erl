@@ -407,7 +407,7 @@ find_url(Url, Session) ->
                 Key ->
                     {ok, binary:split(Key, <<"__">>, [global]) ++ [Last]}
             end;
-        {ok, Key} ->
+        Key ->
             {ok, binary:split(Key, <<"__">>, [global])}
     end.
 
