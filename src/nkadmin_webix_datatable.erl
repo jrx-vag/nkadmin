@@ -31,7 +31,7 @@
     #{
         id => binary(),
         type => pos | text | date | {icon, binary()} | {fixed_icon, binary()},
-        name => binary(),
+        name => binary(),                   % For i18n
         options => filter_options(),
         header_colspan => integer(),
         filter_colspan => integer(),
@@ -56,11 +56,11 @@
 -type spec() ::
     #{
         table_id => binary(),           %% Mandatory
-        subdomains_id => binary(),
-        columns => [column()],
+        filters => [binary()],
+        left_split => integer(),
+        right_split => integer(),
         on_click => [on_click()],
-        domain_id => binary(),
-        filters => [binary()]
+        columns => [column()]
     }.
 
 
@@ -308,12 +308,12 @@ body_pager() ->
 
 body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
     OnMasterCheckboxClick = on_master_checkbox_click(),
-    #{
+    Data = #{
         id => TableId,
         view => <<"datatable">>,
         css => <<"nk_datatable">>,
         select => <<"row">>,
-%        multiselect => true,
+        %        multiselect => true,
         dragColumn => true,
         resizeColumn => true,
         editable => true,
@@ -329,7 +329,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         export => true,
         url => <<"wsProxy->">>,
         save => <<"wsProxy->">>,
-        onClick => make_on_click(TableId, Spec),
+        % onClick => make_on_click(TableId, Spec),
         ready => <<"
             function() {
                 webix.extend(this, webix.ProgressBar);
@@ -349,6 +349,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                 }
         ">>
         },
+        %% TODO Duplicated key!
         onClick => #{
             webix_silent_checkbox => <<"
                 function(e, id) {
@@ -374,7 +375,8 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
             <<"onCheck">> => on_check(),
             <<"data->onStoreUpdated">> => on_store_updated()
         }
-    }.
+    },
+    add_on_click(TableId, Spec, Data).
 
 
 
@@ -511,8 +513,11 @@ column_opts(Data, Column) ->
 
 
 %% @private
-make_on_click(TableId, #{on_click:=OnClick}) ->
-    make_on_click(TableId, OnClick, #{}).
+add_on_click(TableId, #{on_click:=OnClick}, Data) ->
+    Data#{onClick => make_on_click(TableId, OnClick, #{})};
+
+add_on_click(_TableId, _Spec, Data) ->
+    Data.
 
 
 %% @private
@@ -736,7 +741,7 @@ append_id(TableId, Id) ->
     <<TableId/binary, "__", Id/binary>>.
 
 
-i18n(<<"&nbsp">>, _Session) -> <<>>;
+i18n(<<"&nbsp;">>, _Session) -> <<>>;
 i18n(Key, Session) -> nkadmin_util:i18n(Key, Session).
 
 
