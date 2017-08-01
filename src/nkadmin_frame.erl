@@ -94,13 +94,19 @@ element_action(_ElementIdParts, _Id, _Value, Updates, Session) ->
 %% @private
 frame_domain(#admin_session{srv_id=SrvId, domain_id=DomainId}=Session) ->
     case nkdomain:get_name(SrvId, DomainId) of
-        {ok, #{name:=DomName}=Obj} ->
+        {ok, #{name:=DomName, description:=Description}=Obj} ->
             Icon = maps:get(icon_id, Obj, <<>>),
+            case DomName =:= <<>> of
+                true ->
+                    DomName2 = Description;
+                _ ->
+                    DomName2 = DomName
+            end,
             Items = [
                 #{
                     id => admin_frame_domain_name,
                     class => frameDomainName,
-                    value => #{label => DomName, css => DomName}
+                    value => #{label => DomName2, css => DomName2}
                 },
                 #{
                     id => admin_frame_domain_icon,
