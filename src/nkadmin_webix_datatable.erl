@@ -31,7 +31,7 @@
     #{
         id => binary(),
         type => pos | text | date | {icon, binary()} | {fixed_icon, binary()},
-        name => binary(),
+        name => binary(),                   % For i18n
         options => filter_options(),
         header_colspan => integer(),
         filter_colspan => integer(),
@@ -54,17 +54,15 @@
     }.
 
 
--type opts() ::
+-type spec() ::
     #{
-        language => binary(),
-        columns => [column()],
+        table_id => binary(),           %% Mandatory
+        filters => [binary()],
+        left_split => integer(),
+        right_split => integer(),
         on_click => [on_click()],
-        body_id => binary(),
-        domain_id => binary(),
-        filters => [binary()]
+        columns => [column()]
     }.
-
--define(BIN(X), (to_bin(X))/binary).
 
 
 %% ===================================================================
@@ -72,10 +70,10 @@
 %% ===================================================================
 
 %% @doc
--spec datatable(opts(), nkadmin_session_obj:session()) ->
+-spec datatable(spec(), nkadmin_session_obj:session()) ->
     map().
 
-datatable(Opts, Session) ->
+datatable(#{table_id:=TableId}=Spec, Session) ->
     BodyId = maps:get(body_id, Opts, <<"body">>),
     #{
         view => <<"scrollview">>,
@@ -91,10 +89,10 @@ datatable(Opts, Session) ->
                     minHeight => 300,
                     minWidth => 400,
                     rows => [
-                        toolbar(Opts, Session),
+                        toolbar(TableId, Session),
                         #{
                             rows => [
-                                body_data(Opts, Session),
+                                body_data(TableId, Spec, Session),
                                 body_pager()
                             ]
                         }
@@ -105,142 +103,30 @@ datatable(Opts, Session) ->
     }.
 
 
-toolbar(Opts, Session) ->
+toolbar(TableId, Session) ->
     #{
         height => 40,
         cols => [
-            toolbar_show_subdomains(Opts, Session),
+            toolbar_show_subdomains(TableId, Session),
             #{},
-            toolbar_selected_elements(Opts, Session),
+            toolbar_selected_elements(TableId),
             #{},
-            toolbar_real_time(Opts, Session),
-            toolbar_refresh(Opts, Session),
-            toolbar_new(Opts, Session),
-            toolbar_delete(Opts, Session),
-            toolbar_disable(Opts, Session)
+            toolbar_real_time(TableId, Session),
+            toolbar_refresh(TableId, Session),
+            toolbar_new(TableId),
+            toolbar_delete(TableId),
+            toolbar_disable(TableId)
         ]
     }.
 
-toolbar_selected_elements(#{table_id:=TableId}, _Session) ->
-    SelectedId = <<?BIN(TableId),"_selected">>,
-    SelectedIconId = <<?BIN(SelectedId),"_icon">>,
-    SelectedLabelId = <<?BIN(SelectedId),"_label">>,
-    RealTimeButtonId = <<?BIN(TableId),"_real_time">>,
-    RefreshButtonId = <<?BIN(TableId),"_refresh">>,
-    NewButtonId = <<?BIN(TableId),"_new">>,
-    DeleteIconId = <<?BIN(TableId),"_delete">>,
-    DisableIconId = <<?BIN(TableId),"_disable">>,
-    #{
-        view => <<"layout">>,
-        id => <<?BIN(SelectedId)>>,
-        borderless => true,
-        hidden => true,
-        cols => [
-            #{
-                id => <<?BIN(SelectedIconId)>>,
-                width => 30,
-                css => <<"datatable_icon">>,
-                template => <<"
-                    <span style='cursor:pointer;' class='webix_icon fa-times'></span>
-                ">>,
-                onClick => #{
-                    <<"fa-times">> => <<"
-                        function() {
-                            // Clear datatable selection
-                            var masterCheckbox = $$('", ?BIN(TableId), "').getHeaderContent('checkbox');
-                            if (masterCheckbox) {
-                                console.log('masterCheckbox found!', masterCheckbox);
-                                masterCheckbox.uncheck();
-                            } else {
-                                console.log('masterCheckbox not found');
-                            }
-                            // There aren't any object selected
-                            // Hide possible actions
-                            $$('",?BIN(SelectedId),"').hide();
-                            $$('",?BIN(DeleteIconId),"').hide();
-                            $$('",?BIN(DisableIconId),"').hide();
-                            // Show normal buttons
-                            $$('",?BIN(RealTimeButtonId),"').show();
-                            $$('",?BIN(RefreshButtonId),"').show();
-                            $$('",?BIN(NewButtonId),"').show();
-                        }
-                    ">>
-                }
-            },
-            #{
-                view => <<"label">>,
-                id => <<?BIN(SelectedLabelId)>>,
-                autowidth => true,
-                data => #{text => <<" items selected">>},
-                % This label is defined separately to be able to set its width to 'autowidth'
-                %label => nkadmin_util:i18n(domain_show_subdomains, Opts)
-                label => <<"
-                    0 items selected
-                ">>
-            }
-        ]
-    }.
 
-toolbar_refresh(#{table_id:=TableId}=Opts, Session) ->
-    #{
-        view => <<"button">>,
-        id => <<?BIN(TableId),"_refresh">>,
-        type => <<"iconButton">>,
-        icon => <<"refresh">>,
-        autowidth => true,
-        label => nkadmin_util:i18n(domain_refresh, Session),
-        click => fake_delay(Opts)
-    }.
-
-
-toolbar_real_time(#{table_id:=TableId}, Session) ->
-    #{
-        view => <<"layout">>,
-        id => <<?BIN(TableId),"_real_time">>,
-        cols => [
-            #{
-                view => <<"checkbox">>,
-                name => <<"real_time_checkbox">>,
-                width => 20,
-                value => 1,
-                on => #{
-                    onChange => <<"
-                        function() {
-                            var grid = $$(\"", TableId/binary, "\");
-                            grid.clearAll();
-                            // Subscribe/Unsubscribe to real time updates
-                        }
-                    ">>
-                }
-            },
-            #{
-                view => <<"label">>,
-                autowidth => true,
-                % This label is defined separately to be able to set its width to 'autowidth'
-                label => nkadmin_util:i18n(real_time, Session)
-                %align => <<"right">>
-            }
-        ]
-    }.
-
-toolbar_new(#{table_id:=TableId}=Opts, _Session) ->
-    #{
-        view => <<"button">>,
-        id => <<?BIN(TableId),"_new">>,
-        type => <<"iconButton">>,
-        icon => <<"plus">>,
-        autowidth => true,
-        label => <<"New">>,
-        click => fake_delay(Opts)
-    }.
-
-
-toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}, Session) ->
+toolbar_show_subdomains(TableId, Session) ->
+    SubdomainsId = append_id(TableId, <<"_subdomains">>),
     #{
         view => <<"layout">>,
         cols => [
             #{
-                id => <<SubdomainsId/binary>>,
+                id => SubdomainsId,
                 view => <<"checkbox">>,
                 name => <<"show_subdomains_checkbox">>,
                 width => 20,
@@ -264,15 +150,131 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}, Sessi
                 view => <<"label">>,
                 autowidth => true,
                 % This label is defined separately to be able to set its width to 'autowidth'
-                label => nkadmin_util:i18n(domain_show_subdomains, Session)
+                label => i18n(domain_show_subdomains, Session)
                 %align => <<"right">>
             }
         ]
     }.
 
-toolbar_delete(#{table_id:=TableId}, _Session) ->
+
+toolbar_selected_elements(TableId) ->
+    SelectedId = append_id(TableId, <<"_selected">>),
+    SelectedIconId = append_id(SelectedId, <<"_icon">>),
+    SelectedLabelId = append_id(SelectedId, <<"_label">>),
+    RealTimeButtonId = append_id(TableId, <<"_real_time">>),
+    RefreshButtonId = append_id(TableId, <<"_refresh">>),
+    NewButtonId = append_id(TableId, <<"_new">>),
+    DeleteIconId = append_id(TableId, <<"_delete">>),
+    DisableIconId = append_id(TableId, <<"_disable">>),
     #{
-        id => <<?BIN(TableId),"_delete">>,
+        view => <<"layout">>,
+        id => SelectedId,
+        borderless => true,
+        hidden => true,
+        cols => [
+            #{
+                id => SelectedIconId,
+                width => 30,
+                css => <<"datatable_icon">>,
+                template => <<"
+                    <span style='cursor:pointer;' class='webix_icon fa-times'></span>
+                ">>,
+                onClick => #{
+                    <<"fa-times">> => <<"
+                        function() {
+                            // Clear datatable selection
+                            var masterCheckbox = $$('", TableId/binary, "').getHeaderContent('checkbox');
+                            if (masterCheckbox) {
+                                console.log('masterCheckbox found!', masterCheckbox);
+                                masterCheckbox.uncheck();
+                            } else {
+                                console.log('masterCheckbox not found');
+                            }
+                            // There aren't any object selected
+                            // Hide possible actions
+                            $$('", SelectedId/binary, "').hide();
+                            $$('", DeleteIconId/binary, "').hide();
+                            $$('", DisableIconId/binary, "').hide();
+                            // Show normal buttons
+                            $$('", RealTimeButtonId/binary, "').show();
+                            $$('", RefreshButtonId/binary, "').show();
+                            $$('", NewButtonId/binary, "').show();
+                        }
+                    ">>
+                }
+            },
+            #{
+                view => <<"label">>,
+                id => SelectedLabelId,
+                autowidth => true,
+                data => #{text => <<" items selected">>},
+                % This label is defined separately to be able to set its width to 'autowidth'
+                %label => i18n(domain_show_subdomains, Spec)
+                label => <<"
+                    0 items selected
+                ">>
+            }
+        ]
+    }.
+
+toolbar_refresh(TableId, Session) ->
+    #{
+        view => <<"button">>,
+        id => append_id(TableId, <<"_refresh">>),
+        type => <<"iconButton">>,
+        icon => <<"refresh">>,
+        autowidth => true,
+        label => i18n(domain_refresh, Session),
+        click => fake_delay(TableId)
+    }.
+
+
+toolbar_real_time(TableId, Session) ->
+    #{
+        view => <<"layout">>,
+        id => append_id(TableId, <<"_real_time">>),
+        cols => [
+            #{
+                view => <<"checkbox">>,
+                name => <<"real_time_checkbox">>,
+                width => 20,
+                value => 1,
+                on => #{
+                    onChange => <<"
+                        function() {
+                            var grid = $$(\"", TableId/binary, "\");
+                            grid.clearAll();
+                            // Subscribe/Unsubscribe to real time updates
+                        }
+                    ">>
+                }
+            },
+            #{
+                view => <<"label">>,
+                autowidth => true,
+                % This label is defined separately to be able to set its width to 'autowidth'
+                label => i18n(real_time, Session)
+                %align => <<"right">>
+            }
+        ]
+    }.
+
+toolbar_new(TableId) ->
+    #{
+        view => <<"button">>,
+        id => append_id(TableId, <<"_new">>),
+        type => <<"iconButton">>,
+        icon => <<"plus">>,
+        autowidth => true,
+        label => <<"New">>,
+        click => fake_delay(TableId)
+    }.
+
+
+
+toolbar_delete(TableId) ->
+    #{
+        id => append_id(TableId, <<"_delete">>),
         width => 30,
         hidden => true,
         css => <<"datatable_icon">>,
@@ -281,9 +283,9 @@ toolbar_delete(#{table_id:=TableId}, _Session) ->
         ">>
     }.
 
-toolbar_disable(#{table_id:=TableId}, _Session) ->
+toolbar_disable(TableId) ->
     #{
-        id => <<?BIN(TableId),"_disable">>,
+        id => append_id(TableId, <<"_disable">>),
         width => 30,
         hidden => true,
         css => <<"datatable_icon">>,
@@ -306,38 +308,38 @@ body_pager() ->
     }.
 
 
-body_data(#{table_id:=TableId}=Opts, #admin_session{domain_id=DomainId}=Session) ->
-    OnMasterCheckboxClick = on_master_checkbox_click(Opts),
-    #{
+body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
+    OnMasterCheckboxClick = on_master_checkbox_click(),
+    Data = #{
         id => TableId,
         view => <<"datatable">>,
         css => <<"nk_datatable">>,
         select => <<"row">>,
-%        multiselect => true,
+        %        multiselect => true,
         dragColumn => true,
         resizeColumn => true,
         editable => true,
         editaction => <<"dblclick">>,
         scrollX => true,
-        leftSplit => maps:get(left_split, Opts, 0),
-        rightSplit => maps:get(right_split, Opts, 0),
+        leftSplit => maps:get(left_split, Spec, 0),
+        rightSplit => maps:get(right_split, Spec, 0),
         navigation => true,
-        nkFilters => maps:get(filters, Opts, []),
-        nkDomain => DomainId,
-        columns => make_columns(Opts, Session),
+        nkFilters => maps:get(filters, Spec, []),
+        nkDomain => to_bin(DomainId),
+        columns => make_columns(Spec, Session),
         pager => <<"pagerA">>,
         export => true,
         url => <<"wsProxy->">>,
         save => <<"wsProxy->">>,
-        onClick => make_on_click(Opts),
+        % onClick => make_on_click(TableId, Spec),
         ready => <<"
             function() {
                 webix.extend(this, webix.ProgressBar);
-                var grid = $$('", ?BIN(TableId), "');
+                var grid = $$('", TableId/binary, "');
                 var masterCheckbox = grid.getHeaderContent('checkbox');
                 if (masterCheckbox) {
                     // attach an event to customMasterCheckbox;
-                    masterCheckbox.setOnClickListener(", ?BIN(OnMasterCheckboxClick), ");
+                    masterCheckbox.setOnClickListener(", OnMasterCheckboxClick/binary, ");
                 }
             }
         ">>,
@@ -349,6 +351,7 @@ body_data(#{table_id:=TableId}=Opts, #admin_session{domain_id=DomainId}=Session)
                 }
         ">>
         },
+        %% TODO Duplicated key!
         onClick => #{
             webix_silent_checkbox => <<"
                 function(e, id) {
@@ -370,28 +373,29 @@ body_data(#{table_id:=TableId}=Opts, #admin_session{domain_id=DomainId}=Session)
             ">>
         },
         on => #{
-            <<"onBeforeLoad">> => on_before_load(Opts),
-            <<"onCheck">> => on_check(Opts),
+            <<"onBeforeLoad">> => on_before_load(),
+            <<"onCheck">> => on_check(),
             <<"data->onStoreUpdated">> => on_store_updated()
         }
-    }.
+    },
+    add_on_click(TableId, Spec, Data).
 
 
 
 %% @private
-make_columns(#{columns:=Columns}=Opts, Session) ->
-    make_columns(Columns, Opts, [], Session).
+make_columns(#{columns:=Columns}=Spec, Session) ->
+    make_columns(Columns, Spec, [], Session).
 
 
 %% @private
-make_columns([], _Opts, Acc, _Session) ->
+make_columns([], _Spec, Acc, _Session) ->
     lists:reverse(Acc);
 
-make_columns([#{id:=Id, type:=Type}=Column|Rest], Opts, Acc, Session) ->
+make_columns([#{id:=Id, type:=Type}=Column|Rest], Spec, Acc, Session) ->
     Name = maps:get(name, Column, <<"&nbsp;">>),
-    Data1 = column(Id, Type, Name, Column, Session),
+    Data1 = column(to_bin(Id), Type, Name, Column, Session),
     Data2 = column_opts(Data1, Column),
-    make_columns(Rest, Opts, [Data2|Acc], Session).
+    make_columns(Rest, Spec, [Data2|Acc], Session).
 
 
 
@@ -422,9 +426,18 @@ column(Id, text, Name, Column, Session) ->
     FilterColspan = maps:get(filter_colspan, Column, <<"1">>),
     FilterOptions = maps:get(options, Column, []),
     Fillspace = maps:get(fillspace, Column, <<"1">>),
-    case FilterOptions of
-        [] -> Filter = #{ content => <<"serverFilter">>, colspan => FilterColspan };
-        _ -> Filter = #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => FilterOptions }
+    Filter = case FilterOptions of
+        [] ->
+            #{
+                content => <<"serverFilter">>,
+                colspan => FilterColspan
+            };
+        _ ->
+            #{
+                content => <<"serverSelectFilter">>,
+                colspan => FilterColspan,
+                options => FilterOptions
+            }
     end,
     IsHtml = maps:get(is_html, Column, false),
     case IsHtml of
@@ -437,7 +450,7 @@ column(Id, text, Name, Column, Session) ->
     #{
         id => Id,
         header => [
-            #{ text => nkadmin_util:i18n(Name, Session), colspan => HeaderColspan },
+            #{ text => i18n(Name, Session), colspan => HeaderColspan },
             Filter
         ],
         template => Template,
@@ -460,7 +473,7 @@ column(Id, date, Name, Column, Session) ->
     #{
         id => Id,
         header => [
-            #{ text => nkadmin_util:i18n(Name, Session), colspan => HeaderColspan },
+            #{ text => i18n(Name, Session), colspan => HeaderColspan },
             #{ content => <<"serverSelectFilter">>, colspan => FilterColspan, options => CreateOptions }
         ],
         fillspace => Fillspace,
@@ -478,7 +491,7 @@ column(Id, {icon, Icon}, _Name, _Column, _Session) ->
         header => <<"&nbsp;">>,
         width => 30,
         template => <<"
-           <span style='cursor:pointer;' class='webix_icon #", ?BIN(Icon), "#'></span>
+           <span style='cursor:pointer;' class='webix_icon #", Icon/binary, "#'></span>
         ">>
     };
 
@@ -488,7 +501,7 @@ column(Id, {fixed_icon, Icon}, _Name, _Column, _Session) ->
         header => <<"&nbsp;">>,
         width => 30,
         template => <<"
-           <span style='cursor:pointer;' class='webix_icon ", ?BIN(Icon), "'></span>
+           <span style='cursor:pointer;' class='webix_icon ", Icon/binary, "'></span>
         ">>
     }.
 
@@ -509,25 +522,25 @@ column_opts(Data, Column) ->
     end.
 
 
+%% @private
+add_on_click(TableId, #{on_click:=OnClick}, Data) ->
+    Data#{onClick => make_on_click(TableId, OnClick, #{})};
 
+add_on_click(_TableId, _Spec, Data) ->
+    Data.
 
 
 %% @private
-make_on_click(#{on_click:=OnClick}=Opts) ->
-    make_on_click(OnClick, Opts, #{}).
-
-
-%% @private
-make_on_click([], _Opts, Acc) ->
+make_on_click(_TableId, [], Acc) ->
     Acc;
 
-make_on_click([#{id:=Id, type:=Type}=OnClick|Rest], Opts, Acc) ->
-    Acc2 = on_click(Id, Type, OnClick, Opts, Acc),
-    make_on_click(Rest, Opts, Acc2).
+make_on_click(TableId, [#{id:=Id, type:=Type}=OnClick|Rest], Acc) ->
+    Acc2 = on_click(TableId, to_bin(Id), Type, OnClick, Acc),
+    make_on_click(TableId, Rest, Acc2).
 
 
 %% @private
-on_click(Id, delete, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
+on_click(TableId, Id, delete, _OnClick, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
@@ -545,7 +558,7 @@ on_click(Id, delete, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
         ">>
     };
 
-on_click(Id, disable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
+on_click(TableId, Id, disable, _OnClick, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
@@ -577,7 +590,7 @@ on_click(Id, disable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
         ">>
     };
 
-on_click(Id, enable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
+on_click(TableId, Id, enable, _OnClick, Acc) ->
     Acc#{
         Id => <<"
             function(e, id, node) {
@@ -611,7 +624,7 @@ on_click(Id, enable, _OnClick, #{table_id:=TableId}=_Opts, Acc) ->
 
 
 %% @private
-on_before_load(#{table_id:=_TableId}=_Opts) ->
+on_before_load() ->
     <<"
         function() {
             webix.ui.datafilter.customFilter2 = {
@@ -673,7 +686,7 @@ on_before_load(#{table_id:=_TableId}=_Opts) ->
     ">>.
 
 %% @private
-on_check(_Opts) ->
+on_check() ->
     <<"
         function(row, col, val, ignore){
             if (ignore !== undefined || ignore) {
@@ -697,7 +710,7 @@ on_store_updated() ->
     ">>.
 
 %% @private
-on_master_checkbox_click(_Opts) ->
+on_master_checkbox_click() ->
     <<"
         function(value) {
             console.log('Master checkbox: ', value);
@@ -705,13 +718,13 @@ on_master_checkbox_click(_Opts) ->
     ">>.
 
 %% @private
-fake_delay(#{table_id:=TableId}=_Opts) ->
-    SelectedId = <<?BIN(TableId),"_selected">>,
-    RealTimeButtonId = <<?BIN(TableId),"_real_time">>,
-    RefreshButtonId = <<?BIN(TableId),"_refresh">>,
-    NewButtonId = <<?BIN(TableId),"_new">>,
-    DeleteIconId = <<?BIN(TableId),"_delete">>,
-    DisableIconId = <<?BIN(TableId),"_disable">>,
+fake_delay(TableId) ->
+    SelectedId = append_id(TableId, <<"_selected">>),
+    RealTimeButtonId = append_id(TableId, <<"_real_time">>),
+    RefreshButtonId = append_id(TableId, <<"_refresh">>),
+    NewButtonId = append_id(TableId, <<"_new">>),
+    DeleteIconId = append_id(TableId, <<"_delete">>),
+    DisableIconId = append_id(TableId, <<"_disable">>),
     <<"
         function() {
             var grid = $$(\"", TableId/binary, "\");
@@ -720,13 +733,13 @@ fake_delay(#{table_id:=TableId}=_Opts) ->
                 grid.hideProgress();
                 // There are items selected
                 // Show possible actions
-                $$('", ?BIN(SelectedId), "').show();
-                $$('", ?BIN(DeleteIconId), "').show();
-                $$('", ?BIN(DisableIconId), "').show();
+                $$('", SelectedId/binary,  "').show();
+                $$('", DeleteIconId/binary,  "').show();
+                $$('", DisableIconId/binary,  "').show();
                 // Hide normal buttons
-                $$('", ?BIN(RealTimeButtonId), "').hide();
-                $$('", ?BIN(RefreshButtonId), "').hide();
-                $$('", ?BIN(NewButtonId), "').hide();
+                $$('", RealTimeButtonId/binary,  "').hide();
+                $$('", RefreshButtonId/binary,  "').hide();
+                $$('", NewButtonId/binary,  "').hide();
             }, null, null, 300);
         }
     ">>.
@@ -734,5 +747,14 @@ fake_delay(#{table_id:=TableId}=_Opts) ->
 
 
 %% @private
-to_bin(Bin) when is_binary(Bin) -> Bin;
+append_id(TableId, Id) ->
+    <<TableId/binary, "__", Id/binary>>.
+
+
+i18n(<<"&nbsp;">>, _Session) -> <<>>;
+i18n(Key, Session) -> nkadmin_util:i18n(Key, Session).
+
+
+%% @private
+to_bin(Term) when is_binary(Term) -> Term;
 to_bin(Term) -> nklib_util:to_binary(Term).
