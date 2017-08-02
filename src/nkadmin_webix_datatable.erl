@@ -74,10 +74,10 @@
     map().
 
 datatable(#{table_id:=TableId}=Spec, Session) ->
-    BodyId = maps:get(body_id, Opts, <<"body">>),
+    BodyId = maps:get(body_id, Spec, <<"body">>),
     #{
         view => <<"scrollview">>,
-        id => <<?BIN(BodyId)>>,
+        id => BodyId,
         borderless => true,
         type => <<"space">>,
         css => <<"flex-tmp">>,
@@ -443,9 +443,9 @@ column(Id, text, Name, Column, Session) ->
     case IsHtml of
         false ->
             % #!column_id# -> the "!" enforces data escaping
-            Template = <<"<span class=\"", ?BIN(Id), "\">#!", ?BIN(Id) ,"#</span>">>;
+            Template = <<"<span class=\"", Id, "\">#!", Id ,"#</span>">>;
         true ->
-            Template = <<"<span class=\"", ?BIN(Id), "\">#", ?BIN(Id) ,"#</span>">>
+            Template = <<"<span class=\"", Id, "\">#", Id ,"#</span>">>
     end,
     #{
         id => Id,
