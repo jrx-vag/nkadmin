@@ -443,9 +443,9 @@ column(Id, text, Name, Column, Session) ->
     case IsHtml of
         false ->
             % #!column_id# -> the "!" enforces data escaping
-            Template = <<"<span class=\"", Id, "\">#!", Id ,"#</span>">>;
+            Template = <<"<span class=\"", Id/binary, "\">#!", Id/binary ,"#</span>">>;
         true ->
-            Template = <<"<span class=\"", Id, "\">#", Id ,"#</span>">>
+            Template = <<"<span class=\"", Id/binary, "\">#", Id/binary ,"#</span>">>
     end,
     #{
         id => Id,
