@@ -603,7 +603,7 @@ on_click(TableId, Id, enable, _OnClick, Acc) ->
         ">>
     };
 
-on_click(TableId, Id, silent_checkbox, _OnClick, Acc) ->
+on_click(_TableId, Id, silent_checkbox, _OnClick, Acc) ->
     Acc#{
         Id => <<"
             function(e, id) {
