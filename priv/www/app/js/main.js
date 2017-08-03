@@ -1113,40 +1113,15 @@
             */
         }
 
-        function breadcrumbsClicked(pathElem) {
+        function breadcrumbsClicked(id, pathElem) {
             // TODO: Send this event to the server
             console.log('Breadcrumbs clicked: ' + pathElem);
-
-            /* Domain add/remove test */
-            var parent_id = "/";
-            var description = "Testing";
-            var domain = {};
-            var exists = true;
-
-            console.log("Getting test domain...")
-            ncClient.sendMessageAsync("objects/domain/get", {
-                id: "/test"
-            }).catch(function(response) {
-                exists = false;
-                console.log("Test domain doesn't exist: ", response);
-                return ncClient.sendMessageAsync("objects/domain/create", {
-                    obj_name: "/test",
-                    parent_id: parent_id,
-                    description: description,
-                    domain: {}
-                });
-            }).then(function(response) {
-                // Domain exists -> delete
-                if (exists) {
-                    return ncClient.sendMessageAsync("objects/domain/delete", {
-                        id: response.data.obj_id
-                    });
-                }
-            }).catch(function(response) {
-                console.log("Error at breadcrumbsClicked: ", response);
-                webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
-            });
-            /* Domain add/remove test */
+            
+            ncClient.sendMessageAsync("objects/admin.session/element_action", {
+                element_id: id,
+                action: "selected",
+                value: pathElem
+            })
         }
 
 /*
@@ -1426,12 +1401,22 @@
             return {
                 "id": "toolbar-path", "template": function(obj){
                     let gathered = "<ul class='breadcrumb'>";
-                    obj.children.forEach(function(obj) {
-                        gathered += "<li onClick='logic.breadcrumbsClicked(\"" + obj + "\")'>" + obj + "</li>";
+                    let pathSoFar = "/";
+                    obj.children.forEach(function(child) {
+                        if (child !== "/") {
+                            if (pathSoFar === "/") {
+                                pathSoFar += child;
+                            } else {
+                                pathSoFar += "/" + child;
+                            }
+                        } else {
+                            pathSoFar = child;
+                        }
+                        gathered += "<li onClick='logic.breadcrumbsClicked(\"" + obj.id + "\",\"" + pathSoFar + "\")'>" + child + "</li>";
                     });
                     return gathered + "</ul";
                 },
-                "data": {children: path.value.items},
+                "data": {children: path.value.items, id: path.id},
                 "autoheight": true,
                 "css": "nopadding"
             }
