@@ -351,34 +351,15 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                 }
         ">>
         },
-        %% TODO Duplicated key!
-        onClick => #{
-            webix_silent_checkbox => <<"
-                function(e, id) {
-                    // same code uses the default checkbox, but the update part is removed
-                    id = this.locate(e);
-                    
-                    var item = this.getItem(id.row);
-                    var col = this.getColumnConfig(id.column);
-                    var trg = e.target|| e.srcElement;
-                    var check = (trg.type == 'checkbox')? trg.checked : (item[id.column] != col.checkValue);
-                    var value = check ? col.checkValue : col.uncheckValue;
-                    // Save this change silently into the cached data (without sending this change to the server)
-                    item[id.column] = value;
-                    this.refresh(id.row);
-                    // Call the onCheck listener
-                    this.callEvent('onCheck', [id.row, id.column, value]);
-                    return false;
-                }
-            ">>
-        },
         on => #{
             <<"onBeforeLoad">> => on_before_load(),
             <<"onCheck">> => on_check(),
             <<"data->onStoreUpdated">> => on_store_updated()
         }
     },
-    add_on_click(TableId, Spec, Data).
+    #{on_click:=OnClick} = Spec,
+    Spec2 = Spec#{on_click := [#{id => webix_silent_checkbox, type => silent_checkbox } | OnClick]},
+    add_on_click(TableId, Spec2, Data).
 
 
 
@@ -618,6 +599,28 @@ on_click(TableId, Id, enable, _OnClick, Acc) ->
                         }
                     }
                 });
+            }
+        ">>
+    };
+
+on_click(TableId, Id, silent_checkbox, _OnClick, Acc) ->
+    Acc#{
+        Id => <<"
+            function(e, id) {
+                // same code uses the default checkbox, but the update part is removed
+                id = this.locate(e);
+                
+                var item = this.getItem(id.row);
+                var col = this.getColumnConfig(id.column);
+                var trg = e.target|| e.srcElement;
+                var check = (trg.type == 'checkbox')? trg.checked : (item[id.column] != col.checkValue);
+                var value = check ? col.checkValue : col.uncheckValue;
+                // Save this change silently into the cached data (without sending this change to the server)
+                item[id.column] = value;
+                this.refresh(id.row);
+                // Call the onCheck listener
+                this.callEvent('onCheck', [id.row, id.column, value]);
+                return false;
             }
         ">>
     }.
