@@ -29,6 +29,7 @@
 -record(admin_session, {
     srv_id :: nkservice:id(),
     session_id :: nkdomain:obj_id(),
+    http_auth_id :: binary(),
     domain_id :: nkdomain:obj_id(),
     domain_path :: nkdomain:path(),
     user_id :: nkdomain:obj_id(),

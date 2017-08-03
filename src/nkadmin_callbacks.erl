@@ -29,7 +29,7 @@
 -include("nkadmin.hrl").
 -include_lib("nkevent/include/nkevent.hrl").
 
--define(LLOG(Type, Txt, Args), "NkADMIN " ++ Txt, Args).
+-define(LLOG(Type, Txt, Args), lager:Type("NkADMIN " ++ Txt, Args)).
 
 
 %% ===================================================================
