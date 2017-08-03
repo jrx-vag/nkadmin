@@ -37,6 +37,7 @@
         filter_colspan => integer(),
         fillspace => integer(),
         editor => text,
+        is_html => boolean(),
         sort => boolean()
     }.
 
@@ -73,9 +74,10 @@
     map().
 
 datatable(#{table_id:=TableId}=Spec, Session) ->
+    BodyId = maps:get(body_id, Spec, <<"body">>),
     #{
         view => <<"scrollview">>,
-        id => <<"body">>,
+        id => BodyId,
         borderless => true,
         type => <<"space">>,
         css => <<"flex-tmp">>,
@@ -205,7 +207,7 @@ toolbar_selected_elements(TableId) ->
                 view => <<"label">>,
                 id => SelectedLabelId,
                 autowidth => true,
-                data => #{text => " items selected"},
+                data => #{text => <<" items selected">>},
                 % This label is defined separately to be able to set its width to 'autowidth'
                 %label => i18n(domain_show_subdomains, Spec)
                 label => <<"
@@ -437,13 +439,21 @@ column(Id, text, Name, Column, Session) ->
                 options => FilterOptions
             }
     end,
+    IsHtml = maps:get(is_html, Column, false),
+    case IsHtml of
+        false ->
+            % #!column_id# -> the "!" enforces data escaping
+            Template = <<"<span class=\"", Id/binary, "\">#!", Id/binary ,"#</span>">>;
+        true ->
+            Template = <<"<span class=\"", Id/binary, "\">#", Id/binary ,"#</span>">>
+    end,
     #{
         id => Id,
         header => [
             #{ text => i18n(Name, Session), colspan => HeaderColspan },
             Filter
         ],
-        template => <<"<span class=\"", Id/binary, "\">#", Id/binary ,"#</span>">>,
+        template => Template,
         fillspace => Fillspace,
         minWidth => <<"100">>
     };

@@ -193,10 +193,15 @@ textarea.webix_invalid {
 	background: #303E4D;
 }
 
+.netcomposer .webix_template .profile-layout:hover {
+    background-color: #3F4D5C; /* default #f2f2f2; */
+    cursor: pointer;
+}
+
 .webix_layout_toolbar.webix_toolbar.netcomposer {
 	color: #FFF;
 	background: #303E4D;
-} 
+}
 
 .netcomposer_toolbar-title {
 	color: #FFF;
@@ -418,6 +423,15 @@ _toolbar-title {
 
 /**************************************/
 
+/*************** LOGIN ****************/
+
+.webix_win_head {
+    border: none;
+    border-top: 5px solid #3498db; /* default #3498db; */
+}
+
+/**************************************/
+
 /*********** SIDEBAR MENU *************/
 
 .sidebar > .webix_scroll_cont {
@@ -458,8 +472,17 @@ _toolbar-title {
 	padding-left: 0px;
 }
 
-.menu .webix_tree_item.webix_selected .webix_badge {
-  background-color: #ff8839;
+.webix_badge {
+	background-color: #F49C20;
+}
+
+.menu .webix_tree_item.webix_selected, .webix_menu .webix_selected {
+    box-shadow: 5px 0 0 #F49C20 inset;
+    padding-left: 19px;
+}
+
+.menu .webix_tree_item .webix_selected .webix_badge { 
+  background-color: #F49C20; /* default #ff8839; */
   color: #ffffff;
   border-radius: 50%;
   font-size: 12px;
@@ -529,6 +552,20 @@ _toolbar-title {
     background: transparent;
 }
 
+.menu .file_icon {
+	width: 15px;
+	height: 15px;
+	padding-left: 5px;
+	padding-right: 10px;
+}
+
+.menu .img_icon {
+	width: 15px;
+	height: 15px;
+	padding-left: 5px;
+	padding-right: 10px;
+}
+
 /******************************************/
 
 /**************** POPUP *******************/
@@ -576,7 +613,17 @@ _toolbar-title {
 
 /******************************************/
 
+/*************** PROFILE ******************/
 
+.photo{
+	width: 38px;
+	height: 38px;
+	float: left;
+	position:relative;
+	line-height: 36px;
+	border-radius: 50%;
+	margin-top: 2px;
+}
 
 .section_title {
 	font-size: 18px;
@@ -613,6 +660,8 @@ _toolbar-title {
     white-space: nowrap;
     margin: auto 8px;
 }
+
+/******************************************/
 
 .no_results_layout {
     display: flex;
