@@ -47,8 +47,6 @@ start(_Type, _Args) ->
     },
     case nklib_config:load_env(?APP, Syntax) of
         {ok, _} ->
-            register_types(),
-            nkadmin_i18n:reload(),
             {ok, Pid} = nkadmin_sup:start_link(),
             {ok, Vsn} = application:get_key(?APP, vsn),
             lager:info("NkADMIN v~s has started.", [Vsn]),
@@ -63,11 +61,6 @@ start(_Type, _Args) ->
 %% @private OTP standard stop callback
 stop(_) ->
     ok.
-
-
-%% @private
-register_types() ->
-    ok = nkdomain_all_types:register(nkadmin_session_obj).
 
 
 %% Config Management
