@@ -81,8 +81,8 @@ event(_Event, Updates, Session) ->
 
 
 %% @doc
-element_action(_ElementIdParts, _Id, _Value, Updates, Session) ->
-    {ok, Updates, Session}.
+element_action(_ElementIdParts, _Id, _Value, _Updates, _Session) ->
+    continue.
 
 
 %% ===================================================================

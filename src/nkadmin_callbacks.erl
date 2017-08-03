@@ -118,7 +118,14 @@ admin_event(Event, Updates, Session) ->
     {ok, list(), session()} | {error, term(), session()}.
 
 admin_element_action(ElementIdParts, Action, Value, Updates, Session) ->
-    nkadmin_frame:element_action(ElementIdParts, Action, Value, Updates, Session).
+    case nkadmin_frame:element_action(ElementIdParts, Action, Value, Updates, Session) of
+        continue ->
+            ?LLOG(notice, "unsupported action ~s (~p)", [Action, ElementIdParts]),
+            {ok, Updates, Session};
+            %{error, element_action_unknown, Session};
+        Other ->
+            Other
+    end.
 
 
 %% @doc Called when the client asks for specific table data
