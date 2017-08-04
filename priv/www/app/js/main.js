@@ -948,6 +948,9 @@
             } else if (elem && elem.value && isEmpty(elem.value)) {
                 console.log("Clear body");
                 clearBody();
+                console.log("Clear tree selection");
+                // unselect all elements from all trees
+                unselectAll();
             } else if (elem && elem.value) {
                 console.log("Error: unknown detail format");
             }
@@ -1125,10 +1128,10 @@
                 action: "selected",
                 value: pathElem
             }).then(function(response) {
-                // Update view
                 console.log("Breadcrumbs clicked OK: ", response);
                 if (response.data && response.data.elements) {
-                   updateView(response.data.elements);
+                    // Update view
+                    updateView(response.data.elements);
                 }
             }).catch(function(response) {
                 console.log("Error at breadcrumbsClicked: ", response);
