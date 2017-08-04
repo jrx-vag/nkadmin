@@ -1121,7 +1121,16 @@
                 element_id: id,
                 action: "selected",
                 value: pathElem
-            })
+            }).then(function(response) {
+                // Update view
+                console.log("Breadcrumbs clicked OK: ", response);
+                if (response.data && response.data.elements) {
+                   updateView(response.data.elements);
+                }
+            }).catch(function(response) {
+                console.log("Error at breadcrumbsClicked: ", response);
+                webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
+            });
         }
 
 /*
