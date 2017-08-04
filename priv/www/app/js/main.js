@@ -945,6 +945,9 @@
                 parseJSONFunctions(elem.value.value);
                 replaceBody(elem.value.value);
                 console.log("Detail updated!", elem.value.value);
+            } else if (elem && elem.value && isEmpty(elem.value)) {
+                console.log("Clear body");
+                clearBody();
             } else if (elem && elem.value) {
                 console.log("Error: unknown detail format");
             }
@@ -1747,6 +1750,15 @@
 
         function getFileSrc(fileId) {
             return "'" + window.location.origin + window.location.pathname.split("/_admin")[0] + "/_file/" + fileId + "?auth=" + sessionId + "'";
+        }
+
+        function isEmpty(obj) {
+            for (var prop in obj) {
+                if (obj.hasOwnProperty(prop)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         return {
