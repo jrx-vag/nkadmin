@@ -74,7 +74,12 @@
     map().
 
 datatable(#{table_id:=TableId}=Spec, Session) ->
-    BodyId = maps:get(body_id, Spec, <<"body">>),
+    BodyId = case Spec of
+        #{is_subtable:=true} ->
+            <<TableId/binary, "_body">>;
+        _ ->
+            <<"body">>
+    end,
     #{
         view => <<"scrollview">>,
         id => BodyId,
@@ -778,32 +783,32 @@ on_store_updated() ->
         }
     ">>.
 
-%% @private
-fake_delay(TableId) ->
-    SelectedId = append_id(TableId, <<"_selected">>),
-    RealTimeButtonId = append_id(TableId, <<"_real_time">>),
-    RefreshButtonId = append_id(TableId, <<"_refresh">>),
-    NewButtonId = append_id(TableId, <<"_new">>),
-    DeleteIconId = append_id(TableId, <<"_delete">>),
-    DisableIconId = append_id(TableId, <<"_disable">>),
-    <<"
-        function() {
-            var grid = $$(\"", TableId/binary, "\");
-            grid.showProgress();
-            webix.delay(function() {
-                grid.hideProgress();
-                // There are items selected
-                // Show possible actions
-                $$('", SelectedId/binary,  "').show();
-                $$('", DeleteIconId/binary,  "').show();
-                $$('", DisableIconId/binary,  "').show();
-                // Hide normal buttons
-                $$('", RealTimeButtonId/binary,  "').hide();
-                $$('", RefreshButtonId/binary,  "').hide();
-                $$('", NewButtonId/binary,  "').hide();
-            }, null, null, 300);
-        }
-    ">>.
+%%%% @private
+%%fake_delay(TableId) ->
+%%    SelectedId = append_id(TableId, <<"_selected">>),
+%%    RealTimeButtonId = append_id(TableId, <<"_real_time">>),
+%%    RefreshButtonId = append_id(TableId, <<"_refresh">>),
+%%    NewButtonId = append_id(TableId, <<"_new">>),
+%%    DeleteIconId = append_id(TableId, <<"_delete">>),
+%%    DisableIconId = append_id(TableId, <<"_disable">>),
+%%    <<"
+%%        function() {
+%%            var grid = $$(\"", TableId/binary, "\");
+%%            grid.showProgress();
+%%            webix.delay(function() {
+%%                grid.hideProgress();
+%%                // There are items selected
+%%                // Show possible actions
+%%                $$('", SelectedId/binary,  "').show();
+%%                $$('", DeleteIconId/binary,  "').show();
+%%                $$('", DisableIconId/binary,  "').show();
+%%                // Hide normal buttons
+%%                $$('", RealTimeButtonId/binary,  "').hide();
+%%                $$('", RefreshButtonId/binary,  "').hide();
+%%                $$('", NewButtonId/binary,  "').hide();
+%%            }, null, null, 300);
+%%        }
+%%    ">>.
 
 
 
