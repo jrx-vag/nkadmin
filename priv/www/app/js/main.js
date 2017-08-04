@@ -241,20 +241,23 @@
 		            	node.onclick = function(){
 		            		this.getElementsByTagName("input")[0].checked = config.checked = !config.checked;
 		            		var column = master.getColumnConfig(config.columnId);
-		            		var checked = config.checked ? column.checkValue : column.uncheckValue;
-                            if (config.clickListener) {
-                                config.clickListener(checked);
-                            }
+                            var checked = config.checked ? column.checkValue : column.uncheckValue;
+                            var counter = 0;
 		            		master.data.each(function(obj){
 		            			if(obj){ //dyn loading
 		            				obj[config.columnId] = checked;
                                     var ignore = true;
-		            				master.callEvent("onCheck", [obj.id, config.columnId, checked, ignore]);
+                                    master.callEvent("onCheck", [obj.id, config.columnId, checked, ignore]);
+                                    counter++;
                                     // Prevent multiple calls to wsProxy.save()
 		            				//this.callEvent("onStoreUpdated", [obj.id, obj, "save"]);
 		            			}
 		            		});
-		            		master.refresh();
+                            master.refresh();
+                            // Call the click listener with the value and the counter
+                            if (config.clickListener) {
+                                config.clickListener(checked, counter);
+                            }
 		            	};
 		            },
 		            render:function(master, config){ 
