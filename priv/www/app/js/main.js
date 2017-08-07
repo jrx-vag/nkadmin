@@ -707,7 +707,6 @@
                                 console.log("After replace: elem1ID:", elem.id, "elem2ID:", elem2.id, "OBJ1: ", $$(elem.id), "OBJ2:", $$(elem2.id));
                                 if (!$$(elem2.id)) {
                                     console.log("Replace failed somehow: ", elem.id, elem, elem2.id, elem2);
-                                    alert('Replace failed');
                                 }
                             } else {
                                 console.log("ERROR: while replacing standalone element", elem, elem2);

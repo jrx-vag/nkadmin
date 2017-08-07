@@ -121,8 +121,8 @@ toolbar(TableId, Session) ->
             toolbar_real_time(TableId, Session),
             toolbar_refresh(TableId, Session),
             toolbar_new(TableId),
-            toolbar_delete(TableId),
-            toolbar_disable(TableId)
+            toolbar_delete(TableId, Session),
+            toolbar_disable(TableId, Session)
         ]
     }.
 
@@ -261,26 +261,50 @@ toolbar_new(TableId) ->
 
 
 
-toolbar_delete(TableId) ->
+toolbar_delete(TableId, Session) ->
+    Tooltip = i18n(domain_delete_button_tooltip, Session),
     #{
         id => append_id(TableId, <<"_delete">>),
         width => 30,
         hidden => true,
         css => <<"datatable_icon">>,
         template => <<"
-           <span style='cursor:pointer;' class='webix_icon fa-trash'></span>
-        ">>
+           <span title='", Tooltip/binary, "' style='cursor:pointer;' class='webix_icon fa-trash'></span>
+        ">>,
+        onClick => #{
+            <<"fa-trash">> => <<"
+                function() {
+                    // Delete selection
+                    var grid = $$('", TableId/binary, "');
+                    if (grid) {
+                        console.log('delete button clicked!', grid.selectionCounter, grid.selectedItems);
+                    }
+                }
+            ">>
+        }
     }.
 
-toolbar_disable(TableId) ->
+toolbar_disable(TableId, Session) ->
+    Tooltip = i18n(domain_disable_button_tooltip, Session),
     #{
         id => append_id(TableId, <<"_disable">>),
         width => 30,
         hidden => true,
         css => <<"datatable_icon">>,
         template => <<"
-           <span style='cursor:pointer;' class='webix_icon fa-ban'></span>
-        ">>
+           <span title='", Tooltip/binary, "' style='cursor:pointer;' class='webix_icon fa-ban'></span>
+        ">>,
+        onClick => #{
+            <<"fa-ban">> => <<"
+                function() {
+                    // Disable selection
+                    var grid = $$('", TableId/binary, "');
+                    if (grid) {
+                        console.log('disable button clicked!', grid.selectionCounter, grid.selectedItems);
+                    }
+                }
+            ">>
+        }
     }.
 
 body_pager() ->
