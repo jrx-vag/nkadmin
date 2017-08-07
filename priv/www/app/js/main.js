@@ -252,7 +252,10 @@
                                     // Prevent multiple calls to wsProxy.save()
 		            				//this.callEvent("onStoreUpdated", [obj.id, obj, "save"]);
 		            			}
-		            		});
+                            });
+                            if (counter === 0) {
+                                this.getElementsByTagName("input")[0].checked = 0;
+                            }
                             master.refresh();
                             // Call the click listener with the value and the counter
                             if (config.clickListener) {
@@ -647,7 +650,7 @@
                     default:
                         console.log("Default: ", elem.class);
                         console.log("Updating element: ", elem);
-                        console.log("ID READ: ", $$(elem.id));
+                        console.log("ID READ: ", elem.id, $$(elem.id));
                         if (elem.id.startsWith(DOMAIN_TREE)) {
                             // It is an element from the sidebar menu
                             console.log("It is an element from the sidebar menu");
@@ -685,6 +688,30 @@
                             updateFrameState([elem]);
                             console.log("New frame state: ", frameState);
                             replaceComponent(ADMIN_FRAME, createFrame(frameState));
+                        } else {
+                            // It is a standalone element
+                            var elem2 = elem;
+                            while (elem2 !== undefined && elem2["class"] && elem2.class === "webix_ui" && elem2["value"]) {
+                                elem2 = elem2.value;
+                            }
+                            console.log("Replacing", elem.id, elem2.id);
+                            if (elem2) {
+                                console.log("Before replace: elem1ID:", elem.id, "elem2ID:", elem2.id, "OBJ1: ", $$(elem.id), "OBJ2:", $$(elem2.id));
+                                // Force the same ID as the parent JSON
+//                                elem2["id"] = elem.id;
+                                // Eval possible functions
+                                parseJSONFunctions(elem2);
+                                // And replace that component
+                                replaceComponent(elem2.id, elem2);
+                                console.log("Replaced OK", elem, elem2);
+                                console.log("After replace: elem1ID:", elem.id, "elem2ID:", elem2.id, "OBJ1: ", $$(elem.id), "OBJ2:", $$(elem2.id));
+                                if (!$$(elem2.id)) {
+                                    console.log("Replace failed somehow: ", elem.id, elem, elem2.id, elem2);
+                                    alert('Replace failed');
+                                }
+                            } else {
+                                console.log("ERROR: while replacing standalone element", elem, elem2);
+                            }
                         }
                 }
             }

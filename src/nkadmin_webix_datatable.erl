@@ -80,9 +80,11 @@ datatable(#{table_id:=TableId}=Spec, Session) ->
         _ ->
             <<"body">>
     end,
+    Header = maps:get(header, Spec, <<>>),
     #{
         view => <<"scrollview">>,
         id => BodyId,
+        header => Header,
         borderless => true,
         type => <<"space">>,
         css => <<"flex-tmp">>,
@@ -744,7 +746,7 @@ on_master_checkbox_click(TableId) ->
         function(value, counter) {
             console.log('Master checkbox: ', value, counter);
             // This event will update the view once
-            if (value) {
+            if (value && counter > 0) {
                 // Modify the counter
                 var label = $$('", SelectedLabelId/binary, "');
                 // TODO: Replace some special character with the counter instead of concatenating it with our string
