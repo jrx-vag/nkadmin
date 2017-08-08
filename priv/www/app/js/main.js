@@ -374,11 +374,11 @@
                                 value: value
                             }).then(function(response) {
                                 console.log("Action " + action + " OK: ", response);
-                                /*
+                                // Confirm the action
+                                webix.ajax.$callback(dp, callback, "", update);
                                 if (response.data && response.data.elements) {
                                     updateView(response.data.elements);
                                 }
-                                */
                             }).catch(function(response) {
                                 console.log("Error at action " + action + ": ", response);
                                 webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
@@ -392,7 +392,7 @@
                                                 pos--;
                                             }
                                             grid.add(update.data, pos);
-                                            callback.error();
+                                            webix.ajax.$callback(dp, callback, "", "", null, true);
                                         }
                                         break;
                                     case "updated":
@@ -402,22 +402,24 @@
                                             grid.clearAll();
                                             // view.config.save has the same URL as load ("wsProxy->")
                                             grid.load(view.config.save);
-                                            callback.error();
+                                            webix.ajax.$callback(dp, callback, "", "", null, true);
                                         }
                                         break;
                                     default:
                                         // Unknown action performed
-                                        callback.error();
+                                        webix.ajax.$callback(dp, callback, "", "", null, true);
                                 }
                             });
                         } else {
-                            callback.error();
+                            webix.ajax.$callback(dp, callback, "", "", null, true);
                         }
                     },
+                    // This result function it's not needed (by commenting it, we managed to send multiple updates for the same row)
                     result: function (state, view, dp, text, data, loader) {
                         //your logic of server-side response processing ... 
-                        //dp.processResult(state, data, details);
                         console.log('Default result', 'state', state, 'view', view, 'dp', dp, 'text', text, 'data', data, 'loader', loader);
+                        //dp.processResult(state, data, details);
+                        dp.processResult(state, data);
                     }
                     //other custom properties and methods
                     //prop1:value1,
