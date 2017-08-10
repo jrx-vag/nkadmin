@@ -243,11 +243,11 @@
 		            		var column = master.getColumnConfig(config.columnId);
                             var checked = config.checked ? column.checkValue : column.uncheckValue;
                             var counter = 0;
+                            var ignore = true;
 		            		master.data.each(function(obj){
 		            			if(obj){ //dyn loading
 		            				obj[config.columnId] = checked;
-                                    var ignore = true;
-                                    master.callEvent("onCheck", [obj.id, config.columnId, checked, ignore]);
+                                    //master.callEvent("onCheck", [obj.id, config.columnId, checked, ignore]);
                                     counter++;
                                     // Prevent multiple calls to wsProxy.save()
 		            				//this.callEvent("onStoreUpdated", [obj.id, obj, "save"]);
@@ -328,13 +328,47 @@
                             }
                         }
                         console.log('Load query:', query);
+                        var masterCheckbox = view.getHeaderContent('checkbox');
+                        var checkboxState = null;
+                        if (masterCheckbox) {
+                            checkboxState = masterCheckbox.isChecked()? "1": "0";
+                        }
                         ncClient.sendMessageAsync("objects/admin.session/get_data", query)
                         .then(function(response) {
                             console.log("Loaded!", "total_count", response.data.total_count, "data", response.data.data, "requested", end-start, "got", response.data.data.length);
                             var length = response.data.data.length;
+                            if (checkboxState) {
+                                for (var i = 0; i < length; i++) {
+                                    if (checkboxState === "1") {
+                                        // Override the checkbox state with masterCheckbox
+                                        // TODO: Remove this after the server takes into account the state of the master checkbox
+                                        response.data.data[i].checkbox = checkboxState;
+                                    } else {
+                                        // Try to reuse a previously saved state
+                                        response.data.data[i].checkbox = (view.selectedItems && view.selectedItems[response.data.data[i].id]) ? "1" : "0";
+                                    }
+                                }
+                                if (checkboxState === "1") {
+                                    // Update the selection counter
+                                    view.selectionCounter = response.data.total_count;
+                                    // Update the label with the new total
+                                    var label = $$(view.config.id + '__selected__label');
+                                    // TODO: Replace some special character with the total counter instead of concatenating it with our string
+                                    if (label) {
+                                        label.setValue(response.data.total_count + label.data.data.text);
+                                    } else {
+                                        console.log("wsProxy: ERROR, label not found", view.config.id + '__selected__label');
+                                    }
+                                }
+                            }
+                            if (pager) {
+                                // If there is a pager, refresh its contents when there are new data available (or when there is none!)
+                                pager.config.count = response.data.total_count;
+                                pager.render();
+                            }
             				webix.ajax.$callback(view, callback, "", {
                                 total_count: response.data.total_count, // used to get the total number of pages
-                                pos: response.data.pos,
+                                pos: response.data.total_count === 0? null : response.data.pos,
                                 data: response.data.data
                             }, -1);
                         }).catch(function(response) {

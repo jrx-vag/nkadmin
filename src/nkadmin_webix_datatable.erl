@@ -121,14 +121,14 @@ toolbar(TableId, Session) ->
             toolbar_real_time(TableId, Session),
             toolbar_refresh(TableId, Session),
             toolbar_new(TableId),
-            toolbar_delete(TableId, Session),
-            toolbar_disable(TableId, Session)
+            toolbar_disable(TableId, Session),
+            toolbar_delete(TableId, Session)
         ]
     }.
 
 
 toolbar_show_subdomains(TableId, Session) ->
-    SubdomainsId = append_id(TableId, <<"_subdomains">>),
+    SubdomainsId = append_id(TableId, <<"subdomains">>),
     #{
         view => <<"layout">>,
         cols => [
@@ -165,9 +165,9 @@ toolbar_show_subdomains(TableId, Session) ->
 
 
 toolbar_selected_elements(TableId, Session) ->
-    SelectedId = append_id(TableId, <<"_selected">>),
-    SelectedIconId = append_id(SelectedId, <<"_icon">>),
-    SelectedLabelId = append_id(SelectedId, <<"_label">>),
+    SelectedId = append_id(TableId, <<"selected">>),
+    SelectedIconId = append_id(SelectedId, <<"icon">>),
+    SelectedLabelId = append_id(SelectedId, <<"label">>),
     #{
         view => <<"layout">>,
         id => SelectedId,
@@ -185,6 +185,11 @@ toolbar_selected_elements(TableId, Session) ->
                     <<"fa-times">> => <<"
                         function() {
                             // Clear datatable selection
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                grid.selectedItems = {};
+                                grid.selectionCounter = 0;
+                            }
                             var masterCheckbox = $$('", TableId/binary, "').getHeaderContent('checkbox');
                             if (masterCheckbox) {
                                 console.log('masterCheckbox found!', masterCheckbox);
@@ -210,7 +215,7 @@ toolbar_selected_elements(TableId, Session) ->
 toolbar_refresh(TableId, Session) ->
     #{
         view => <<"button">>,
-        id => append_id(TableId, <<"_refresh">>),
+        id => append_id(TableId, <<"refresh">>),
         type => <<"iconButton">>,
         icon => <<"refresh">>,
         autowidth => true,
@@ -222,7 +227,7 @@ toolbar_refresh(TableId, Session) ->
 toolbar_real_time(TableId, Session) ->
     #{
         view => <<"layout">>,
-        id => append_id(TableId, <<"_real_time">>),
+        id => append_id(TableId, <<"real_time">>),
         cols => [
             #{
                 view => <<"checkbox">>,
@@ -251,7 +256,7 @@ toolbar_real_time(TableId, Session) ->
 toolbar_new(TableId) ->
     #{
         view => <<"button">>,
-        id => append_id(TableId, <<"_new">>),
+        id => append_id(TableId, <<"new">>),
         type => <<"iconButton">>,
         icon => <<"plus">>,
         autowidth => true,
@@ -264,7 +269,7 @@ toolbar_new(TableId) ->
 toolbar_delete(TableId, Session) ->
     Tooltip = i18n(domain_delete_button_tooltip, Session),
     #{
-        id => append_id(TableId, <<"_delete">>),
+        id => append_id(TableId, <<"delete">>),
         width => 30,
         hidden => true,
         css => <<"datatable_icon">>,
@@ -278,6 +283,30 @@ toolbar_delete(TableId, Session) ->
                     var grid = $$('", TableId/binary, "');
                     if (grid) {
                         console.log('delete button clicked!', grid.selectionCounter, grid.selectedItems);
+                        var masterCheckbox = grid.getHeaderContent('checkbox');
+                        var isChecked = false;
+                        if (masterCheckbox) {
+                            isChecked = masterCheckbox.isChecked();
+                        }
+                        webix.confirm({
+                            'text': 'Deleting ' + grid.selectionCounter + ' items<br/> Are you sure?',
+                            'ok': 'Yes',
+                            'cancel': 'Cancel',
+                            'callback': function(res) {
+                                if (res) {
+                                    /*
+                                    ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                        element_id: '", TableId/binary, "',
+                                        action: 'disabled',
+                                        value: {
+                                            obj_id: id.row
+                                        }
+                                    });
+                                    */
+                                    // TODO: Refresh datatable same page
+                                }
+                            }
+                        });
                     }
                 }
             ">>
@@ -287,7 +316,7 @@ toolbar_delete(TableId, Session) ->
 toolbar_disable(TableId, Session) ->
     Tooltip = i18n(domain_disable_button_tooltip, Session),
     #{
-        id => append_id(TableId, <<"_disable">>),
+        id => append_id(TableId, <<"disable">>),
         width => 30,
         hidden => true,
         css => <<"datatable_icon">>,
@@ -362,7 +391,12 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
             silentCheckbox => <<"
                 function(obj, common, value, config) {
                     var checked = (value == config.checkValue) ? 'checked=\"true\"' : '';
-                    return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\">\";
+                    var master = config.header;
+                    if (master && master[0] && master[0].checked !== undefined && master[0].checked) {
+                        return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\" disabled>\";
+                    } else {
+                        return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\">\";
+                    }
                 }
         ">>
         },
@@ -705,16 +739,16 @@ on_before_load() ->
 
 %% @private
 on_check(TableId) ->
-    SelectedId = append_id(TableId, <<"_selected">>),
-    SelectedLabelId = append_id(SelectedId, <<"_label">>),
-    RealTimeButtonId = append_id(TableId, <<"_real_time">>),
-    RefreshButtonId = append_id(TableId, <<"_refresh">>),
-    NewButtonId = append_id(TableId, <<"_new">>),
-    DeleteIconId = append_id(TableId, <<"_delete">>),
-    DisableIconId = append_id(TableId, <<"_disable">>),
+    SelectedId = append_id(TableId, <<"selected">>),
+    SelectedLabelId = append_id(SelectedId, <<"label">>),
+    RealTimeButtonId = append_id(TableId, <<"real_time">>),
+    RefreshButtonId = append_id(TableId, <<"refresh">>),
+    NewButtonId = append_id(TableId, <<"new">>),
+    DeleteIconId = append_id(TableId, <<"delete">>),
+    DisableIconId = append_id(TableId, <<"disable">>),
     <<"
-        function(row, col, val, fromMaster){
-            console.log('Checkbox: ', row, col, val, fromMaster);
+        function(row, col, val) {
+            console.log('Checkbox: ', row, col, val);
             var grid = $$('", TableId/binary, "');
             if (grid) {
                 if (val) {
@@ -725,33 +759,30 @@ on_check(TableId) ->
                     delete grid.selectedItems[row];
                 }
                 console.log('Grid selection counter: ', grid.selectionCounter);
-                if (fromMaster === undefined || !fromMaster) {
-                    // Update the view only if this event wasn't started by a master checkbox click
-                    if (grid.selectionCounter > 0) {
-                        // There are items selected
-                        // Modify the counter
-                        var label = $$('", SelectedLabelId/binary, "');
-                        // TODO: Replace some special character with the counter instead of concatenating it with our string
-                        label.setValue(grid.selectionCounter + label.data.data.text);
-                        // Show possible actions
-                        $$('", SelectedId/binary, "').show();
-                        $$('", DeleteIconId/binary, "').show();
-                        $$('", DisableIconId/binary, "').show();
-                        // Hide normal buttons
-                        $$('", RealTimeButtonId/binary, "').hide();
-                        $$('", RefreshButtonId/binary, "').hide();
-                        $$('", NewButtonId/binary, "').hide();
-                    } else {
-                        // There aren't any items selected
-                        // Hide possible actions
-                        $$('", SelectedId/binary, "').hide();
-                        $$('", DeleteIconId/binary, "').hide();
-                        $$('", DisableIconId/binary, "').hide();
-                        // Show normal buttons
-                        $$('", RealTimeButtonId/binary, "').show();
-                        $$('", RefreshButtonId/binary, "').show();
-                        $$('", NewButtonId/binary, "').show();
-                    }
+                if (grid.selectionCounter > 0) {
+                    // There are items selected
+                    // Modify the counter
+                    var label = $$('", SelectedLabelId/binary, "');
+                    // TODO: Replace some special character with the counter instead of concatenating it with our string
+                    label.setValue(grid.selectionCounter + label.data.data.text);
+                    // Show possible actions
+                    $$('", SelectedId/binary, "').show();
+                    $$('", DeleteIconId/binary, "').show();
+                    $$('", DisableIconId/binary, "').show();
+                    // Hide normal buttons
+                    $$('", RealTimeButtonId/binary, "').hide();
+                    $$('", RefreshButtonId/binary, "').hide();
+                    $$('", NewButtonId/binary, "').hide();
+                } else {
+                    // There aren't any items selected
+                    // Hide possible actions
+                    $$('", SelectedId/binary, "').hide();
+                    $$('", DeleteIconId/binary, "').hide();
+                    $$('", DisableIconId/binary, "').hide();
+                    // Show normal buttons
+                    $$('", RealTimeButtonId/binary, "').show();
+                    $$('", RefreshButtonId/binary, "').show();
+                    $$('", NewButtonId/binary, "').show();
                 }
             }
         }
@@ -759,22 +790,26 @@ on_check(TableId) ->
 
 %% @private
 on_master_checkbox_click(TableId) ->
-    SelectedId = append_id(TableId, <<"_selected">>),
-    SelectedLabelId = append_id(SelectedId, <<"_label">>),
-    RealTimeButtonId = append_id(TableId, <<"_real_time">>),
-    RefreshButtonId = append_id(TableId, <<"_refresh">>),
-    NewButtonId = append_id(TableId, <<"_new">>),
-    DeleteIconId = append_id(TableId, <<"_delete">>),
-    DisableIconId = append_id(TableId, <<"_disable">>),
+    SelectedId = append_id(TableId, <<"selected">>),
+    SelectedLabelId = append_id(SelectedId, <<"label">>),
+    RealTimeButtonId = append_id(TableId, <<"real_time">>),
+    RefreshButtonId = append_id(TableId, <<"refresh">>),
+    NewButtonId = append_id(TableId, <<"new">>),
+    DeleteIconId = append_id(TableId, <<"delete">>),
+    DisableIconId = append_id(TableId, <<"disable">>),
     <<"
         function(value, counter) {
             console.log('Master checkbox: ', value, counter);
+            var grid = $$('", TableId/binary, "');
+            var pager = grid? grid.getPager() : null;
             // This event will update the view once
-            if (value && counter > 0) {
+            if (value && counter > 0 && pager) {
                 // Modify the counter
                 var label = $$('", SelectedLabelId/binary, "');
-                // TODO: Replace some special character with the counter instead of concatenating it with our string
-                label.setValue(counter + label.data.data.text);
+                // TODO: Replace some special character with the total counter instead of concatenating it with our string
+                var total_count = pager.config.count;
+                grid.selectionCounter = total_count;
+                label.setValue(total_count + label.data.data.text);
                 // Show possible actions
                 $$('", SelectedId/binary, "').show();
                 $$('", DeleteIconId/binary, "').show();
@@ -785,6 +820,8 @@ on_master_checkbox_click(TableId) ->
                 $$('", NewButtonId/binary, "').hide();
             } else {
                 // There aren't any items selected
+                grid.selectionCounter = 0;
+                grid.selectedItems = {};
                 // Hide possible actions
                 $$('", SelectedId/binary, "').hide();
                 $$('", DeleteIconId/binary, "').hide();
@@ -811,12 +848,12 @@ on_store_updated() ->
 
 %%%% @private
 %%fake_delay(TableId) ->
-%%    SelectedId = append_id(TableId, <<"_selected">>),
-%%    RealTimeButtonId = append_id(TableId, <<"_real_time">>),
-%%    RefreshButtonId = append_id(TableId, <<"_refresh">>),
-%%    NewButtonId = append_id(TableId, <<"_new">>),
-%%    DeleteIconId = append_id(TableId, <<"_delete">>),
-%%    DisableIconId = append_id(TableId, <<"_disable">>),
+%%    SelectedId = append_id(TableId, <<"selected">>),
+%%    RealTimeButtonId = append_id(TableId, <<"real_time">>),
+%%    RefreshButtonId = append_id(TableId, <<"refresh">>),
+%%    NewButtonId = append_id(TableId, <<"new">>),
+%%    DeleteIconId = append_id(TableId, <<"delete">>),
+%%    DisableIconId = append_id(TableId, <<"disable">>),
 %%    <<"
 %%        function() {
 %%            var grid = $$(\"", TableId/binary, "\");
