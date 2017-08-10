@@ -291,8 +291,60 @@ toolbar_delete(TableId, Session) ->
                                 if (res) {
                                     if (isChecked) {
                                         console.log('Send delete all');
+                                        ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                            element_id: '", TableId/binary, "',
+                                            action: 'delete_all',
+                                            value: {
+                                                filter: grid.nkGetFilters()
+                                            }
+                                        }).then(function(response) {
+                                            // Delete OK
+                                            webix.message('Items deleted');
+                                        }).catch(function(response) {
+                                            // Delete Error
+                                            console.log('ERROR: at delete', response);
+                                            if (response.data) {
+                                                webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                            }
+                                            webix.message('Items deleted');
+                                        }).then(function(response) {
+                                            // Finally
+                                            grid.hideProgress();
+                                            grid.nkUnselectAll();
+                                            // TODO: refresh datatable
+                                        });
                                     } else {
-                                        console.log('Send delete N');
+                                        console.log('Send delete N', grid.selectedItems);
+                                        var ids = [];
+                                        for (var id in grid.selectedItems) {
+                                            ids.push(id);
+                                        }
+                                        if (ids.length > 0) {
+                                            grid.showProgress();
+                                            ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                                element_id: '", TableId/binary, "',
+                                                action: 'delete',
+                                                value: {
+                                                    ids: ids
+                                                }
+                                            }).then(function(response) {
+                                                // Delete OK
+                                                webix.message('Items deleted');
+                                            }).catch(function(response) {
+                                                // Delete Error
+                                                console.log('ERROR: at delete', response);
+                                                if (response.data) {
+                                                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                                }
+                                            }).then(function(response) {
+                                                // Finally
+                                                grid.hideProgress();
+                                                grid.nkUnselectAll();
+                                                // TODO: refresh datatable
+                                            });
+                                        } else {
+                                            grid.nkUnselectAll();
+                                        }
                                     }
                                     /*
                                     ncClient.sendMessageAsync('objects/admin.session/element_action', {
@@ -393,6 +445,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                     }
                     grid.selectedItems = {};
                     grid.selectionCounter = 0;
+                    grid.nkQueryFilters = {};
                     grid.nkGetSelection = function() {
                         var grid = $$('", TableId/binary, "');
                         var selectionCounter = 0;
@@ -435,6 +488,15 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                         }
                     }
                     grid.nkUnselectAll = function() {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            var masterCheckbox = grid.getHeaderContent('checkbox');
+                            if (masterCheckbox) {
+                                masterCheckbox.uncheck();
+                            }
+                        }
+                    }
+                    grid.nkUnselectAllButCheckboxes = function() {
                         var grid = $$('", TableId/binary, "');
                         if (grid) {
                             grid.selectionCounter = 0;
@@ -482,6 +544,20 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                             } else {
                                 return grid.selectedItems.hasOwnProperty(id);
                             }
+                        }
+                    }
+                    grid.nkUpdateFilters = function(filters) {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            grid.nkQueryFilters = filters ? filters : {};
+                        }
+                    }
+                    grid.nkGetFilters = function() {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            return grid.nkQueryFilters;
+                        } else {
+                            return {};
                         }
                     }
                 }
@@ -866,7 +942,7 @@ on_master_checkbox_click(TableId) ->
                 grid.nkSelectAll(total_count);
             } else {
                 // There aren't any items selected
-                grid.nkUnselectAll();
+                grid.nkUnselectAllButCheckboxes();
             }
         }
     ">>.

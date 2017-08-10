@@ -327,6 +327,9 @@
                                 query.sort = details.sort;
                             }
                         }
+                        if (details && details.filter && view.nkUpdateFilters) {
+                            view.nkUpdateFilters(details.filter);
+                        }
                         console.log('Load query:', query);
                         var masterCheckbox = view.getHeaderContent('checkbox');
                         var checkboxState = null;
@@ -345,10 +348,10 @@
                                         response.data.data[i].checkbox = checkboxState;
                                     } else {
                                         // Try to reuse a previously saved state
-                                        response.data.data[i].checkbox = view.nkIsSelectedItem(response.data.data[i].id) ? "1" : "0";
+                                        response.data.data[i].checkbox = (view.nkIsSelectedItem && view.nkIsSelectedItem(response.data.data[i].id)) ? "1" : response.data.data[i].checkbox;
                                     }
                                 }
-                                if (checkboxState === "1") {
+                                if (checkboxState === "1" && view.nkSelectAll) {
                                     // Update the selection counter
                                     view.nkSelectAll(response.data.total_count);
                                 }
