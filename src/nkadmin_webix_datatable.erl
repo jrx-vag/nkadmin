@@ -121,6 +121,7 @@ toolbar(TableId, Session) ->
             toolbar_real_time(TableId, Session),
             toolbar_refresh(TableId, Session),
             toolbar_new(TableId),
+            toolbar_enable(TableId, Session),
             toolbar_disable(TableId, Session),
             toolbar_delete(TableId, Session)
         ]
@@ -306,7 +307,6 @@ toolbar_delete(TableId, Session) ->
                                             if (response.data) {
                                                 webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
                                             }
-                                            webix.message('Items deleted');
                                         }).then(function(response) {
                                             // Finally
                                             grid.hideProgress();
@@ -346,16 +346,6 @@ toolbar_delete(TableId, Session) ->
                                             grid.nkUnselectAll();
                                         }
                                     }
-                                    /*
-                                    ncClient.sendMessageAsync('objects/admin.session/element_action', {
-                                        element_id: '", TableId/binary, "',
-                                        action: 'disabled',
-                                        value: {
-                                            obj_id: id.row
-                                        }
-                                    });
-                                    */
-                                    // TODO: Refresh datatable same page
                                 }
                             }
                         });
@@ -382,6 +372,169 @@ toolbar_disable(TableId, Session) ->
                     var grid = $$('", TableId/binary, "');
                     if (grid) {
                         console.log('disable button clicked!', grid.selectionCounter, grid.selectedItems);
+                        var masterCheckbox = grid.getHeaderContent('checkbox');
+                        var isChecked = false;
+                        if (masterCheckbox) {
+                            isChecked = masterCheckbox.isChecked();
+                        }
+                        webix.confirm({
+                            'text': 'Disabling ' + grid.selectionCounter + ' items<br/> Are you sure?',
+                            'ok': 'Yes',
+                            'cancel': 'Cancel',
+                            'callback': function(res) {
+                                if (res) {
+                                    if (isChecked) {
+                                        console.log('Send disable all');
+                                        ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                            element_id: '", TableId/binary, "',
+                                            action: 'disable_all',
+                                            value: {
+                                                filter: grid.nkGetFilters()
+                                            }
+                                        }).then(function(response) {
+                                            // Disable OK
+                                            webix.message('Items disabled');
+                                        }).catch(function(response) {
+                                            // Disable Error
+                                            console.log('ERROR: at disable', response);
+                                            if (response.data) {
+                                                webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                            }
+                                        }).then(function(response) {
+                                            // Finally
+                                            grid.hideProgress();
+                                            grid.nkUnselectAll();
+                                            // TODO: refresh datatable
+                                        });
+                                    } else {
+                                        console.log('Send disable N', grid.selectedItems);
+                                        var ids = [];
+                                        for (var id in grid.selectedItems) {
+                                            ids.push(id);
+                                        }
+                                        if (ids.length > 0) {
+                                            grid.showProgress();
+                                            ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                                element_id: '", TableId/binary, "',
+                                                action: 'disable',
+                                                value: {
+                                                    ids: ids
+                                                }
+                                            }).then(function(response) {
+                                                // Disable OK
+                                                webix.message('Items disabled');
+                                            }).catch(function(response) {
+                                                // Disable Error
+                                                console.log('ERROR: at disable', response);
+                                                if (response.data) {
+                                                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                                }
+                                            }).then(function(response) {
+                                                // Finally
+                                                grid.hideProgress();
+                                                grid.nkUnselectAll();
+                                                // TODO: refresh datatable
+                                            });
+                                        } else {
+                                            grid.nkUnselectAll();
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            ">>
+        }
+    }.
+
+toolbar_enable(TableId, Session) ->
+    Tooltip = i18n(domain_enable_button_tooltip, Session),
+    #{
+        id => append_id(TableId, <<"enable">>),
+        width => 30,
+        hidden => true,
+        css => <<"datatable_icon">>,
+        template => <<"
+           <span title='", Tooltip/binary, "' style='cursor:pointer;' class='webix_icon fa-circle-thin'></span>
+        ">>,
+        onClick => #{
+            <<"fa-circle-thin">> => <<"
+                function() {
+                    // Enable selection
+                    var grid = $$('", TableId/binary, "');
+                    if (grid) {
+                        console.log('enable button clicked!', grid.selectionCounter, grid.selectedItems);
+                        var masterCheckbox = grid.getHeaderContent('checkbox');
+                        var isChecked = false;
+                        if (masterCheckbox) {
+                            isChecked = masterCheckbox.isChecked();
+                        }
+                        webix.confirm({
+                            'text': 'Enabling ' + grid.selectionCounter + ' items<br/> Are you sure?',
+                            'ok': 'Yes',
+                            'cancel': 'Cancel',
+                            'callback': function(res) {
+                                if (res) {
+                                    if (isChecked) {
+                                        console.log('Send enable all');
+                                        ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                            element_id: '", TableId/binary, "',
+                                            action: 'enable_all',
+                                            value: {
+                                                filter: grid.nkGetFilters()
+                                            }
+                                        }).then(function(response) {
+                                            // Enable OK
+                                            webix.message('Items enabled');
+                                        }).catch(function(response) {
+                                            // Enable Error
+                                            console.log('ERROR: at enable', response);
+                                            if (response.data) {
+                                                webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                            }
+                                        }).then(function(response) {
+                                            // Finally
+                                            grid.hideProgress();
+                                            grid.nkUnselectAll();
+                                            // TODO: refresh datatable
+                                        });
+                                    } else {
+                                        console.log('Send enable N', grid.selectedItems);
+                                        var ids = [];
+                                        for (var id in grid.selectedItems) {
+                                            ids.push(id);
+                                        }
+                                        if (ids.length > 0) {
+                                            grid.showProgress();
+                                            ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                                element_id: '", TableId/binary, "',
+                                                action: 'enable',
+                                                value: {
+                                                    ids: ids
+                                                }
+                                            }).then(function(response) {
+                                                // Enable OK
+                                                webix.message('Items enabled');
+                                            }).catch(function(response) {
+                                                // Enable Error
+                                                console.log('ERROR: at enable', response);
+                                                if (response.data) {
+                                                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                                }
+                                            }).then(function(response) {
+                                                // Finally
+                                                grid.hideProgress();
+                                                grid.nkUnselectAll();
+                                                // TODO: refresh datatable
+                                            });
+                                        } else {
+                                            grid.nkUnselectAll();
+                                        }
+                                    }
+                                }
+                            }
+                        });
                     }
                 }
             ">>
@@ -409,8 +562,9 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
     RealTimeButtonId = append_id(TableId, <<"real_time">>),
     RefreshButtonId = append_id(TableId, <<"refresh">>),
     NewButtonId = append_id(TableId, <<"new">>),
-    DeleteIconId = append_id(TableId, <<"delete">>),
+    EnableIconId = append_id(TableId, <<"enable">>),
     DisableIconId = append_id(TableId, <<"disable">>),
+    DeleteIconId = append_id(TableId, <<"delete">>),
     Data = #{
         id => TableId,
         view => <<"datatable">>,
@@ -516,8 +670,9 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                                 label.setValue(grid.selectionCounter + label.data.data.text);
                                 // Show possible actions
                                 $$('", SelectedId/binary, "').show();
-                                $$('", DeleteIconId/binary, "').show();
+                                $$('", EnableIconId/binary, "').show();
                                 $$('", DisableIconId/binary, "').show();
+                                $$('", DeleteIconId/binary, "').show();
                                 // Hide normal buttons
                                 $$('", RealTimeButtonId/binary, "').hide();
                                 $$('", RefreshButtonId/binary, "').hide();
@@ -526,8 +681,9 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                                 // There aren't any items selected
                                 // Hide possible actions
                                 $$('", SelectedId/binary, "').hide();
-                                $$('", DeleteIconId/binary, "').hide();
+                                $$('", EnableIconId/binary, "').hide();
                                 $$('", DisableIconId/binary, "').hide();
+                                $$('", DeleteIconId/binary, "').hide();
                                 // Show normal buttons
                                 $$('", RealTimeButtonId/binary, "').show();
                                 $$('", RefreshButtonId/binary, "').show();
