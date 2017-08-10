@@ -185,11 +185,6 @@ toolbar_selected_elements(TableId, Session) ->
                     <<"fa-times">> => <<"
                         function() {
                             // Clear datatable selection
-                            var grid = $$('", TableId/binary, "');
-                            if (grid) {
-                                grid.selectedItems = {};
-                                grid.selectionCounter = 0;
-                            }
                             var masterCheckbox = $$('", TableId/binary, "').getHeaderContent('checkbox');
                             if (masterCheckbox) {
                                 console.log('masterCheckbox found!', masterCheckbox);
@@ -294,6 +289,11 @@ toolbar_delete(TableId, Session) ->
                             'cancel': 'Cancel',
                             'callback': function(res) {
                                 if (res) {
+                                    if (isChecked) {
+                                        console.log('Send delete all');
+                                    } else {
+                                        console.log('Send delete N');
+                                    }
                                     /*
                                     ncClient.sendMessageAsync('objects/admin.session/element_action', {
                                         element_id: '", TableId/binary, "',
@@ -352,6 +352,13 @@ body_pager() ->
 
 body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
     OnMasterCheckboxClick = on_master_checkbox_click(TableId),
+    SelectedId = append_id(TableId, <<"selected">>),
+    SelectedLabelId = append_id(SelectedId, <<"label">>),
+    RealTimeButtonId = append_id(TableId, <<"real_time">>),
+    RefreshButtonId = append_id(TableId, <<"refresh">>),
+    NewButtonId = append_id(TableId, <<"new">>),
+    DeleteIconId = append_id(TableId, <<"delete">>),
+    DisableIconId = append_id(TableId, <<"disable">>),
     Data = #{
         id => TableId,
         view => <<"datatable">>,
@@ -378,12 +385,105 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
             function() {
                 webix.extend(this, webix.ProgressBar);
                 var grid = $$('", TableId/binary, "');
-                var masterCheckbox = grid.getHeaderContent('checkbox');
-                grid.selectedItems = {};
-                grid.selectionCounter = 0;
-                if (masterCheckbox) {
-                    // attach an event to customMasterCheckbox;
-                    masterCheckbox.setOnClickListener(", OnMasterCheckboxClick/binary, ");
+                if (grid) {
+                    var masterCheckbox = grid.getHeaderContent('checkbox');
+                    if (masterCheckbox) {
+                        // attach an event to customMasterCheckbox;
+                        masterCheckbox.setOnClickListener(", OnMasterCheckboxClick/binary, ");
+                    }
+                    grid.selectedItems = {};
+                    grid.selectionCounter = 0;
+                    grid.nkGetSelection = function() {
+                        var grid = $$('", TableId/binary, "');
+                        var selectionCounter = 0;
+                        var selectedItems = {};
+                        if (grid) {
+                            selectionCounter = grid.selectionCounter;
+                            selectedItems = grid.selectedItems;
+                        }
+                        return {
+                            selectionCounter: selectionCounter,
+                            selectedItems: selectedItems
+                        }
+                    }
+                    grid.nkSelectItem = function(id) {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            if (!grid.selectedItems.hasOwnProperty(id)) {
+                                grid.selectionCounter += 1;
+                                grid.selectedItems[id] = id;
+                            }
+                            grid.nkUpdateView();
+                        }
+                    }
+                    grid.nkSelectAll = function(counter) {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            grid.selectionCounter = counter;
+                            grid.selectedItems = {};
+                            grid.nkUpdateView();
+                        }
+                    }
+                    grid.nkUnselectItem = function(id) {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            if (grid.selectedItems.hasOwnProperty(id)) {
+                                grid.selectionCounter = grid.selectionCounter > 0? grid.selectionCounter - 1 : 0;
+                                delete grid.selectedItems[id];
+                            }
+                            grid.nkUpdateView();
+                        }
+                    }
+                    grid.nkUnselectAll = function() {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            grid.selectionCounter = 0;
+                            grid.selectedItems = {};
+                            grid.nkUpdateView();
+                        }
+                    }
+                    grid.nkUpdateView = function() {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            console.log('Updating view:', grid.selectionCounter, grid.selectedItems);
+                            if (grid.selectionCounter > 0) {
+                                // There are items selected
+                                // Modify the counter
+                                var label = $$('", SelectedLabelId/binary, "');
+                                // TODO: Replace some special character with the counter instead of concatenating it with our string
+                                label.setValue(grid.selectionCounter + label.data.data.text);
+                                // Show possible actions
+                                $$('", SelectedId/binary, "').show();
+                                $$('", DeleteIconId/binary, "').show();
+                                $$('", DisableIconId/binary, "').show();
+                                // Hide normal buttons
+                                $$('", RealTimeButtonId/binary, "').hide();
+                                $$('", RefreshButtonId/binary, "').hide();
+                                $$('", NewButtonId/binary, "').hide();
+                            } else {
+                                // There aren't any items selected
+                                // Hide possible actions
+                                $$('", SelectedId/binary, "').hide();
+                                $$('", DeleteIconId/binary, "').hide();
+                                $$('", DisableIconId/binary, "').hide();
+                                // Show normal buttons
+                                $$('", RealTimeButtonId/binary, "').show();
+                                $$('", RefreshButtonId/binary, "').show();
+                                $$('", NewButtonId/binary, "').show();
+                            }
+                        }
+                    }
+                    grid.nkIsSelectedItem = function(id) {
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            var masterCheckbox = grid.getHeaderContent('checkbox');
+                            if (masterCheckbox && masterCheckbox.isChecked()) {
+                                return true;
+                            } else {
+                                return grid.selectedItems.hasOwnProperty(id);
+                            }
+                        }
+                    }
                 }
             }
         ">>,
@@ -739,50 +839,15 @@ on_before_load() ->
 
 %% @private
 on_check(TableId) ->
-    SelectedId = append_id(TableId, <<"selected">>),
-    SelectedLabelId = append_id(SelectedId, <<"label">>),
-    RealTimeButtonId = append_id(TableId, <<"real_time">>),
-    RefreshButtonId = append_id(TableId, <<"refresh">>),
-    NewButtonId = append_id(TableId, <<"new">>),
-    DeleteIconId = append_id(TableId, <<"delete">>),
-    DisableIconId = append_id(TableId, <<"disable">>),
     <<"
         function(row, col, val) {
             console.log('Checkbox: ', row, col, val);
             var grid = $$('", TableId/binary, "');
             if (grid) {
                 if (val) {
-                    grid.selectionCounter += 1;
-                    grid.selectedItems[row] = row;
+                    grid.nkSelectItem(row);
                 } else {
-                    grid.selectionCounter = grid.selectionCounter > 0? grid.selectionCounter - 1 : 0;
-                    delete grid.selectedItems[row];
-                }
-                console.log('Grid selection counter: ', grid.selectionCounter);
-                if (grid.selectionCounter > 0) {
-                    // There are items selected
-                    // Modify the counter
-                    var label = $$('", SelectedLabelId/binary, "');
-                    // TODO: Replace some special character with the counter instead of concatenating it with our string
-                    label.setValue(grid.selectionCounter + label.data.data.text);
-                    // Show possible actions
-                    $$('", SelectedId/binary, "').show();
-                    $$('", DeleteIconId/binary, "').show();
-                    $$('", DisableIconId/binary, "').show();
-                    // Hide normal buttons
-                    $$('", RealTimeButtonId/binary, "').hide();
-                    $$('", RefreshButtonId/binary, "').hide();
-                    $$('", NewButtonId/binary, "').hide();
-                } else {
-                    // There aren't any items selected
-                    // Hide possible actions
-                    $$('", SelectedId/binary, "').hide();
-                    $$('", DeleteIconId/binary, "').hide();
-                    $$('", DisableIconId/binary, "').hide();
-                    // Show normal buttons
-                    $$('", RealTimeButtonId/binary, "').show();
-                    $$('", RefreshButtonId/binary, "').show();
-                    $$('", NewButtonId/binary, "').show();
+                    grid.nkUnselectItem(row);
                 }
             }
         }
@@ -790,13 +855,6 @@ on_check(TableId) ->
 
 %% @private
 on_master_checkbox_click(TableId) ->
-    SelectedId = append_id(TableId, <<"selected">>),
-    SelectedLabelId = append_id(SelectedId, <<"label">>),
-    RealTimeButtonId = append_id(TableId, <<"real_time">>),
-    RefreshButtonId = append_id(TableId, <<"refresh">>),
-    NewButtonId = append_id(TableId, <<"new">>),
-    DeleteIconId = append_id(TableId, <<"delete">>),
-    DisableIconId = append_id(TableId, <<"disable">>),
     <<"
         function(value, counter) {
             console.log('Master checkbox: ', value, counter);
@@ -804,32 +862,11 @@ on_master_checkbox_click(TableId) ->
             var pager = grid? grid.getPager() : null;
             // This event will update the view once
             if (value && counter > 0 && pager) {
-                // Modify the counter
-                var label = $$('", SelectedLabelId/binary, "');
-                // TODO: Replace some special character with the total counter instead of concatenating it with our string
                 var total_count = pager.config.count;
-                grid.selectionCounter = total_count;
-                label.setValue(total_count + label.data.data.text);
-                // Show possible actions
-                $$('", SelectedId/binary, "').show();
-                $$('", DeleteIconId/binary, "').show();
-                $$('", DisableIconId/binary, "').show();
-                // Hide normal buttons
-                $$('", RealTimeButtonId/binary, "').hide();
-                $$('", RefreshButtonId/binary, "').hide();
-                $$('", NewButtonId/binary, "').hide();
+                grid.nkSelectAll(total_count);
             } else {
                 // There aren't any items selected
-                grid.selectionCounter = 0;
-                grid.selectedItems = {};
-                // Hide possible actions
-                $$('", SelectedId/binary, "').hide();
-                $$('", DeleteIconId/binary, "').hide();
-                $$('", DisableIconId/binary, "').hide();
-                // Show normal buttons
-                $$('", RealTimeButtonId/binary, "').show();
-                $$('", RefreshButtonId/binary, "').show();
-                $$('", NewButtonId/binary, "').show();                
+                grid.nkUnselectAll();
             }
         }
     ">>.

@@ -345,20 +345,12 @@
                                         response.data.data[i].checkbox = checkboxState;
                                     } else {
                                         // Try to reuse a previously saved state
-                                        response.data.data[i].checkbox = (view.selectedItems && view.selectedItems[response.data.data[i].id]) ? "1" : "0";
+                                        response.data.data[i].checkbox = view.nkIsSelectedItem(response.data.data[i].id) ? "1" : "0";
                                     }
                                 }
                                 if (checkboxState === "1") {
                                     // Update the selection counter
-                                    view.selectionCounter = response.data.total_count;
-                                    // Update the label with the new total
-                                    var label = $$(view.config.id + '__selected__label');
-                                    // TODO: Replace some special character with the total counter instead of concatenating it with our string
-                                    if (label) {
-                                        label.setValue(response.data.total_count + label.data.data.text);
-                                    } else {
-                                        console.log("wsProxy: ERROR, label not found", view.config.id + '__selected__label');
-                                    }
+                                    view.nkSelectAll(response.data.total_count);
                                 }
                             }
                             if (pager) {
