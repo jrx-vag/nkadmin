@@ -263,7 +263,26 @@ toolbar_new(TableId) ->
         type => <<"iconButton">>,
         icon => <<"plus">>,
         autowidth => true,
-        label => <<"New">>
+        label => <<"New">>,
+        click => <<"
+            function() {
+                console.log('New button clicked');
+                ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                    element_id: '", TableId/binary, "',
+                    action: 'new'
+                }).then(function(response) {
+                    console.log('New button clicked OK: ', response);
+                    if (response.data && response.data.elements) {
+                        // Update view
+                        updateView(response.data.elements);
+                    }
+                }).catch(function(response) {
+                    console.log('Error at new button clicked: ', response);
+                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                });
+            }
+        ">>
+
 %        click => fake_delay(TableId)
     }.
 
