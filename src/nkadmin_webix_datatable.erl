@@ -215,8 +215,15 @@ toolbar_refresh(TableId, Session) ->
         type => <<"iconButton">>,
         icon => <<"refresh">>,
         autowidth => true,
-        label => i18n(domain_refresh, Session)
-%        click => fake_delay(TableId)
+        label => i18n(domain_refresh, Session),
+        click => <<"
+            function() {
+                var grid = $$(\"", TableId/binary, "\");
+                if (grid) {
+                    grid.nkRefresh();
+                }
+            }
+        ">>
     }.
 
 
@@ -311,7 +318,7 @@ toolbar_delete(TableId, Session) ->
                                             // Finally
                                             grid.hideProgress();
                                             grid.nkUnselectAll();
-                                            // TODO: refresh datatable
+                                            grid.nkRefresh();
                                         });
                                     } else {
                                         console.log('Send delete N', grid.selectedItems);
@@ -340,7 +347,7 @@ toolbar_delete(TableId, Session) ->
                                                 // Finally
                                                 grid.hideProgress();
                                                 grid.nkUnselectAll();
-                                                // TODO: refresh datatable
+                                                grid.nkRefresh();
                                             });
                                         } else {
                                             grid.nkUnselectAll();
@@ -404,7 +411,7 @@ toolbar_disable(TableId, Session) ->
                                             // Finally
                                             grid.hideProgress();
                                             grid.nkUnselectAll();
-                                            // TODO: refresh datatable
+                                            grid.nkRefresh();
                                         });
                                     } else {
                                         console.log('Send disable N', grid.selectedItems);
@@ -433,7 +440,7 @@ toolbar_disable(TableId, Session) ->
                                                 // Finally
                                                 grid.hideProgress();
                                                 grid.nkUnselectAll();
-                                                // TODO: refresh datatable
+                                                grid.nkRefresh();
                                             });
                                         } else {
                                             grid.nkUnselectAll();
@@ -497,7 +504,7 @@ toolbar_enable(TableId, Session) ->
                                             // Finally
                                             grid.hideProgress();
                                             grid.nkUnselectAll();
-                                            // TODO: refresh datatable
+                                            grid.nkRefresh();
                                         });
                                     } else {
                                         console.log('Send enable N', grid.selectedItems);
@@ -526,7 +533,7 @@ toolbar_enable(TableId, Session) ->
                                                 // Finally
                                                 grid.hideProgress();
                                                 grid.nkUnselectAll();
-                                                // TODO: refresh datatable
+                                                grid.nkRefresh();
                                             });
                                         } else {
                                             grid.nkUnselectAll();
@@ -714,6 +721,12 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                             return grid.nkQueryFilters;
                         } else {
                             return {};
+                        }
+                    }
+                    grid.nkRefresh = function() {
+                        var grid = $$(\"", TableId/binary, "\");
+                        if (grid) {
+                            grid.filterByAll();
                         }
                     }
                 }
