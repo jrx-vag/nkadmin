@@ -117,8 +117,8 @@ toolbar(TableId, Session) ->
             toolbar_show_subdomains(TableId, Session),
             #{},
             toolbar_selected_elements(TableId, Session),
-            #{},
             toolbar_real_time(TableId, Session),
+            #{},
             toolbar_refresh(TableId, Session),
             toolbar_new(TableId),
             toolbar_enable(TableId, Session),
@@ -228,30 +228,84 @@ toolbar_refresh(TableId, Session) ->
 
 
 toolbar_real_time(TableId, Session) ->
+    RealTimeId = append_id(TableId, <<"real_time">>),
+    RealTimeCheckboxId = append_id(RealTimeId, <<"checkbox">>),
+    RealTimeComboId = append_id(RealTimeId, <<"combo">>),
     #{
         view => <<"layout">>,
-        id => append_id(TableId, <<"real_time">>),
+        id => RealTimeId,
+        minWidth => 250,
         cols => [
             #{
                 view => <<"checkbox">>,
-                name => <<"real_time_checkbox">>,
+                id => RealTimeCheckboxId,
                 width => 20,
                 value => 1,
                 on => #{
                     onChange => <<"
-                        function() {
+                        function(value) {
                             var grid = $$(\"", TableId/binary, "\");
-                            // Subscribe/Unsubscribe to real time updates
+                            var combo = $$(\"", RealTimeComboId/binary, "\");
+                            if (combo) {
+                                // Subscribe/Unsubscribe to real time updates
+                                if (value) {
+                                    grid.nkSetInterval(combo.getValue());
+                                    combo.enable();
+                                } else {
+                                    grid.nkClearInterval();
+                                    combo.disable();
+                                }
+                            }
                         }
                     ">>
                 }
             },
             #{
-                view => <<"label">>,
-                autowidth => true,
-                % This label is defined separately to be able to set its width to 'autowidth'
-                label => i18n(real_time, Session)
-                %align => <<"right">>
+                view => <<"combo">>,
+                id => RealTimeComboId,
+                minWidth => 230,
+                label => i18n(real_time, Session),
+                value => 30000,
+                options => [
+                    #{
+                        id => 5000,
+                        value => <<"5 seconds">>
+                    },
+                    #{
+                        id => 10000,
+                        value => <<"10 seconds">>
+                    },
+                    #{
+                        id => 30000,
+                        value => <<"30 seconds">>
+                    },
+                    #{
+                        id => 60000,
+                        value => <<"1 minute">>
+                    },
+                    #{
+                        id => 300000,
+                        value => <<"5 minutes">>
+                    }
+                ],
+                on => #{
+                    onChange => <<"
+                        function(value) {
+                            var grid = $$(\"", TableId/binary, "\");
+                            var checkbox = $$(\"", RealTimeCheckboxId/binary, "\");
+                            if (grid && checkbox && checkbox.getValue()) {
+                                if (value) {
+                                    console.log(value);
+                                    grid.nkSetInterval(value);
+                                } else {
+                                    grid.nkClearInterval();
+                                }
+                            }
+                            // Hide the combo options
+                            this.blur();
+                        }
+                    ">>
+                }
             }
         ]
     }.
@@ -591,6 +645,9 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
     EnableIconId = append_id(TableId, <<"enable">>),
     DisableIconId = append_id(TableId, <<"disable">>),
     DeleteIconId = append_id(TableId, <<"delete">>),
+    RealTimeId = append_id(TableId, <<"real_time">>),
+    RealTimeCheckboxId = append_id(RealTimeId, <<"checkbox">>),
+    RealTimeComboId = append_id(RealTimeId, <<"combo">>),
     Data = #{
         id => TableId,
         view => <<"datatable">>,
@@ -743,9 +800,34 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                         }
                     }
                     grid.nkRefresh = function() {
-                        var grid = $$(\"", TableId/binary, "\");
+                        var grid = $$('", TableId/binary, "');
                         if (grid) {
                             grid.filterByAll();
+                        }
+                    }
+                    grid.nkSetInterval = function(value) {
+                        var grid = $$(\"", TableId/binary, "\");
+                        // Subscribe/Unsubscribe to real time updates
+                        if (grid) {
+                            clearInterval(grid.nkInterval);
+                            if (value) {
+                                grid.nkInterval = setInterval(grid.nkRefresh, value);
+                            }
+                        }
+                    }
+                    grid.nkClearInterval = function() {
+                        var grid = $$(\"", TableId/binary, "\");
+                        if (grid) {
+                            clearInterval(grid.nkInterval);
+                        }
+                    }
+                    var realTimeCheckbox = $$('", RealTimeCheckboxId/binary, "');
+                    var realTimeCombo = $$('", RealTimeComboId/binary, "');
+                    if (realTimeCheckbox && realTimeCombo) {
+                        if (realTimeCheckbox.getValue()) {
+                            grid.nkSetInterval(realTimeCombo.getValue());
+                        } else {
+                            realTimeCombo.disable();
                         }
                     }
                 }
