@@ -140,18 +140,20 @@ toolbar_show_subdomains(TableId, Session) ->
                 width => 20,
                 value => 1,
                 on => #{
-                    onChange => <<"
-                        function() {
-                            var grid = $$(\"", TableId/binary, "\");
-                            var pager = grid.getPager();
-                            var page = pager.config.page;
-                            var start = page * pager.config.size;
-                            console.log('grid', grid);
-                            //grid.loadNext(number count,number start,function callback,string url,boolean now);
-                            grid.clearAll();
-                            grid.loadNext(grid.config.datafetch, 0, null, grid.config.url, true);
-                        }
-                    ">>
+                    onChange => #{
+                        nkParseFunction => <<"
+                            function() {
+                                var grid = $$(\"", TableId/binary, "\");
+                                var pager = grid.getPager();
+                                var page = pager.config.page;
+                                var start = page * pager.config.size;
+                                console.log('grid', grid);
+                                //grid.loadNext(number count,number start,function callback,string url,boolean now);
+                                grid.clearAll();
+                                grid.loadNext(grid.config.datafetch, 0, null, grid.config.url, true);
+                            }
+                        ">>
+                    }
                 }
             },
             #{
@@ -183,18 +185,20 @@ toolbar_selected_elements(TableId, Session) ->
                     <span style='cursor:pointer;' class='webix_icon fa-times'></span>
                 ">>,
                 onClick => #{
-                    <<"fa-times">> => <<"
-                        function() {
-                            // Clear datatable selection
-                            var masterCheckbox = $$('", TableId/binary, "').getHeaderContent('checkbox');
-                            if (masterCheckbox) {
-                                console.log('masterCheckbox found!', masterCheckbox);
-                                masterCheckbox.uncheck();
-                            } else {
-                                console.log('masterCheckbox not found');
+                    <<"fa-times">> => #{
+                        nkParseFunction => <<"
+                            function() {
+                                // Clear datatable selection
+                                var masterCheckbox = $$('", TableId/binary, "').getHeaderContent('checkbox');
+                                if (masterCheckbox) {
+                                    console.log('masterCheckbox found!', masterCheckbox);
+                                    masterCheckbox.uncheck();
+                                } else {
+                                    console.log('masterCheckbox not found');
+                                }
                             }
-                        }
-                    ">>
+                        ">>
+                    }
                 }
             },
             #{
@@ -216,14 +220,16 @@ toolbar_refresh(TableId, Session) ->
         icon => <<"refresh">>,
         autowidth => true,
         label => i18n(domain_refresh, Session),
-        click => <<"
-            function() {
-                var grid = $$(\"", TableId/binary, "\");
-                if (grid) {
-                    grid.nkRefresh();
+        click => #{
+            nkParseFunction => <<"
+                function() {
+                    var grid = $$(\"", TableId/binary, "\");
+                    if (grid) {
+                        grid.nkRefresh();
+                    }
                 }
-            }
-        ">>
+            ">>
+        }
     }.
 
 
@@ -242,22 +248,24 @@ toolbar_real_time(TableId, Session) ->
                 width => 20,
                 value => 1,
                 on => #{
-                    onChange => <<"
-                        function(value) {
-                            var grid = $$(\"", TableId/binary, "\");
-                            var combo = $$(\"", RealTimeComboId/binary, "\");
-                            if (combo) {
-                                // Subscribe/Unsubscribe to real time updates
-                                if (value) {
-                                    grid.nkSetInterval(combo.getValue());
-                                    combo.enable();
-                                } else {
-                                    grid.nkClearInterval();
-                                    combo.disable();
+                    onChange => #{
+                        nkParseFunction => <<"
+                            function(value) {
+                                var grid = $$(\"", TableId/binary, "\");
+                                var combo = $$(\"", RealTimeComboId/binary, "\");
+                                if (combo) {
+                                    // Subscribe/Unsubscribe to real time updates
+                                    if (value) {
+                                        grid.nkSetInterval(combo.getValue());
+                                        combo.enable();
+                                    } else {
+                                        grid.nkClearInterval();
+                                        combo.disable();
+                                    }
                                 }
                             }
-                        }
-                    ">>
+                        ">>
+                    }
                 }
             },
             #{
@@ -289,22 +297,24 @@ toolbar_real_time(TableId, Session) ->
                     }
                 ],
                 on => #{
-                    onChange => <<"
-                        function(value) {
-                            var grid = $$(\"", TableId/binary, "\");
-                            var checkbox = $$(\"", RealTimeCheckboxId/binary, "\");
-                            if (grid && checkbox && checkbox.getValue()) {
-                                if (value) {
-                                    console.log(value);
-                                    grid.nkSetInterval(value);
-                                } else {
-                                    grid.nkClearInterval();
+                    onChange => #{
+                        nkParseFunction => <<"
+                            function(value) {
+                                var grid = $$(\"", TableId/binary, "\");
+                                var checkbox = $$(\"", RealTimeCheckboxId/binary, "\");
+                                if (grid && checkbox && checkbox.getValue()) {
+                                    if (value) {
+                                        console.log(value);
+                                        grid.nkSetInterval(value);
+                                    } else {
+                                        grid.nkClearInterval();
+                                    }
                                 }
+                                // Hide the combo options
+                                this.blur();
                             }
-                            // Hide the combo options
-                            this.blur();
-                        }
-                    ">>
+                        ">>
+                    }
                 }
             }
         ]
@@ -318,26 +328,26 @@ toolbar_new(TableId) ->
         icon => <<"plus">>,
         autowidth => true,
         label => <<"New">>,
-        click => <<"
-            function() {
-                console.log('New button clicked');
-                ncClient.sendMessageAsync('objects/admin.session/element_action', {
-                    element_id: '", TableId/binary, "',
-                    action: 'new'
-                }).then(function(response) {
-                    console.log('New button clicked OK: ', response);
-                    if (response.data && response.data.elements) {
-                        // Update view
-                        updateView(response.data.elements);
-                    }
-                }).catch(function(response) {
-                    console.log('Error at new button clicked: ', response);
-                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
-                });
-            }
-        ">>
-
-%        click => fake_delay(TableId)
+        click => #{
+            nkParseFunction => <<"
+                function() {
+                    console.log('New button clicked');
+                    ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                        element_id: '", TableId/binary, "',
+                        action: 'new'
+                    }).then(function(response) {
+                        console.log('New button clicked OK: ', response);
+                        if (response.data && response.data.elements) {
+                            // Update view
+                            updateView(response.data.elements);
+                        }
+                    }).catch(function(response) {
+                        console.log('Error at new button clicked: ', response);
+                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                    });
+                }
+            ">>
+        }
     }.
 
 
@@ -353,59 +363,31 @@ toolbar_delete(TableId, Session) ->
            <span title='", Tooltip/binary, "' style='cursor:pointer;' class='webix_icon fa-trash'></span>
         ">>,
         onClick => #{
-            <<"fa-trash">> => <<"
-                function() {
-                    // Delete selection
-                    var grid = $$('", TableId/binary, "');
-                    if (grid) {
-                        console.log('delete button clicked!', grid.selectionCounter, grid.selectedItems);
-                        var masterCheckbox = grid.getHeaderContent('checkbox');
-                        var isChecked = false;
-                        if (masterCheckbox) {
-                            isChecked = masterCheckbox.isChecked();
-                        }
-                        webix.confirm({
-                            'text': 'Deleting ' + grid.selectionCounter + ' items<br/> Are you sure?',
-                            'ok': 'Yes',
-                            'cancel': 'Cancel',
-                            'callback': function(res) {
-                                if (res) {
-                                    if (isChecked) {
-                                        console.log('Send delete all');
-                                        ncClient.sendMessageAsync('objects/admin.session/element_action', {
-                                            element_id: '", TableId/binary, "',
-                                            action: 'delete_all',
-                                            value: {
-                                                filter: grid.nkGetFilters()
-                                            }
-                                        }).then(function(response) {
-                                            // Delete OK
-                                            webix.message('Items deleted');
-                                        }).catch(function(response) {
-                                            // Delete Error
-                                            console.log('ERROR: at delete', response);
-                                            if (response.data) {
-                                                webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
-                                            }
-                                        }).then(function(response) {
-                                            // Finally
-                                            grid.hideProgress();
-                                            grid.nkUnselectAll();
-                                            grid.nkRefresh();
-                                        });
-                                    } else {
-                                        console.log('Send delete N', grid.selectedItems);
-                                        var ids = [];
-                                        for (var id in grid.selectedItems) {
-                                            ids.push(id);
-                                        }
-                                        if (ids.length > 0) {
-                                            grid.showProgress();
+            <<"fa-trash">> => #{
+                nkParseFunction => <<"
+                    function() {
+                        // Delete selection
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            console.log('delete button clicked!', grid.selectionCounter, grid.selectedItems);
+                            var masterCheckbox = grid.getHeaderContent('checkbox');
+                            var isChecked = false;
+                            if (masterCheckbox) {
+                                isChecked = masterCheckbox.isChecked();
+                            }
+                            webix.confirm({
+                                'text': 'Deleting ' + grid.selectionCounter + ' items<br/> Are you sure?',
+                                'ok': 'Yes',
+                                'cancel': 'Cancel',
+                                'callback': function(res) {
+                                    if (res) {
+                                        if (isChecked) {
+                                            console.log('Send delete all');
                                             ncClient.sendMessageAsync('objects/admin.session/element_action', {
                                                 element_id: '", TableId/binary, "',
-                                                action: 'delete',
+                                                action: 'delete_all',
                                                 value: {
-                                                    ids: ids
+                                                    filter: grid.nkGetFilters()
                                                 }
                                             }).then(function(response) {
                                                 // Delete OK
@@ -423,15 +405,45 @@ toolbar_delete(TableId, Session) ->
                                                 grid.nkRefresh();
                                             });
                                         } else {
-                                            grid.nkUnselectAll();
+                                            console.log('Send delete N', grid.selectedItems);
+                                            var ids = [];
+                                            for (var id in grid.selectedItems) {
+                                                ids.push(id);
+                                            }
+                                            if (ids.length > 0) {
+                                                grid.showProgress();
+                                                ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                                    element_id: '", TableId/binary, "',
+                                                    action: 'delete',
+                                                    value: {
+                                                        ids: ids
+                                                    }
+                                                }).then(function(response) {
+                                                    // Delete OK
+                                                    webix.message('Items deleted');
+                                                }).catch(function(response) {
+                                                    // Delete Error
+                                                    console.log('ERROR: at delete', response);
+                                                    if (response.data) {
+                                                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                                    }
+                                                }).then(function(response) {
+                                                    // Finally
+                                                    grid.hideProgress();
+                                                    grid.nkUnselectAll();
+                                                    grid.nkRefresh();
+                                                });
+                                            } else {
+                                                grid.nkUnselectAll();
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
-                }
-            ">>
+                ">>
+            }
         }
     }.
 
@@ -446,59 +458,31 @@ toolbar_disable(TableId, Session) ->
            <span title='", Tooltip/binary, "' style='cursor:pointer;' class='webix_icon fa-ban'></span>
         ">>,
         onClick => #{
-            <<"fa-ban">> => <<"
-                function() {
-                    // Disable selection
-                    var grid = $$('", TableId/binary, "');
-                    if (grid) {
-                        console.log('disable button clicked!', grid.selectionCounter, grid.selectedItems);
-                        var masterCheckbox = grid.getHeaderContent('checkbox');
-                        var isChecked = false;
-                        if (masterCheckbox) {
-                            isChecked = masterCheckbox.isChecked();
-                        }
-                        webix.confirm({
-                            'text': 'Disabling ' + grid.selectionCounter + ' items<br/> Are you sure?',
-                            'ok': 'Yes',
-                            'cancel': 'Cancel',
-                            'callback': function(res) {
-                                if (res) {
-                                    if (isChecked) {
-                                        console.log('Send disable all');
-                                        ncClient.sendMessageAsync('objects/admin.session/element_action', {
-                                            element_id: '", TableId/binary, "',
-                                            action: 'disable_all',
-                                            value: {
-                                                filter: grid.nkGetFilters()
-                                            }
-                                        }).then(function(response) {
-                                            // Disable OK
-                                            webix.message('Items disabled');
-                                        }).catch(function(response) {
-                                            // Disable Error
-                                            console.log('ERROR: at disable', response);
-                                            if (response.data) {
-                                                webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
-                                            }
-                                        }).then(function(response) {
-                                            // Finally
-                                            grid.hideProgress();
-                                            grid.nkUnselectAll();
-                                            grid.nkRefresh();
-                                        });
-                                    } else {
-                                        console.log('Send disable N', grid.selectedItems);
-                                        var ids = [];
-                                        for (var id in grid.selectedItems) {
-                                            ids.push(id);
-                                        }
-                                        if (ids.length > 0) {
-                                            grid.showProgress();
+            <<"fa-ban">> => #{
+                nkParseFunction => <<"
+                    function() {
+                        // Disable selection
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            console.log('disable button clicked!', grid.selectionCounter, grid.selectedItems);
+                            var masterCheckbox = grid.getHeaderContent('checkbox');
+                            var isChecked = false;
+                            if (masterCheckbox) {
+                                isChecked = masterCheckbox.isChecked();
+                            }
+                            webix.confirm({
+                                'text': 'Disabling ' + grid.selectionCounter + ' items<br/> Are you sure?',
+                                'ok': 'Yes',
+                                'cancel': 'Cancel',
+                                'callback': function(res) {
+                                    if (res) {
+                                        if (isChecked) {
+                                            console.log('Send disable all');
                                             ncClient.sendMessageAsync('objects/admin.session/element_action', {
                                                 element_id: '", TableId/binary, "',
-                                                action: 'disable',
+                                                action: 'disable_all',
                                                 value: {
-                                                    ids: ids
+                                                    filter: grid.nkGetFilters()
                                                 }
                                             }).then(function(response) {
                                                 // Disable OK
@@ -516,15 +500,45 @@ toolbar_disable(TableId, Session) ->
                                                 grid.nkRefresh();
                                             });
                                         } else {
-                                            grid.nkUnselectAll();
+                                            console.log('Send disable N', grid.selectedItems);
+                                            var ids = [];
+                                            for (var id in grid.selectedItems) {
+                                                ids.push(id);
+                                            }
+                                            if (ids.length > 0) {
+                                                grid.showProgress();
+                                                ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                                    element_id: '", TableId/binary, "',
+                                                    action: 'disable',
+                                                    value: {
+                                                        ids: ids
+                                                    }
+                                                }).then(function(response) {
+                                                    // Disable OK
+                                                    webix.message('Items disabled');
+                                                }).catch(function(response) {
+                                                    // Disable Error
+                                                    console.log('ERROR: at disable', response);
+                                                    if (response.data) {
+                                                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                                    }
+                                                }).then(function(response) {
+                                                    // Finally
+                                                    grid.hideProgress();
+                                                    grid.nkUnselectAll();
+                                                    grid.nkRefresh();
+                                                });
+                                            } else {
+                                                grid.nkUnselectAll();
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
-                }
-            ">>
+                ">>
+            }
         }
     }.
 
@@ -539,59 +553,31 @@ toolbar_enable(TableId, Session) ->
            <span title='", Tooltip/binary, "' style='cursor:pointer;' class='webix_icon fa-circle-thin'></span>
         ">>,
         onClick => #{
-            <<"fa-circle-thin">> => <<"
-                function() {
-                    // Enable selection
-                    var grid = $$('", TableId/binary, "');
-                    if (grid) {
-                        console.log('enable button clicked!', grid.selectionCounter, grid.selectedItems);
-                        var masterCheckbox = grid.getHeaderContent('checkbox');
-                        var isChecked = false;
-                        if (masterCheckbox) {
-                            isChecked = masterCheckbox.isChecked();
-                        }
-                        webix.confirm({
-                            'text': 'Enabling ' + grid.selectionCounter + ' items<br/> Are you sure?',
-                            'ok': 'Yes',
-                            'cancel': 'Cancel',
-                            'callback': function(res) {
-                                if (res) {
-                                    if (isChecked) {
-                                        console.log('Send enable all');
-                                        ncClient.sendMessageAsync('objects/admin.session/element_action', {
-                                            element_id: '", TableId/binary, "',
-                                            action: 'enable_all',
-                                            value: {
-                                                filter: grid.nkGetFilters()
-                                            }
-                                        }).then(function(response) {
-                                            // Enable OK
-                                            webix.message('Items enabled');
-                                        }).catch(function(response) {
-                                            // Enable Error
-                                            console.log('ERROR: at enable', response);
-                                            if (response.data) {
-                                                webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
-                                            }
-                                        }).then(function(response) {
-                                            // Finally
-                                            grid.hideProgress();
-                                            grid.nkUnselectAll();
-                                            grid.nkRefresh();
-                                        });
-                                    } else {
-                                        console.log('Send enable N', grid.selectedItems);
-                                        var ids = [];
-                                        for (var id in grid.selectedItems) {
-                                            ids.push(id);
-                                        }
-                                        if (ids.length > 0) {
-                                            grid.showProgress();
+            <<"fa-circle-thin">> => #{
+                nkParseFunction => <<"
+                    function() {
+                        // Enable selection
+                        var grid = $$('", TableId/binary, "');
+                        if (grid) {
+                            console.log('enable button clicked!', grid.selectionCounter, grid.selectedItems);
+                            var masterCheckbox = grid.getHeaderContent('checkbox');
+                            var isChecked = false;
+                            if (masterCheckbox) {
+                                isChecked = masterCheckbox.isChecked();
+                            }
+                            webix.confirm({
+                                'text': 'Enabling ' + grid.selectionCounter + ' items<br/> Are you sure?',
+                                'ok': 'Yes',
+                                'cancel': 'Cancel',
+                                'callback': function(res) {
+                                    if (res) {
+                                        if (isChecked) {
+                                            console.log('Send enable all');
                                             ncClient.sendMessageAsync('objects/admin.session/element_action', {
                                                 element_id: '", TableId/binary, "',
-                                                action: 'enable',
+                                                action: 'enable_all',
                                                 value: {
-                                                    ids: ids
+                                                    filter: grid.nkGetFilters()
                                                 }
                                             }).then(function(response) {
                                                 // Enable OK
@@ -609,15 +595,45 @@ toolbar_enable(TableId, Session) ->
                                                 grid.nkRefresh();
                                             });
                                         } else {
-                                            grid.nkUnselectAll();
+                                            console.log('Send enable N', grid.selectedItems);
+                                            var ids = [];
+                                            for (var id in grid.selectedItems) {
+                                                ids.push(id);
+                                            }
+                                            if (ids.length > 0) {
+                                                grid.showProgress();
+                                                ncClient.sendMessageAsync('objects/admin.session/element_action', {
+                                                    element_id: '", TableId/binary, "',
+                                                    action: 'enable',
+                                                    value: {
+                                                        ids: ids
+                                                    }
+                                                }).then(function(response) {
+                                                    // Enable OK
+                                                    webix.message('Items enabled');
+                                                }).catch(function(response) {
+                                                    // Enable Error
+                                                    console.log('ERROR: at enable', response);
+                                                    if (response.data) {
+                                                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+                                                    }
+                                                }).then(function(response) {
+                                                    // Finally
+                                                    grid.hideProgress();
+                                                    grid.nkUnselectAll();
+                                                    grid.nkRefresh();
+                                                });
+                                            } else {
+                                                grid.nkUnselectAll();
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
-                }
-            ">>
+                ">>
+            }
         }
     }.
 
@@ -670,181 +686,185 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         url => <<"wsProxy->">>,
         save => <<"wsProxy->">>,
         % onClick => make_on_click(TableId, Spec),
-        ready => <<"
-            function() {
-                webix.extend(this, webix.ProgressBar);
-                var grid = $$('", TableId/binary, "');
-                if (grid) {
-                    var masterCheckbox = grid.getHeaderContent('checkbox');
-                    if (masterCheckbox) {
-                        // attach an event to customMasterCheckbox;
-                        masterCheckbox.setOnClickListener(", OnMasterCheckboxClick/binary, ");
-                    }
-                    grid.selectedItems = {};
-                    grid.selectionCounter = 0;
-                    grid.nkQueryFilters = {};
-                    grid.nkGetSelection = function() {
-                        var grid = $$('", TableId/binary, "');
-                        var selectionCounter = 0;
-                        var selectedItems = {};
-                        if (grid) {
-                            selectionCounter = grid.selectionCounter;
-                            selectedItems = grid.selectedItems;
+        ready => #{
+            nkParseFunction => <<"
+                function() {
+                    webix.extend(this, webix.ProgressBar);
+                    var grid = $$('", TableId/binary, "');
+                    if (grid) {
+                        var masterCheckbox = grid.getHeaderContent('checkbox');
+                        if (masterCheckbox) {
+                            // attach an event to customMasterCheckbox;
+                            masterCheckbox.setOnClickListener(", OnMasterCheckboxClick/binary, ");
                         }
-                        return {
-                            selectionCounter: selectionCounter,
-                            selectedItems: selectedItems
-                        }
-                    }
-                    grid.nkSelectItem = function(id) {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            if (!grid.selectedItems.hasOwnProperty(id)) {
-                                grid.selectionCounter += 1;
-                                grid.selectedItems[id] = id;
+                        grid.selectedItems = {};
+                        grid.selectionCounter = 0;
+                        grid.nkQueryFilters = {};
+                        grid.nkGetSelection = function() {
+                            var grid = $$('", TableId/binary, "');
+                            var selectionCounter = 0;
+                            var selectedItems = {};
+                            if (grid) {
+                                selectionCounter = grid.selectionCounter;
+                                selectedItems = grid.selectedItems;
                             }
-                            grid.nkUpdateView();
-                        }
-                    }
-                    grid.nkSelectAll = function(counter) {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            grid.selectionCounter = counter;
-                            grid.selectedItems = {};
-                            grid.nkUpdateView();
-                        }
-                    }
-                    grid.nkUnselectItem = function(id) {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            if (grid.selectedItems.hasOwnProperty(id)) {
-                                grid.selectionCounter = grid.selectionCounter > 0? grid.selectionCounter - 1 : 0;
-                                delete grid.selectedItems[id];
-                            }
-                            grid.nkUpdateView();
-                        }
-                    }
-                    grid.nkUnselectAll = function() {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            var masterCheckbox = grid.getHeaderContent('checkbox');
-                            if (masterCheckbox) {
-                                masterCheckbox.uncheck();
+                            return {
+                                selectionCounter: selectionCounter,
+                                selectedItems: selectedItems
                             }
                         }
-                    }
-                    grid.nkUnselectAllButCheckboxes = function() {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            grid.selectionCounter = 0;
-                            grid.selectedItems = {};
-                            grid.nkUpdateView();
+                        grid.nkSelectItem = function(id) {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                if (!grid.selectedItems.hasOwnProperty(id)) {
+                                    grid.selectionCounter += 1;
+                                    grid.selectedItems[id] = id;
+                                }
+                                grid.nkUpdateView();
+                            }
                         }
-                    }
-                    grid.nkUpdateView = function() {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            console.log('Updating view:', grid.selectionCounter, grid.selectedItems);
-                            if (grid.selectionCounter > 0) {
-                                // There are items selected
-                                // Modify the counter
-                                var label = $$('", SelectedLabelId/binary, "');
-                                // TODO: Replace some special character with the counter instead of concatenating it with our string
-                                label.setValue(grid.selectionCounter + label.data.data.text);
-                                // Show possible actions
-                                $$('", SelectedId/binary, "').show();
-                                $$('", EnableIconId/binary, "').show();
-                                $$('", DisableIconId/binary, "').show();
-                                $$('", DeleteIconId/binary, "').show();
-                                // Hide normal buttons
-                                $$('", RealTimeButtonId/binary, "').hide();
-                                $$('", RefreshButtonId/binary, "').hide();
-                                $$('", NewButtonId/binary, "').hide();
+                        grid.nkSelectAll = function(counter) {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                grid.selectionCounter = counter;
+                                grid.selectedItems = {};
+                                grid.nkUpdateView();
+                            }
+                        }
+                        grid.nkUnselectItem = function(id) {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                if (grid.selectedItems.hasOwnProperty(id)) {
+                                    grid.selectionCounter = grid.selectionCounter > 0? grid.selectionCounter - 1 : 0;
+                                    delete grid.selectedItems[id];
+                                }
+                                grid.nkUpdateView();
+                            }
+                        }
+                        grid.nkUnselectAll = function() {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                var masterCheckbox = grid.getHeaderContent('checkbox');
+                                if (masterCheckbox) {
+                                    masterCheckbox.uncheck();
+                                }
+                            }
+                        }
+                        grid.nkUnselectAllButCheckboxes = function() {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                grid.selectionCounter = 0;
+                                grid.selectedItems = {};
+                                grid.nkUpdateView();
+                            }
+                        }
+                        grid.nkUpdateView = function() {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                console.log('Updating view:', grid.selectionCounter, grid.selectedItems);
+                                if (grid.selectionCounter > 0) {
+                                    // There are items selected
+                                    // Modify the counter
+                                    var label = $$('", SelectedLabelId/binary, "');
+                                    // TODO: Replace some special character with the counter instead of concatenating it with our string
+                                    label.setValue(grid.selectionCounter + label.data.data.text);
+                                    // Show possible actions
+                                    $$('", SelectedId/binary, "').show();
+                                    $$('", EnableIconId/binary, "').show();
+                                    $$('", DisableIconId/binary, "').show();
+                                    $$('", DeleteIconId/binary, "').show();
+                                    // Hide normal buttons
+                                    $$('", RealTimeButtonId/binary, "').hide();
+                                    $$('", RefreshButtonId/binary, "').hide();
+                                    $$('", NewButtonId/binary, "').hide();
+                                } else {
+                                    // There aren't any items selected
+                                    // Hide possible actions
+                                    $$('", SelectedId/binary, "').hide();
+                                    $$('", EnableIconId/binary, "').hide();
+                                    $$('", DisableIconId/binary, "').hide();
+                                    $$('", DeleteIconId/binary, "').hide();
+                                    // Show normal buttons
+                                    $$('", RealTimeButtonId/binary, "').show();
+                                    $$('", RefreshButtonId/binary, "').show();
+                                    $$('", NewButtonId/binary, "').show();
+                                }
+                            }
+                        }
+                        grid.nkIsSelectedItem = function(id) {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                var masterCheckbox = grid.getHeaderContent('checkbox');
+                                if (masterCheckbox && masterCheckbox.isChecked()) {
+                                    return true;
+                                } else {
+                                    return grid.selectedItems.hasOwnProperty(id);
+                                }
+                            }
+                        }
+                        grid.nkUpdateFilters = function(filters) {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                grid.nkQueryFilters = filters ? filters : {};
+                            }
+                        }
+                        grid.nkGetFilters = function() {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                return grid.nkQueryFilters;
                             } else {
-                                // There aren't any items selected
-                                // Hide possible actions
-                                $$('", SelectedId/binary, "').hide();
-                                $$('", EnableIconId/binary, "').hide();
-                                $$('", DisableIconId/binary, "').hide();
-                                $$('", DeleteIconId/binary, "').hide();
-                                // Show normal buttons
-                                $$('", RealTimeButtonId/binary, "').show();
-                                $$('", RefreshButtonId/binary, "').show();
-                                $$('", NewButtonId/binary, "').show();
+                                return {};
                             }
                         }
-                    }
-                    grid.nkIsSelectedItem = function(id) {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            var masterCheckbox = grid.getHeaderContent('checkbox');
-                            if (masterCheckbox && masterCheckbox.isChecked()) {
-                                return true;
+                        grid.nkRefresh = function() {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid) {
+                                grid.filterByAll();
+                            }
+                        }
+                        grid.nkSetInterval = function(value) {
+                            var grid = $$(\"", TableId/binary, "\");
+                            // Subscribe/Unsubscribe to real time updates
+                            if (grid) {
+                                clearInterval(grid.nkInterval);
+                                if (value) {
+                                    grid.nkInterval = setInterval(grid.nkRefresh, value);
+                                }
+                            }
+                        }
+                        grid.nkClearInterval = function() {
+                            var grid = $$(\"", TableId/binary, "\");
+                            if (grid) {
+                                clearInterval(grid.nkInterval);
+                            }
+                        }
+                        var realTimeCheckbox = $$('", RealTimeCheckboxId/binary, "');
+                        var realTimeCombo = $$('", RealTimeComboId/binary, "');
+                        if (realTimeCheckbox && realTimeCombo) {
+                            if (realTimeCheckbox.getValue()) {
+                                grid.nkSetInterval(realTimeCombo.getValue());
                             } else {
-                                return grid.selectedItems.hasOwnProperty(id);
+                                realTimeCombo.disable();
                             }
-                        }
-                    }
-                    grid.nkUpdateFilters = function(filters) {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            grid.nkQueryFilters = filters ? filters : {};
-                        }
-                    }
-                    grid.nkGetFilters = function() {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            return grid.nkQueryFilters;
-                        } else {
-                            return {};
-                        }
-                    }
-                    grid.nkRefresh = function() {
-                        var grid = $$('", TableId/binary, "');
-                        if (grid) {
-                            grid.filterByAll();
-                        }
-                    }
-                    grid.nkSetInterval = function(value) {
-                        var grid = $$(\"", TableId/binary, "\");
-                        // Subscribe/Unsubscribe to real time updates
-                        if (grid) {
-                            clearInterval(grid.nkInterval);
-                            if (value) {
-                                grid.nkInterval = setInterval(grid.nkRefresh, value);
-                            }
-                        }
-                    }
-                    grid.nkClearInterval = function() {
-                        var grid = $$(\"", TableId/binary, "\");
-                        if (grid) {
-                            clearInterval(grid.nkInterval);
-                        }
-                    }
-                    var realTimeCheckbox = $$('", RealTimeCheckboxId/binary, "');
-                    var realTimeCombo = $$('", RealTimeComboId/binary, "');
-                    if (realTimeCheckbox && realTimeCombo) {
-                        if (realTimeCheckbox.getValue()) {
-                            grid.nkSetInterval(realTimeCombo.getValue());
-                        } else {
-                            realTimeCombo.disable();
                         }
                     }
                 }
-            }
-        ">>,
+            ">>
+        },
         type => #{
-            silentCheckbox => <<"
-                function(obj, common, value, config) {
-                    var checked = (value == config.checkValue) ? 'checked=\"true\"' : '';
-                    var master = config.header;
-                    if (master && master[0] && master[0].checked !== undefined && master[0].checked) {
-                        return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\" disabled>\";
-                    } else {
-                        return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\">\";
+            silentCheckbox => #{
+                nkParseFunction => <<"
+                    function(obj, common, value, config) {
+                        var checked = (value == config.checkValue) ? 'checked=\"true\"' : '';
+                        var master = config.header;
+                        if (master && master[0] && master[0].checked !== undefined && master[0].checked) {
+                            return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\" disabled>\";
+                        } else {
+                            return \"<input class='webix_silent_checkbox' type='checkbox' \"+checked+\">\";
+                        }
                     }
-                }
-        ">>
+                ">>
+            }
         },
         on => #{
             <<"onBeforeLoad">> => on_before_load(),
@@ -954,11 +974,13 @@ column(Id, date, Name, Column, Session) ->
         ],
         fillspace => Fillspace,
         minWidth => <<"100">>,
-        format => <<"
-            function(value) {   // 'en-US', 'es-ES', etc.
+        format => #{
+            nkParseFunction => <<"
+                function(value) {   // 'en-US', 'es-ES', etc.
                     return (new Date(value)).toLocaleString();
-            }
-        ">>
+                }
+            ">>
+        }
     };
 
 column(Id, {icon, Icon}, _Name, _Column, _Session) ->
@@ -1018,189 +1040,202 @@ make_on_click(TableId, [#{id:=Id, type:=Type}=OnClick|Rest], Acc) ->
 %% @private
 on_click(TableId, Id, delete, _OnClick, Acc) ->
     Acc#{
-        Id => <<"
-            function(e, id, node) {
-                webix.confirm({
-                    \"text\": \"This object will be deleted. <br/> Are you sure?\",
-                    \"ok\": \"Yes\",
-                    \"cancel\": \"Cancel\",
-                    \"callback\": function(res) {
-                        if(res) {
-                            $$(\"", TableId/binary, "\").remove(id);
+        Id => #{
+            nkParseFunction => <<"
+                function(e, id, node) {
+                    webix.confirm({
+                        \"text\": \"This object will be deleted. <br/> Are you sure?\",
+                        \"ok\": \"Yes\",
+                        \"cancel\": \"Cancel\",
+                        \"callback\": function(res) {
+                            if(res) {
+                                $$(\"", TableId/binary, "\").remove(id);
+                            }
                         }
-                    }
-                });
-            }
-        ">>
+                    });
+                }
+            ">>
+        }
     };
 
 on_click(TableId, Id, disable, _OnClick, Acc) ->
     Acc#{
-        Id => <<"
-            function(e, id, node) {
-                // id === { row: obj_id, column: column_id };
-                webix.confirm({
-                    \"text\": \"This object will be disabled. <br/> Are you sure?\",
-                    \"ok\": \"Yes\",
-                    \"cancel\": \"Cancel\",
-                    \"callback\": function(res) {
-                        if (res) {
-                            var grid = $$(\"", TableId/binary, "\");
-                            ncClient.sendMessageAsync(\"objects/admin.session/element_action\", {
-                                element_id: \"", TableId/binary, "\",
-                                action: \"disabled\",
-                                value: {
-                                    obj_id: id.row
+        Id => #{
+            nkParseFunction => <<"
+                function(e, id, node) {
+                    // id === { row: obj_id, column: column_id };
+                    webix.confirm({
+                        \"text\": \"This object will be disabled. <br/> Are you sure?\",
+                        \"ok\": \"Yes\",
+                        \"cancel\": \"Cancel\",
+                        \"callback\": function(res) {
+                            if (res) {
+                                var grid = $$(\"", TableId/binary, "\");
+                                ncClient.sendMessageAsync(\"objects/admin.session/element_action\", {
+                                    element_id: \"", TableId/binary, "\",
+                                    action: \"disabled\",
+                                    value: {
+                                        obj_id: id.row
+                                    }
+                                });
+                                // Remove this lines (the state of the row will be changed by an event)
+                                if(grid) {
+                                    grid.addRowCss(id, \"webix_cell_disabled\");
+                                    grid.getItem(id).enabled_icon = \"fa-check\";
+                                    grid.refresh(id);
                                 }
-                            });
-                            // Remove this lines (the state of the row will be changed by an event)
-                            if(grid) {
-                                grid.addRowCss(id, \"webix_cell_disabled\");
-                                grid.getItem(id).enabled_icon = \"fa-check\";
-                                grid.refresh(id);
                             }
                         }
-                    }
-                });
-            }
-        ">>
+                    });
+                }
+            ">>
+        }
     };
 
 on_click(TableId, Id, enable, _OnClick, Acc) ->
     Acc#{
-        Id => <<"
-            function(e, id, node) {
-                // id === { row: obj_id, column: column_id };
-                webix.confirm({
-                    text: \"This object will be enabled. <br/> Are you sure?\",
-                    ok: \"Yes\",
-                    cancel: \"Cancel\",
-                    callback: function(res) {
-                        if (res) {
-                            var grid = $$(\"", TableId/binary, "\");
-                            ncClient.sendMessageAsync(\"objects/admin.session/element_action\", {
-                                element_id: \"", TableId/binary, "\",
-                                action: \"enabled\",
-                                value: {
-                                    obj_id: id.row
+        Id => #{
+            nkParseFunction => <<"
+                function(e, id, node) {
+                    // id === { row: obj_id, column: column_id };
+                    webix.confirm({
+                        text: \"This object will be enabled. <br/> Are you sure?\",
+                        ok: \"Yes\",
+                        cancel: \"Cancel\",
+                        callback: function(res) {
+                            if (res) {
+                                var grid = $$(\"", TableId/binary, "\");
+                                ncClient.sendMessageAsync(\"objects/admin.session/element_action\", {
+                                    element_id: \"", TableId/binary, "\",
+                                    action: \"enabled\",
+                                    value: {
+                                        obj_id: id.row
+                                    }
+                                });
+                                // Remove this lines (the state of the row will be changed by an event)
+                                if(grid) {
+                                    grid.removeRowCss(id, \"webix_cell_disabled\");
+                                    grid.getItem(id).enabled_icon = \"fa-times\";
+                                    grid.refresh(id);
                                 }
-                            });
-                            // Remove this lines (the state of the row will be changed by an event)
-                            if(grid) {
-                                grid.removeRowCss(id, \"webix_cell_disabled\");
-                                grid.getItem(id).enabled_icon = \"fa-times\";
-                                grid.refresh(id);
                             }
                         }
-                    }
-                });
-            }
-        ">>
+                    });
+                }
+            ">>
+        }
     };
 
 on_click(_TableId, Id, silent_checkbox, _OnClick, Acc) ->
     Acc#{
-        Id => <<"
-            function(e, id) {
-                // same code uses the default checkbox, but the update part is removed
-                id = this.locate(e);
-                
-                var item = this.getItem(id.row);
-                var col = this.getColumnConfig(id.column);
-                var trg = e.target|| e.srcElement;
-                var check = (trg.type == 'checkbox')? trg.checked : (item[id.column] != col.checkValue);
-                var value = check ? col.checkValue : col.uncheckValue;
-                // Save this change silently into the cached data (without sending this change to the server)
-                item[id.column] = value;
-                this.refresh(id.row);
-                // Call the onCheck listener
-                this.callEvent('onCheck', [id.row, id.column, value]);
-                return false;
-            }
-        ">>
+        Id => #{
+            nkParseFunction => <<"
+                function(e, id) {
+                    // same code uses the default checkbox, but the update part is removed
+                    id = this.locate(e);
+
+                    var item = this.getItem(id.row);
+                    var col = this.getColumnConfig(id.column);
+                    var trg = e.target|| e.srcElement;
+                    var check = (trg.type == 'checkbox')? trg.checked : (item[id.column] != col.checkValue);
+                    var value = check ? col.checkValue : col.uncheckValue;
+                    // Save this change silently into the cached data (without sending this change to the server)
+                    item[id.column] = value;
+                    this.refresh(id.row);
+                    // Call the onCheck listener
+                    this.callEvent('onCheck', [id.row, id.column, value]);
+                    return false;
+                }
+            ">>
+        }
     }.
 
 
 %% @private
 on_before_load() ->
-    <<"
-        function() {
-            webix.ui.datafilter.customFilter2 = {
-                refresh: function(master, node, column) {
-                    node.onchange = function() {};
-                    node.onclick = function(e) {
-                        // Prevent the column from changing the order when clicking the filter
-                        e.stopPropagation();
-                    };
-                },
-                render: function(a, b) {
-                    return  \"<select style='width:100%; height:25px; font-family:Verdana'; id=\"+b.columnId+\">\" +
-                            \"<option>Old</option>\" +
-                            \"<option>New</option>\" +
-                            \"</select>\";
-                }
-            };
-            webix.ui.datafilter.extendedFilter2 = webix.extend({
-                refresh:function(master, node, column){
-                    //event handlers
-                    node.onclick = function(e) {
-                        // Prevent the column from changing the order when clicking the filter
-                        e.stopPropagation();
-                    };
-                    node.onkeyup = function(){
-                        let input = this.children[0].children[0];
-                        if (input.prevValue !== input.value) {
-                            console.log('Filter ' + column.columnId + ' changed: ' + input.value);
-                            master.clearAll();
-                            let newObj =
-                            {
-                                id: 1,
-                                uuid: 123456789,
-                                parentUuid: 987654321,
-                                type: 0,
-                                typeName: \"User\",
-                                shortName: \"user\",
-                                enabled: true,
-                                enabledIcon: \"fa-check\"
-                            };
-                            if (column.columnId === 'id') {
-                                newObj.id = input.value;
-                            } else if (column.columnId === 'uuid') {
-                                newObj.uuid = input.value;
-                            } else if (column.columnId === 'parentUuid') {
-                                newObj.parentUuid = input.value;
-                            } else if (column.columnId === 'typeName') {
-                                newObj.typeName = input.value;
-                            } else if (column.columnId === 'shortName') {
-                                newObj.shortName = input.value;
-                            }
-                            master.add(newObj, 0);
+    #{
+        nkParseFunction => <<"
+            function() {
+                webix.ui.datafilter.customFilter2 = {
+                    refresh: function(master, node, column) {
+                        node.onchange = function() {};
+                        node.onclick = function(e) {
+                            // Prevent the column from changing the order when clicking the filter
+                            e.stopPropagation();
                         };
-                        input.prevValue = input.value;
+                    },
+                    render: function(a, b) {
+                        return  \"<select style='width:100%; height:25px; font-family:Verdana'; id=\"+b.columnId+\">\" +
+                                \"<option>Old</option>\" +
+                                \"<option>New</option>\" +
+                                \"</select>\";
                     }
-                }
-            }, webix.ui.datafilter.textFilter);
-        }
-    ">>.
+                };
+                webix.ui.datafilter.extendedFilter2 = webix.extend({
+                    refresh:function(master, node, column){
+                        //event handlers
+                        node.onclick = function(e) {
+                            // Prevent the column from changing the order when clicking the filter
+                            e.stopPropagation();
+                        };
+                        node.onkeyup = function(){
+                            let input = this.children[0].children[0];
+                            if (input.prevValue !== input.value) {
+                                console.log('Filter ' + column.columnId + ' changed: ' + input.value);
+                                master.clearAll();
+                                let newObj =
+                                {
+                                    id: 1,
+                                    uuid: 123456789,
+                                    parentUuid: 987654321,
+                                    type: 0,
+                                    typeName: \"User\",
+                                    shortName: \"user\",
+                                    enabled: true,
+                                    enabledIcon: \"fa-check\"
+                                };
+                                if (column.columnId === 'id') {
+                                    newObj.id = input.value;
+                                } else if (column.columnId === 'uuid') {
+                                    newObj.uuid = input.value;
+                                } else if (column.columnId === 'parentUuid') {
+                                    newObj.parentUuid = input.value;
+                                } else if (column.columnId === 'typeName') {
+                                    newObj.typeName = input.value;
+                                } else if (column.columnId === 'shortName') {
+                                    newObj.shortName = input.value;
+                                }
+                                master.add(newObj, 0);
+                            };
+                            input.prevValue = input.value;
+                        }
+                    }
+                }, webix.ui.datafilter.textFilter);
+            }
+        ">>
+    }.
 
 %% @private
 on_check(TableId) ->
-    <<"
-        function(row, col, val) {
-            console.log('Checkbox: ', row, col, val);
-            var grid = $$('", TableId/binary, "');
-            if (grid) {
-                if (val) {
-                    grid.nkSelectItem(row);
-                } else {
-                    grid.nkUnselectItem(row);
+    #{
+        nkParseFunction => <<"
+            function(row, col, val) {
+                console.log('Checkbox: ', row, col, val);
+                var grid = $$('", TableId/binary, "');
+                if (grid) {
+                    if (val) {
+                        grid.nkSelectItem(row);
+                    } else {
+                        grid.nkUnselectItem(row);
+                    }
                 }
             }
-        }
-    ">>.
+        ">>
+    }.
 
 %% @private
 on_master_checkbox_click(TableId) ->
+    % this listener will be included in an already parsed function
     <<"
         function(value, counter) {
             console.log('Master checkbox: ', value, counter);
@@ -1219,44 +1254,17 @@ on_master_checkbox_click(TableId) ->
 
 %% @private
 on_store_updated() ->
-    <<"
-        function() {
-            this.data.each(function(obj, i) {
-                if (obj !== undefined) {
-                    obj.index = i+1;
-                }
-            })
-        }
-    ">>.
-
-%%%% @private
-%%fake_delay(TableId) ->
-%%    SelectedId = append_id(TableId, <<"selected">>),
-%%    RealTimeButtonId = append_id(TableId, <<"real_time">>),
-%%    RefreshButtonId = append_id(TableId, <<"refresh">>),
-%%    NewButtonId = append_id(TableId, <<"new">>),
-%%    DeleteIconId = append_id(TableId, <<"delete">>),
-%%    DisableIconId = append_id(TableId, <<"disable">>),
-%%    <<"
-%%        function() {
-%%            var grid = $$(\"", TableId/binary, "\");
-%%            grid.showProgress();
-%%            webix.delay(function() {
-%%                grid.hideProgress();
-%%                // There are items selected
-%%                // Show possible actions
-%%                $$('", SelectedId/binary,  "').show();
-%%                $$('", DeleteIconId/binary,  "').show();
-%%                $$('", DisableIconId/binary,  "').show();
-%%                // Hide normal buttons
-%%                $$('", RealTimeButtonId/binary,  "').hide();
-%%                $$('", RefreshButtonId/binary,  "').hide();
-%%                $$('", NewButtonId/binary,  "').hide();
-%%            }, null, null, 300);
-%%        }
-%%    ">>.
-
-
+    #{
+        nkParseFunction => <<"
+            function() {
+                this.data.each(function(obj, i) {
+                    if (obj !== undefined) {
+                        obj.index = i+1;
+                    }
+                })
+            }
+        ">>
+    }.
 
 %% @private
 append_id(TableId, Id) ->

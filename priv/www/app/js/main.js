@@ -1002,7 +1002,9 @@
         function updateDetail(elem) {
             console.log("updateDetail: ", elem);
             if (elem && elem.value && elem.value.class === 'webix_ui' && elem.value.value) {
+                console.log("Parsing JSON: ", JSON.stringify(elem.value.value));
                 parseJSONFunctions(elem.value.value);
+                console.log("Result JSON: ", JSON.stringify(elem.value.value));
                 replaceBody(elem.value.value);
                 console.log("Detail updated!", elem.value.value);
             } else if (elem && elem.value && isEmpty(elem.value)) {
@@ -1055,7 +1057,12 @@
             let component = $$(componentId);
 
             if (component) {
-                webix.ui(newJson, component);
+                try {
+                    webix.ui(newJson, component);
+                } catch(e) {
+                    console.log("ERROR in replaceComponent: component ID ", componentId, newJson);
+                    throw(e);
+                }
             } else {
                 console.log("ERROR in replaceComponent: component ID " + componentId + " not found");
             }
@@ -1065,9 +1072,14 @@
             let component = $$(componentId);
             let parent = $$(parentId);
             if (component && parent) {
-                webix.ui(newJson, parent, component);
+                try {
+                    webix.ui(newJson, parent, component);
+                } catch(e) {
+                    console.log("ERROR in replaceComponentWithParent: component ID ", componentId, parentId, newJson);
+                    throw(e);
+                }
             } else {
-                console.log("ERROR in replaceComponent: component ID " + componentId + " or parent ID " + parentId + " not found");
+                console.log("ERROR in replaceComponentWithParent: component ID " + componentId + " or parent ID " + parentId + " not found");
             }
         }
 
@@ -1784,14 +1796,28 @@
                 }
             } else {
                 let value;
-                for (property in json) {
-                    if (json.hasOwnProperty(property)) {
-                        value = json[property];
-                        if (value && typeof value === "object") {
-                            parseJSONFunctions(json[property]);
-                        } else if (value && typeof value === "string" && value.trim().startsWith("function")) {
-                            console.log("Substituting property '" + property + "' with its evaluated javascript code: '" + value + "'");
-                            json[property] = eval('(' + value + ')');
+                let child;
+                if (json && typeof json === "object") {
+                    for (child in json) {
+                        if (json.hasOwnProperty(child)
+                        && json[child] && typeof json[child] === "object") {
+                            if (json[child].hasOwnProperty("nkParseFunction")) {
+                                value = json[child]["nkParseFunction"];
+                                if (value && typeof value === "string" && value.trim().startsWith("function")) {
+                                    console.log("Substituting object with its evaluated javascript code: '" + value + "'");
+                                    json[child] = eval('(' + value + ')');
+                                } else {
+                                    console.log("ERROR: in parseJSONFunctions, unknown format", json[child]);
+                                }
+                            } else if (json[child].hasOwnProperty("nkFormatDate")) {
+                                value = json[child]["nkFormatDate"];
+                                // TODO: Add date parsing to current locale
+                            } else {
+                                parseJSONFunctions(json[child]);
+                            }
+                        } else if (json.hasOwnProperty(child) && typeof json[child] === "string" && json[child].trim().startsWith("function")) {
+                            alert("WARNING: Old function format found");
+                            console.log("WARNING: Old function format found");
                         }
                     }
                 }
