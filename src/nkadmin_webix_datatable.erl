@@ -213,6 +213,8 @@ toolbar_selected_elements(TableId, Session) ->
     }.
 
 toolbar_refresh(TableId, Session) ->
+    RealTimeId = append_id(TableId, <<"real_time">>),
+    RealTimeCheckboxId = append_id(RealTimeId, <<"checkbox">>),
     #{
         view => <<"button">>,
         id => append_id(TableId, <<"refresh">>),
@@ -225,6 +227,11 @@ toolbar_refresh(TableId, Session) ->
                 function() {
                     var grid = $$(\"", TableId/binary, "\");
                     if (grid) {
+                        var checkbox = $$(\"", RealTimeCheckboxId/binary, "\");
+                        if (checkbox) {
+                            // uncheck real time checkbox
+                            checkbox.setValue(0);
+                        }
                         grid.nkRefresh();
                     }
                 }
