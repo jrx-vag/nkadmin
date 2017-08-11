@@ -133,6 +133,10 @@ textarea.webix_invalid {
 	content: "/";
 }
 
+.webix_img_btn__centered > div > button {
+	text-align: center;
+}
+
 /*****************************************/
 
 /************** FAB BUTTON ***************/
