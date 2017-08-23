@@ -41,7 +41,8 @@
     url_to_key = #{} :: #{Url::binary() => Key::binary()},
     db_types = [] :: [nkdomain:type()],                                     % Types used in db now
     resources = [] :: [nkdomain:type()],
-    sessions = [] :: #{nkdomain:type() => integer()}
+    sessions = [] :: #{nkdomain:type() => integer()},
+    reg_pids = #{} :: #{pid()=>[domain|nkdomain:obj_id()]}
 }).
 
 
