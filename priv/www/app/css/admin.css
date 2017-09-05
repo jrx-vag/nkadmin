@@ -369,8 +369,20 @@ _toolbar-title {
 }
 
 .custom_datatable .custom_datatable_hover {
-    background: rgba(0, 0, 0, 0.13);
+	background: rgba(0, 0, 0, 0.13);
     cursor: pointer;
+}
+
+/* Row State */
+/*
+.enabled_row {
+	color: #B2ADAD;
+	background-color: #FAFAFA;
+}
+*/
+.disabled_row {
+	color: #B2ADAD;
+	background-color: #FAFAFA;
 }
 
 /* Row Actions */

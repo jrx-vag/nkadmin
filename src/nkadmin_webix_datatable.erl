@@ -692,6 +692,21 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         export => true,
         url => <<"wsProxy->">>,
         save => <<"wsProxy->">>,
+        scheme => #{
+            <<"$change">> => #{
+                nkParseFunction => <<"
+                    function(item) {
+                        if (item.enabled === null
+                            || item.enabled === undefined
+                            || item.enabled === true) {
+                            item.$css = 'enabled_row';
+                        } else {
+                            item.$css = 'disabled_row';
+                        }
+                    }
+                ">>
+            }
+        },
         % onClick => make_on_click(TableId, Spec),
         ready => #{
             nkParseFunction => <<"
