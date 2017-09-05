@@ -841,8 +841,9 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                         }
                         grid.nkClearInterval = function() {
                             var grid = $$(\"", TableId/binary, "\");
-                            if (grid) {
+                            if (grid && grid['nkInterval']) {
                                 clearInterval(grid.nkInterval);
+                                console.log('Interval cleared!', grid.nkInterval);
                             }
                         }
                         var realTimeCheckbox = $$('", RealTimeCheckboxId/binary, "');
@@ -875,6 +876,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         },
         on => #{
             <<"onBeforeLoad">> => on_before_load(),
+            <<"onDestruct">> => on_destruct(),
             <<"onCheck">> => on_check(TableId),
             <<"data->onStoreUpdated">> => on_store_updated()
         }
@@ -1218,6 +1220,21 @@ on_before_load() ->
                         }
                     }
                 }, webix.ui.datafilter.textFilter);
+            }
+        ">>
+    }.
+
+%% @private
+on_destruct() ->
+    #{
+        nkParseFunction => <<"
+            function() {
+                console.log('OnDestruct: ', this);
+                if (this.hasOwnProperty('nkInterval')) {
+                    console.log('OnDestruct: Found an interval');
+                    clearInterval(this.nkInterval);
+                    console.log('OnDestruct: Interval cleared');
+                }
             }
         ">>
     }.
