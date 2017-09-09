@@ -59,7 +59,7 @@ get_tree(Session) ->
 
 %% @private
 get_categories(#admin_session{srv_id=SrvId}=Session) ->
-    case SrvId:admin_tree_categories(#{}, Session) of
+    case apply(SrvId, admin_tree_categories, [#{}, Session]) of
         {ok, Categories1, Session2} ->
             Categories2 = [{Weight, Key} || {Key, Weight} <- maps:to_list(Categories1)],
             {ok, [Key || {_Weight, Key} <- lists:sort(Categories2)], Session2};
@@ -73,7 +73,7 @@ load_categories([], Acc, Session) ->
     {ok, Acc, Session};
 
 load_categories([Category|Rest], Acc, #admin_session{srv_id=SrvId}=Session) ->
-    case SrvId:admin_tree_get_category(Category, Session) of
+    case apply(SrvId, admin_tree_get_category, [Category, Session]) of
         {ok, Map, Session2} when map_size(Map)==0 ->
             load_categories(Rest, Acc, Session2);
         {ok, Map, Session2} when is_map(Map) ->

@@ -34,14 +34,14 @@
     domain_path :: nkdomain:path(),
     user_id :: nkdomain:obj_id(),
     language :: binary(),
-    detail_url = <<>> :: binary(),
+    url = <<>> :: binary(),
     detail = #{} :: map(),
-    object_tags = #{} :: #{ObjId::nkdomain:obj_id() => [Tag::term]},
-    key_data = #{} :: #{Key::binary() => term()},                         % Map client keys to data
-    url_to_key = #{} :: #{Url::binary() => Key::binary()},
-    db_types = [] :: [nkdomain:type()],                                     % Types used in db now
+    db_types = [] :: [nkdomain:type()], % Types currently used in db
     resources = [] :: [nkdomain:type()],
     sessions = [] :: #{nkdomain:type() => integer()},
+    object_tags = #{} :: #{ObjId::nkdomain:obj_id() => [Tag::term]},
+    key_data = #{} :: #{Key::binary() => term()}, % Map client keys to data
+    special_urls = #{} :: #{Url::binary() => Key::binary()}, % Special urls like "/alerts"
     reg_pids = #{} :: #{pid()=>[domain|nkdomain:obj_id()]}
 }).
 

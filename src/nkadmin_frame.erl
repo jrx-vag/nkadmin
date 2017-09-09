@@ -67,10 +67,10 @@ event(#nkevent{type = <<"updated">>, obj_id=ObjId}, Updates, Session) ->
 event(#nkevent{type = <<"deleted">>, obj_id=ObjId}, Updates, Session) ->
     case Session of
         #admin_session{domain_id=ObjId} ->
-            nkdomain:unload(any, self(), domain_deleted),
+            nkdomain:unload(self(), domain_deleted),
             {ok, Updates, Session};
         #admin_session{user_id=ObjId} ->
-            nkdomain:unload(any, self(), user_deleted),
+            nkdomain:unload(self(), user_deleted),
             {ok, Updates, Session};
         _ ->
             {ok, Updates, Session}
@@ -92,8 +92,8 @@ element_action(_ElementIdParts, _Id, _Value, _Updates, _Session) ->
 
 
 %% @private
-frame_domain(#admin_session{srv_id=SrvId, domain_id=DomainId}=Session) ->
-    case nkdomain:get_name(SrvId, DomainId) of
+frame_domain(#admin_session{domain_id=DomainId}=Session) ->
+    case nkdomain:get_name(DomainId) of
         {ok, #{name:=DomName, description:=Description}=Obj} ->
             Icon = maps:get(icon_id, Obj, <<>>),
             case DomName =:= <<>> of
@@ -114,16 +114,16 @@ frame_domain(#admin_session{srv_id=SrvId, domain_id=DomainId}=Session) ->
                     value => #{icon => Icon}
                 }
             ],
-            Session2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, Session),
-            {ok, Items, Session2};
+            % Session2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, Session),
+            {ok, Items, Session};
         {error, Error} ->
             {error, Error}
     end.
 
 
 %% @private
-frame_user(#admin_session{srv_id=SrvId, user_id=UserId}=Session) ->
-    case nkdomain_user_obj:get_name(SrvId, UserId) of
+frame_user(#admin_session{user_id=UserId}=Session) ->
+    case nkdomain_user_obj:get_name(UserId) of
         {ok, #{name:=UserName, surname:=UserSurname}=Obj} ->
             UserIconId = maps:get(icon_id, Obj, <<>>),
             Items = [
@@ -152,8 +152,8 @@ frame_user(#admin_session{srv_id=SrvId, user_id=UserId}=Session) ->
                     }
                 }
             ],
-            Session2 = nkadmin_util:add_object_tag(UserId, nkadmin_frame_user, Session),
-            {ok, Items, Session2};
+            % Session2 = nkadmin_util:add_object_tag(UserId, nkadmin_frame_user, Session),
+            {ok, Items, Session};
         {error, Error} ->
             {error, Error}
     end.

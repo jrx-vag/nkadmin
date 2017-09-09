@@ -22,7 +22,7 @@
 -export([i18n/2, menu_item/4]).
 -export([get_key_data/2, set_key_data/3, remove_key_data/2]).
 -export([update_detail/4]).
--export([get_url_key/2, set_url_key/3, remove_url_key/2]).
+-export([get_special_url/2, set_special_url/3, remove_special_url/2]).
 -export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
 
 -include("nkadmin.hrl").
@@ -103,7 +103,7 @@ update_path(Path, Updates, #admin_session{domain_path=Base}=Session) ->
           }
         | Updates
     ],
-    {Updates2, Session#admin_session{detail_url=Path}}.
+    {Updates2, Session#admin_session{url=Path}}.
 
 
 
@@ -131,20 +131,20 @@ remove_key_data(Key, #admin_session{key_data=Keys}=Session) ->
 
 
 %% @doc Maps Urls to Keys
-get_url_key(Url, #admin_session{url_to_key=Urls}) ->
+get_special_url(Url, #admin_session{special_urls=Urls}) ->
     maps:get(to_bin(Url), Urls, undefined).
 
 
 %% @doc
-set_url_key(Url, Key, #admin_session{url_to_key=Urls}=Session) ->
+set_special_url(Url, Key, #admin_session{special_urls=Urls} = Session) ->
     Urls2 = Urls#{to_bin(Url) => Key},
-    Session#admin_session{url_to_key=Urls2}.
+    Session#admin_session{special_urls=Urls2}.
 
 
 %% @doc
-remove_url_key(Url, #admin_session{url_to_key=Urls}=Session) ->
+remove_special_url(Url, #admin_session{special_urls=Urls} = Session) ->
     Urls2 = maps:remove(to_bin(Url), Urls),
-    Session#admin_session{url_to_key=Urls2}.
+    Session#admin_session{special_urls=Urls2}.
 
 
 %% @doc Associate a tag with an object
@@ -188,8 +188,8 @@ remove_object_tag(ObjId, Tag, #admin_session{object_tags=Objects}=Session) ->
 
 
 %% @private
-i18n(Key, #admin_session{language=Lang}) ->
-    case nklib_i18n:get(Key, Lang) of
+i18n(Key, #admin_session{srv_id=SrvId, language=Lang}) ->
+    case apply(SrvId, i18n, [SrvId, Key, Lang]) of
         <<>> ->
             lager:warning("Missing i18n: ~s", [Key]),
             <<>>;

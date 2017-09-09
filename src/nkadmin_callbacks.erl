@@ -146,7 +146,6 @@ admin_tree_categories(Map, Session) ->
 
 
 %% @doc Called from nkadmin_tree to get the data of a category
-%% Must return  a map with the position (lower first)
 -spec admin_tree_get_category(binary(), session()) ->
     {ok, map(), session()} | {error, term()}.
 

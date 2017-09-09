@@ -20,12 +20,42 @@
 
 -module(nkadmin).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
-
+-export_type([update/0]).
 
 %% ===================================================================
 %% Types
 %% ===================================================================
 
+
+-type update() ::
+    #{
+        class => update_class(),        % Mandatory
+        id => update_id(),              % Optional
+        value => update_value()
+    }.
+
+-type update_id() :: binary().
+
+-type update_class() ::
+    frame |
+    tree |
+    detail |
+    url |
+    breadcrumbs |
+    frameDomainName | frameDomainIcon |
+    frameUserIcon | frameUserIcon | frameUserMenu |
+    menuCategory | menuGroup | menuEntry.
+
+
+
+-type update_value() ::
+    #{
+        label => binary(),
+        css => binary(),
+        icon => binary(),
+        tooltip => binary(),
+        items => [update()] | [binary()]
+    }.
 
 
 
