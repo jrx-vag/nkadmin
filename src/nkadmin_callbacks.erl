@@ -129,10 +129,10 @@ admin_element_action(ElementIdParts, Action, Value, Updates, Session) ->
 
 
 %% @doc Called when the client asks for specific table data
--spec admin_get_data(binary(), map(), session()) ->
+-spec admin_get_data([binary()], map(), session()) ->
     {ok, map(), session()} | {error, term(), session()}.
 
-admin_get_data(_ElementId, _Spec, Session) ->
+admin_get_data(_ElementIdParts, _Spec, Session) ->
     {error, unrecognized_element, Session}.
 
 
