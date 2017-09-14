@@ -21,7 +21,7 @@
 -module(nkadmin_util).
 -export([i18n/2, menu_item/4]).
 -export([get_key_data/2, set_key_data/3, remove_key_data/2]).
--export([update_detail/4]).
+-export([update_detail/4, update_url/2]).
 -export([get_special_url/2, set_special_url/3, remove_special_url/2]).
 -export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
 
@@ -90,21 +90,26 @@ update_path(Path, Updates, #admin_session{domain_path=Base}=Session) ->
         <<"/">>  -> Path;
         _ -> <<Base/binary, Path/binary>>
     end,
-    Updates2 = [
-          #{
-              class => url,
-              id => url,
-              value => #{label => Path2}
-          },
-          #{
-              class => breadcrumbs,
-              id => breadcrumbs,
-              value => #{items => get_parts(Path2)}
-          }
-        | Updates
-    ],
-    {Updates2, Session#admin_session{url=Path}}.
+    Data = #{
+        class => breadcrumbs,
+        id => breadcrumbs,
+        value => #{items => get_parts(Path2)}
+    },
+    {[Data|Updates], Session#admin_session{url=Path}}.
 
+
+%% @doc
+update_url(Updates, #admin_session{url=Url}=Session) ->
+%%    Path2 = case Base of
+%%        <<"/">>  -> Path;
+%%        _ -> <<Base/binary, Path/binary>>
+%%    end,
+    Data = #{
+        class => url,
+        id => url,
+        value => #{label => Url}
+    },
+    {[Data|Updates], Session}.
 
 
 
