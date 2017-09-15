@@ -311,6 +311,12 @@
                             console.log('No extra filters defined');
                         }
 
+                        if (view.config.nkBaseDomain) {
+                            details.filter.nkBaseDomain = view.config.nkBaseDomain;
+                        } else {
+                            console.log('nkBaseDomain not defined');
+                        }
+
                         console.log('Load... start: ' + start + ', end: ' + end, 'Details: ', details);
 
                         var query = {
