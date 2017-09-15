@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_util).
--export([i18n/2, menu_item/4, append_id/2]).
+-export([i18n/2, menu_item/4, make_id/1]).
 -export([get_key_data/2, set_key_data/3, remove_key_data/2]).
 -export([update_detail/4, update_url/2]).
 -export([get_special_url/2, set_special_url/3, remove_special_url/2]).
@@ -114,15 +114,8 @@ update_url(Updates, #admin_session{url=Url}=Session) ->
 
 %% @doc
 
-append_id(Base, []) ->
-    Base;
-
-append_id(Base, [Id|Rest]) when is_binary(Id) ->
-    Base2 = append_id(Base, Id),
-    append_id(Base2, Rest);
-
-append_id(Base, Id) ->
-    <<(to_bin(Base))/binary, "__", (to_bin(Id))/binary>>.
+make_id(List) ->
+    nklib_util:bjoin(List, <<"__">>).
 
 
 %% ===================================================================
