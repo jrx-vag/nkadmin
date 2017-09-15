@@ -304,7 +304,7 @@
                                     console.log('Extra filter found!: ', filter, 'value', $$(filter).getValue());
                                     details.filter[filter] = $$(filter).getValue();
                                 } else {
-                                    console.log('Extra filter not found!');
+                                    console.log('Extra filter not found!', view.config.id, view.config.nkFilters, filter);
                                 }
                             }
                         } else {
