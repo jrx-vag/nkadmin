@@ -58,6 +58,7 @@
     #{
         table_id => binary(),           %% Mandatory
         filters => [binary()],
+        base_domain => binary(),
         left_split => integer(),
         right_split => integer(),
         on_click => [on_click()],
@@ -686,6 +687,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         rightSplit => maps:get(right_split, Spec, 0),
         navigation => true,
         nkFilters => maps:get(filters, Spec, []),
+        nkBaseDomain => maps:get(base_domain, Spec, <<>>),
         nkDomain => to_bin(DomainId),
         columns => make_columns(Spec, Session),
         pager => <<"pagerA">>,
