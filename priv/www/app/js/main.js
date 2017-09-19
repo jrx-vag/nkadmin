@@ -900,7 +900,7 @@
                         "height": (numElems * 40) + "px",
                         "type": "menuTree2",
                         "css": "menu",
-                        "template": "{common.icon()}<span class='webix_tree_item_span' style='#style#'>#value#</span>#badge#",
+                        "template": "{common.icon()}<span class='webix_tree_item_span' style='#style#'>#value#</span>#badge##coloured_badge#",
                         "activeTitle": true, // Sets if the tree should open/close a branch when clicked
                         "select": true,
                         "type": {
@@ -956,6 +956,7 @@
                         "value": createCounterLabel(element),
                         "tooltip": element.value.tooltip !== undefined? element.value.tooltip : "",
                         "badge": createBadgeSpan(element),
+                        "coloured_badge": createColouredBadge(element),
                         "icon": element.value.icon === undefined? "" : element.value.icon,
                         "size": 1
                     };
@@ -973,6 +974,7 @@
                         "value": createCounterLabel(element),
                         "tooltip": element.value.tooltip !== undefined? element.value.tooltip : "",
                         "badge": createBadgeSpan(element),
+                        "coloured_badge": createColouredBadge(element),
                         "icon": element.value.icon === undefined? "" : element.value.icon,
                         "data": data,
                         "size": length+1
@@ -1029,6 +1031,13 @@
                 return element.value.label + " (" + element.value.counter + ")";
             }
             return element.value.label;
+        }
+
+        function createColouredBadge(element) {
+            if (element.value.coloured_badge && element.value.coloured_badge !== "") {
+                return "&nbsp;<span class='webix_badge' style='position: relative; background-color: "+element.value.coloured_badge+"'>&nbsp;&nbsp;&nbsp;</span>";
+            }
+            return "";
         }
 
         function createBadgeSpan(element) {
