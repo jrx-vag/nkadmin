@@ -97,7 +97,7 @@ datatable(#{table_id:=TableId}=Spec, Session) ->
                     minHeight => 300,
                     minWidth => 400,
                     rows => [
-                        toolbar(TableId, Session),
+                        toolbar(Spec, Session),
                         #{
                             rows => [
                                 body_data(TableId, Spec, Session),
@@ -111,12 +111,12 @@ datatable(#{table_id:=TableId}=Spec, Session) ->
     }.
 
 
-toolbar(TableId, Session) ->
+toolbar(#{table_id:=TableId}=Spec, Session) ->
     #{
         height => 40,
         cols => [
-            toolbar_show_subdomains(TableId, Session),
-            toolbar_show_deleted(TableId, Session),
+            toolbar_show_subdomains(Spec, Session),
+            toolbar_show_deleted(Spec, Session),
             #{},
             toolbar_selected_elements(TableId, Session),
             toolbar_real_time(TableId, Session),
@@ -130,8 +130,7 @@ toolbar(TableId, Session) ->
     }.
 
 
-toolbar_show_subdomains(TableId, Session) ->
-    SubdomainsId = append_id(TableId, <<"subdomains">>),
+toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=_Spec, Session) ->
     #{
         view => <<"layout">>,
         cols => [
@@ -168,8 +167,7 @@ toolbar_show_subdomains(TableId, Session) ->
         ]
     }.
 
-toolbar_show_deleted(TableId, Session) ->
-    DeletedId = append_id(TableId, <<"deleted">>),
+toolbar_show_deleted(#{table_id:=TableId, deleted_id:=DeletedId}=_Spec, Session) ->
     #{
         view => <<"layout">>,
         cols => [
