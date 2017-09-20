@@ -900,7 +900,7 @@
                         "height": (numElems * 40) + "px",
                         "type": "menuTree2",
                         "css": "menu",
-                        "template": "{common.icon()}<span class='webix_tree_item_span' style='#style#'>#value#</span>#badge##coloured_badge#",
+                        "template": "{common.icon()}#coloured_badge#<span class='webix_tree_item_span' style='#style#'>#value#</span>#badge#",
                         "activeTitle": true, // Sets if the tree should open/close a branch when clicked
                         "select": true,
                         "type": {
@@ -1035,14 +1035,14 @@
 
         function createColouredBadge(element) {
             if (element.value.coloured_badge && element.value.coloured_badge !== "") {
-                return "&nbsp;<span class='webix_badge' style='position: relative; background-color: "+element.value.coloured_badge+"'>&nbsp;&nbsp;&nbsp;</span>";
+                return "&nbsp;<span class='webix_badge' style='position: relative; background-color: "+element.value.coloured_badge+"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>";
             }
             return "";
         }
 
         function createBadgeSpan(element) {
             if (element.value.badge && element.value.badge > 0) {
-                return "&nbsp;<span class='webix_badge' style='position: relative'>"+element.value.badge+"</span>";
+                return "&nbsp;<span class='webix_badge' style='position: relative'>&nbsp;&nbsp;"+element.value.badge+"&nbsp;&nbsp;</span>";
             }
             return "";
         }

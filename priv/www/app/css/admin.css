@@ -505,7 +505,16 @@ _toolbar-title {
 
 .webix_badge {
 	margin-left: 2px;
+	margin-right: 8px;
+	padding: 0px 0px;
+	font-size: 14px;
 	background-color: #F49C20;
+}
+
+.menu .webix_tree_item.webix_selected .webix_badge {
+	margin-left: 2px;
+	margin-right: 12px;
+	padding: 0 0px;
 }
 
 .menu .webix_tree_item.webix_selected, .webix_menu .webix_selected {
