@@ -227,14 +227,19 @@ _toolbar-title {
 
 /* 3ca2e0 #d6e8f4; */
 .breadcrumb {
+	height: 20px;
 	list-style: none;
 	margin: 5px;
-	padding: 0px;
+	padding: 2px;
 	font-size: 1em;
-	color: #3498DB;
+	background-color: #3498db;
+	color: #3498db;
+/*	color: #3F4D5C;
 /*	background: rgba(0, 0, 0, 0.2); */
 	display: inline-block;
-	border-radius: 6px;
+	border-radius: 2px;
+/*	border: 5px solid #EBEBEB;
+*/
 }
 
 .breadcrumb > li {
@@ -256,8 +261,13 @@ _toolbar-title {
 }
 
 .breadcrumb > li:hover {
+/*
 	background: rgba(52, 152, 219, 0.2);
 	border-color: rgba(52, 152, 219, 0.2);
+*/
+	background: transparent;
+	border-color: transparent;
+	color: #F7F7F7;
 	margin-left: 20px;
 	margin-right: 5px;
 }
