@@ -496,11 +496,13 @@ _toolbar-title {
 	background-color: @menuHoverBgColor;
 	padding-right: 0px;
 	padding-left: 0px;
+	margin-left: 0px;
 }
 
 .menu .webix_tree_item.webix_selected .webix_badge {
 	margin-left: 2px;
-	padding: 0 4px;
+	margin-right: 8px;
+	padding: 0px 0px;
 }
 
 .webix_badge {
@@ -511,15 +513,8 @@ _toolbar-title {
 	background-color: #F49C20;
 }
 
-.menu .webix_tree_item.webix_selected .webix_badge {
-	margin-left: 2px;
-	margin-right: 12px;
-	padding: 0 0px;
-}
-
 .menu .webix_tree_item.webix_selected, .webix_menu .webix_selected {
     box-shadow: 5px 0 0 #F49C20 inset;
-    padding-left: 19px;
 }
 
 .menu .webix_tree_item .webix_selected .webix_badge { 
@@ -582,7 +577,7 @@ _toolbar-title {
 
 .menu .webix_tree_leaves .webix_tree_branch_2 .webix_tree_item {
 	margin-left: 0px;
-	padding-left: 10px;
+	padding-left: 40px;
 }
 
 .menu .webix_tree_item .webix_selected {
