@@ -684,6 +684,9 @@
                     case "detail":
                         updateDetail(elem);
                         break;
+                    case "popup":
+                        showPopup(elem);
+                        break;
                     default:
                         console.log("Default: ", elem.class);
                         console.log("Updating element: ", elem);
@@ -1023,6 +1026,129 @@
                 unselectAll();
             } else if (elem && elem.value) {
                 console.log("Error: unknown detail format");
+            }
+        }
+
+        function showPopup(elem) {
+            console.log("showPopup: ", elem);
+            if (elem && elem.value && elem.value.class === 'webix_confirm' && elem.value.value) {
+                console.log("showPopup: webix_confirm detected");
+                var popup = elem.value.value;
+                if (!popup.title) {
+                    popup.title = "";
+                }
+                if (!popup.text) {
+                    popup.text = "";
+                }
+                if (!popup.ok) {
+                    popup.ok = "OK";
+                }
+                if (popup.callback) {
+                    parseJSONFunctions(popup);
+                }
+                /*
+                "title": "Logout",
+                "text": "Are you sure to want to logout?",
+                "ok": "Logout",
+                "cancel": "No",
+                "callback": function(response) {
+                    
+                }
+                */
+                webix.confirm(popup);
+            } else if (elem && elem.value && elem.value.class === 'webix_message' && elem.value.value) {
+                console.log("showPopup: webix_message detected");
+                var msg = elem.value.value;
+                /*
+                type: "error", // "default"/"error" (white or red background)
+                text: "Form Data is Invalid", // Text of the message
+                expire: 10000 // Expiration time in milliseconds
+                              // You can set it to "-1" for canceling expire period
+                              // This will close it only on mouse click
+                */
+                webix.message(msg);
+            } else if (elem && elem.value && elem.value.class === 'webix_ui' && elem.value.value) {
+                console.log("showPopup: webix_ui detected");
+                var parentComponent = null;
+                var node = null;
+                var position = {};
+                var hasPosition = false;
+                if (elem.value.position) {
+                    if (elem.value.position.pos && elem.value.position.pos === "center") {
+                        elem.value.value.position = "center";
+                    } else {
+                        if (elem.value.position.id) {
+                            // Position relative to a component ID
+                            parentComponent = $$(elem.value.position.id);
+                            if (parentComponent && elem.value.position.hasOwnProperty("filter")) {
+                                try {
+                                    node = parentComponent.getHeaderNode(elem.value.position.filter, 1);
+                                } catch (e) {
+                                    console.log("ERROR: Couldn't get header node", elem.value.position, e);
+                                    node = null;
+                                }
+                            } else if (parentComponent) {
+                                try {
+                                    node = parentComponent.getNode();
+                                } catch (e) {
+                                    console.log("ERROR: Couldn't get node", elem.value.position, e);
+                                    node = null;
+                                }
+                            } else {
+                                console.log("ERROR: Couldn't find parent component ID", elem.value.position.id);
+                                node = null;
+                            }
+                        }
+                        position = elem.value.position;
+                        hasPosition = true;
+                    }
+                }
+                if (elem.value.value.hasOwnProperty("view")
+                    && elem.value.value.view !== "popup" && elem.value.value.view !== "window") {
+                    // This new element will be hidden because of its z-index,
+                    // so we need a wrapper for this new component
+                    var wrapper = {
+                        view: "popup",
+                        headHeight: 0,
+                        borderless: true,
+                        autofit: true,
+                        autofocus: true            
+                    }
+                    wrapper.body = elem.value.value;
+                    wrapper.body.borderless = true; // Hide borders to make the wrapper seamless
+                    if (wrapper.body.hasOwnProperty("position")) {
+                        wrapper.position = wrapper.body.position;
+                    }
+                    elem.value.value = wrapper;
+                }
+                parseJSONFunctions(elem.value.value);
+                /*
+                class: "popup",
+                value: {
+                    class: "webix_ui",
+                    position: {
+                        filter: "created_time",
+                        id: "domain_detail_obj_subview__user__user-UsDU2eCogFUVn5NfVlKprWtxbuu__message__table"
+                    },
+                    value: {
+                        view: "calendar",
+                        weekHeader: true,
+                        date: new Date(2012,3,16),
+                        events: webix.Date.isHoliday,
+                        timepicker: true,
+                        icons: true
+                    }
+                }
+                */
+                if (!hasPosition) {
+                    webix.ui(elem.value.value).show();
+                } else if (node) {
+                    webix.ui(elem.value.value).show(node, position);
+                } else {
+                    webix.ui(elem.value.value).show(position);
+                }
+            } else {
+                console.log("Error: unknown popup format");
             }
         }
 
