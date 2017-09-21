@@ -225,11 +225,15 @@ _toolbar-title {
 	padding: 0px;
 }
 
+.toolbar-path {
+	background-color: #FAFAFA;
+}
+
 /* 3ca2e0 #d6e8f4; */
 .breadcrumb {
 	height: 20px;
 	list-style: none;
-	margin: 5px;
+	margin: 0px;
 	padding: 2px;
 	font-size: 1em;
 	background-color: #3498db;

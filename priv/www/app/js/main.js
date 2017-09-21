@@ -1646,7 +1646,7 @@
                 },
                 "data": {children: path.value.items, id: path.id},
                 "autoheight": true,
-                "css": "nopadding"
+                "css": "nopadding toolbar-path"
             }
         }
 
