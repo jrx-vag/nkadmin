@@ -1552,6 +1552,114 @@
             }
         }
 
+        function createUploadAPI() {
+            return {
+                id: "uploadAPI",
+                view: "uploader",
+                upload: "../_file",
+                apiOnly: true,                
+                on: {
+                    onBeforeFileAdd: function(item) {
+                        console.log("uploadAPI: onBeforeFileAdd", item);
+                        var type = item.type.toLowerCase();
+                        var id = null;
+                        var component = null;
+                        var progressConfig = {
+                            type: "icon"
+                        }
+                        if (item.context.hasOwnProperty("types")) {
+                            var i = 0;
+                            var types = item.context.types;
+                            while (i < types.length && types[i].toLowerCase() !== type) {
+                                i++;
+                            }
+                            if (i >= types.length) {
+                                webix.message("Unsupported file type");
+                                return false;
+                            }
+                        }
+                        if (item.context.hasOwnProperty("id")) {
+                            id = item.context.id;
+                            component = $$(id);
+                            if (component) {
+                                webix.extend(component, webix.ProgressBar);
+                                if (item.context.hasOwnProperty("progress")) {
+                                    progressConfig = item.context.progress;
+                                }
+                                component.showProgress(progressConfig);
+                            }
+                        }
+                        var callback = {};
+                        var xhr = new XMLHttpRequest();
+                        var rawData = new ArrayBuffer();
+
+                        if (item && item.context && item.context.callback) {
+                            callback = item.context.callback;
+                        }
+    
+                        xhr.upload.addEventListener("progress", function(e) {
+                            if (callback.hasOwnProperty("updateProgress")) {
+                                callback.updateProgress(item, e.loaded/e.total*100);
+                            }
+                            if (component) {
+                                component.hideProgress();
+                            }
+                        }, false);
+                        xhr.onabort = function () {
+                            if (callback.hasOwnProperty("error")) {
+                                callback.error("abort", xhr);
+                            }
+                            if (component) {
+                                component.hideProgress();
+                            }
+                        }
+                        xhr.ontimeout = function () {
+                            if (callback.hasOwnProperty("error")) {
+                                callback.error("timeout", xhr);
+                            }
+                            if (component) {
+                                component.hideProgress();
+                            }
+                        }
+                        xhr.onerror = function () {
+                            if (callback.hasOwnProperty("error")) {
+                                callback.error("requestError", xhr);
+                            }
+                            if (component) {
+                                component.hideProgress();
+                            }
+                        }
+                        xhr.onload = function (e) {
+                            if (xhr.status >= 200 && xhr.status <= 204 && callback.hasOwnProperty("success")) {
+                                callback.success(e, xhr);
+                            } else if (callback.hasOwnProperty("error")) {
+                                callback.error("httpError", xhr);
+                            }
+                            if (component) {
+                                component.hideProgress();
+                            }
+                        }
+                        
+                        xhr.open("POST", "../_file", true);
+                        xhr.overrideMimeType("text/plain; charset=x-user-defined");
+                        xhr.setRequestHeader("X-NetComposer-Auth", logic.getSessionId());
+                        
+                        var fileReaderWorker = new Worker("app/js/file-reader-worker.js");
+
+                        fileReaderWorker.onmessage = function(oEvent) {
+                            console.log("File reader worker result: ", oEvent, oEvent.data);
+                            xhr.send(oEvent.data);
+                        };
+
+                        fileReaderWorker.postMessage(item.file);
+
+                        // Ignore webix default uploadAPI driver
+                        return false;
+                    },
+                }
+            }
+        }
+
         function recreatePathFromTreeElem(id, treeId) {
             let tree = $$(treeId);
             let elemId = id;
@@ -1718,6 +1826,9 @@
             var hash = window.location.hash;
             if (hash && hash.length > 0) {
                 url = hash.substring(1);
+            }
+            if (currentURLId === null) {
+                currentURLId = "url";
             }
             ncClient.sendMessageAsync("objects/admin.session/element_action", {
                 element_id: currentURLId,
@@ -1995,8 +2106,11 @@
             createLoginPopup: createLoginPopup,
             createProfile: createProfile,
             createProfilePopup: createProfilePopup,
+            createUploadAPI: createUploadAPI,
 			init: init,
-            breadcrumbsClicked: breadcrumbsClicked
+            breadcrumbsClicked: breadcrumbsClicked,
+            getAdminSessionId: function() { return adminSessionId },
+            getSessionId: function() { return sessionId }
 		}
     })();
 })();

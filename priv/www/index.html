@@ -23,9 +23,11 @@
         console.log(window.location.pathname);
         var profilePopup = logic.createProfilePopup();
         var loginPopup = logic.createLoginPopup();
+        var uploadAPI = logic.createUploadAPI();
 
         webix.ui(profilePopup);
         webix.ui(loginPopup);
+        webix.ui(uploadAPI);
 
         webix.message.position = "bottom";
 
