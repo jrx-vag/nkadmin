@@ -31,6 +31,15 @@
 
         webix.message.position = "bottom";
 
+        window.addEventListener("dragover",function(e) {
+            e = e || event;
+            e.preventDefault();
+        }, false);
+        window.addEventListener("drop",function(e) {
+            e = e || event;
+            e.preventDefault();
+        }, false);
+
         // TODO: Use a specific domain instead of the URL path
         logic.init(window.location.pathname);
 

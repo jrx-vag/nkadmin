@@ -1552,22 +1552,31 @@
             }
         }
 
-        function createUploadAPI() {
+        function createUploadAPI(id, defaultContext) {
+            if (id === null || id === undefined) {
+                id = "uploadAPI";
+            }
+            if (defaultContext === null || defaultContext === undefined) {
+                defaultContext = {};
+            }
             return {
-                id: "uploadAPI",
+                id: id,
                 view: "uploader",
                 upload: "../_file",
                 apiOnly: true,                
                 on: {
                     onBeforeFileAdd: function(item) {
-                        console.log("uploadAPI: onBeforeFileAdd", item);
+                        console.log(id, "onBeforeFileAdd", item);
                         var type = item.type.toLowerCase();
                         var id = null;
                         var component = null;
                         var progressConfig = {
                             type: "icon"
                         }
-                        if (item.context.hasOwnProperty("types")) {
+                        if (item && (!item.hasOwnProperty("context") || item.context === null || item.context === undefined)) {
+                            item.context = defaultContext;
+                        }
+                        if (item && item.context && item.context.hasOwnProperty("types")) {
                             var i = 0;
                             var types = item.context.types;
                             while (i < types.length && types[i].toLowerCase() !== type) {
@@ -1578,7 +1587,7 @@
                                 return false;
                             }
                         }
-                        if (item.context.hasOwnProperty("id")) {
+                        if (item && item.context && item.context.hasOwnProperty("id")) {
                             id = item.context.id;
                             component = $$(id);
                             if (component) {
@@ -1593,7 +1602,7 @@
                         var xhr = new XMLHttpRequest();
                         var rawData = new ArrayBuffer();
 
-                        if (item && item.context && item.context.callback) {
+                        if (item && item.context && item.context.hasOwnProperty("callback")) {
                             callback = item.context.callback;
                         }
     
@@ -1937,10 +1946,46 @@
                     "view": "template",
                     "padding": 0,
                     "borderless": true,
-                    "css": domain_css,
+                    "css": domain_css + " admin_frame_domain_icon",
                     "width": 60,
                     "height": 60,
-                    "template": domain_icon_img
+                    "template": domain_icon_img,
+                    "onClick": {
+                        "admin_frame_domain_icon": function() {
+                            var api = $$('uploadAPI');
+                            if (api) {
+                                api.fileDialog({
+                                    id: ADMIN_FRAME_DOMAIN_ICON,
+                                    types: ['png', 'jpg'],
+                                    progress: {
+                                        type: 'icon'
+                                    },
+                                    callback: {
+                                        success: function(e, xhr) {
+                                            console.log('SUCCESS', e, xhr);
+                                            var response = JSON.parse(xhr.responseText);
+                                            console.log('new file_id: ', response.obj_id);
+                                            ncClient.sendMessageAsync('objects/domain/update', {
+                                                id: 'root',
+                                                icon_id: response.obj_id
+                                            }).then(function(response) {
+                                                // Force page reload
+                                                location.reload(true);
+                                            });
+                                        },
+                                        error: function(error, xhr) {
+                                            console.log('ERROR', error, xhr);
+                                        },
+                                        updateProgress: function(item, progress) {
+                                            console.log('PROGRESS', item, progress);
+                                        }
+                                    }
+                                });
+                            } else {
+                                console.log('ERROR: (' + ADMIN_FRAME_DOMAIN_ICON + ' onClick) uploadAPI not found');
+                            }
+                        }
+                    }
                 }, {
                     "id": ADMIN_FRAME_DOMAIN_NAME,
                     "view": "label",

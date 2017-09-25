@@ -192,6 +192,10 @@ textarea.webix_invalid {
 /**************************************/
 
 /************** TOOLBARS **************/
+.admin_frame_domain_icon {
+	cursor: pointer;
+}
+
 .netcomposer {
 	color: #FFF;
 	background: #303E4D;
