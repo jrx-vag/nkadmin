@@ -20,7 +20,7 @@
 
 -module(nkadmin_callbacks).
 
--export([plugin_deps/0, plugin_syntax/0, plugin_listen/2]).
+-export([plugin_deps/0, plugin_syntax/0, plugin_config/2]).
 -export([error/1]).
 -export([admin_get_frame/1, admin_get_tree/1]).
 -export([admin_event/3, admin_element_action/5, admin_get_data/3]).
@@ -43,20 +43,37 @@ plugin_deps() ->
 
 
 plugin_syntax() ->
-    nkpacket_util:get_plugin_net_syntax(#{
-        admin_url_web => fun nkservice_webserver_util:parse_web_server/1,
-        admin_url_ws => fun nkapi_util:parse_api_server/1
-    }).
+    #{
+        nkadmin => #{
+            webserver_url => fun nkservice_webserver_util:parse_url/1,
+            webserver_opts => nkpacket_syntax:safe_syntax(),
+            api_url => fun nkapi_util:parse_url/1,
+            api_opts => nkpacket_syntax:safe_syntax()
+        }
+    }.
 
 
-plugin_listen(Config, #{id:=SrvId}) ->
-    {parsed_urls, WebSrv} = maps:get(admin_url_web, Config, {parsed_urls, []}),
-    Priv = list_to_binary(code:priv_dir(nkadmin)),
-    Path = <<Priv/binary, "/www">>,
-    WebSrvs = nkservice_webserver_util:get_web_servers(SrvId, WebSrv, Path, Config#{debug=>false}),
-    {nkapi_parsed, ApiSrv} = maps:get(admin_url_ws, Config, {nkapi_parsed, []}),
-    ApiSrvs = nkapi_util:get_api_sockets(SrvId, ApiSrv, Config#{manager=>nkadmin, debug=>false}),
-    WebSrvs++ApiSrvs.
+plugin_config(#{nkadmin:=NkAdmin}=Config, _Service) ->
+    Config2 = case NkAdmin of
+        #{webserver_url:=WebUrl} ->
+            Priv = list_to_binary(code:priv_dir(nkadmin)),
+            WebPath = <<Priv/binary, "/www">>,
+            WebOpts = maps:get(webserver_opts, NkAdmin, #{}),
+            WebObj = #{id => <<"nkadmin">>, url=>WebUrl, opts=>WebOpts, file_path=>WebPath},
+            nkservice_util:add_config_obj(nkservice_webserver, WebObj, Config);
+        _ ->
+            Config
+    end,
+    Config3 = case NkAdmin of
+        #{api_url:=ApiUrl} ->
+            ApiOpts = maps:get(api_opts, NkAdmin, #{}),
+            ApiObj = #{id => <<"nkadmin">>, url=>ApiUrl, opts=>ApiOpts},
+            nkservice_util:add_config_obj(nkapi_server, ApiObj, Config2);
+        _ ->
+            Config2
+    end,
+    {ok, Config3}.
+
 
 
 
