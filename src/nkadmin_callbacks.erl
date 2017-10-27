@@ -20,7 +20,6 @@
 
 -module(nkadmin_callbacks).
 
--export([plugin_deps/0, plugin_syntax/0, plugin_config/2]).
 -export([error/1]).
 -export([admin_get_frame/1, admin_get_tree/1]).
 -export([admin_event/3, admin_element_action/5, admin_get_data/3]).
