@@ -29,8 +29,7 @@
 
 
 plugin_deps() ->
-    [
-    ].
+    [nkservice_webserver].
 
 
 plugin_syntax() ->
