@@ -33,59 +33,10 @@
 
 
 %% ===================================================================
-%% Config callbacks
-%% ===================================================================
-
-
-plugin_deps() ->
-    [
-    ].
-
-
-plugin_syntax() ->
-    #{
-        nkadmin => #{
-            webserver_url => fun nkservice_webserver_util:parse_url/1,
-            webserver_opts => nkpacket_syntax:safe_syntax(),
-            api_url => fun nkapi_util:parse_url/1,
-            api_opts => nkpacket_syntax:safe_syntax()
-        }
-    }.
-
-
-plugin_config(#{nkadmin:=NkAdmin}=Config, _Service) ->
-    Config2 = case NkAdmin of
-        #{webserver_url:=WebUrl} ->
-            Priv = list_to_binary(code:priv_dir(nkadmin)),
-            WebPath = <<Priv/binary, "/www">>,
-            WebOpts = maps:get(webserver_opts, NkAdmin, #{}),
-            WebObj = #{id => <<"nkadmin">>, url=>WebUrl, opts=>WebOpts, file_path=>WebPath},
-            nkservice_util:add_config_obj(nkservice_webserver, WebObj, Config);
-        _ ->
-            Config
-    end,
-    Config3 = case NkAdmin of
-        #{api_url:=ApiUrl} ->
-            ApiOpts = maps:get(api_opts, NkAdmin, #{}),
-            ApiObj = #{id => <<"nkadmin">>, url=>ApiUrl, opts=>ApiOpts},
-            nkservice_util:add_config_obj(nkapi_server, ApiObj, Config2);
-        _ ->
-            Config2
-    end,
-    {ok, Config3}.
-
-
-
-
-
-
-
-    %% ===================================================================
 %% Types
 %% ===================================================================
 
 
-%%-type continue() :: continue | {continue, list()}.
 -type session() :: nkadmin_session_obj:session().
 
 
