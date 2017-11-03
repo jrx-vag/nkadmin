@@ -123,7 +123,7 @@ frame_domain(#admin_session{domain_id=DomainId}=Session) ->
 
 %% @private
 frame_user(#admin_session{user_id=UserId}=Session) ->
-    case nkdomain_user_obj:get_name(UserId) of
+    case nkdomain_user:get_name(UserId) of
         {ok, #{name:=UserName, surname:=UserSurname}=Obj} ->
             UserIconId = maps:get(icon_id, Obj, <<>>),
             Items = [
