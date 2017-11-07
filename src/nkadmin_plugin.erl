@@ -62,7 +62,9 @@ plugin_config(#{nkadmin:=NkAdmin}=Config, _Service) ->
         _ ->
             Config2
     end,
-    {ok, Config3}.
+    {ok, Config3};
 
+plugin_config(Config, _Service) ->
+    {ok, Config}.
 
 
