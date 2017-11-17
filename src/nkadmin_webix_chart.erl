@@ -155,6 +155,7 @@
         alpha => binary(),                                  %% default: 1.0
         border_color => hex_color(),
         borderless => boolean(),                            %% default: false
+        data => map(),
         dynamic => boolean(),                               %% (line, spline, area and splineArea adds more data. Others will reload all data)
         event_radius => integer(),                          %% default: 0
         fix_overflow => boolean(),                          %% default: false
@@ -263,11 +264,16 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
     BorderColor = maps:get(border_color, Spec, <<>>),
     Borderless = maps:get(borderless, Spec, false),
     Cant = maps:get(cant, Spec, <<"0.5">>),
-    CellWidth = maps:get(cell_width, Spec, 30),
-    Data = maps:get(data, Spec, <<>>),
+    Data = maps:get(data, Spec, []),
     DisableLines = maps:get(disable_lines, Spec, false),
     Dynamic = maps:get(dynamic, Spec, false),
-    EventRadius = maps:get(event_radius, Spec, 0),
+    CellWidth = case Dynamic of
+        true ->
+            maps:get(cell_width, Spec, 30);
+        false ->
+            maps:get(cell_width, Spec, <<>>)
+    end,
+    EventRadius = maps:get(event_radius, Spec, 10),
     Fill = maps:get(fill, Spec, <<>>),
     FixOverflow = maps:get(fix_overflow, Spec, false),
     Gradient = maps:get(gradient, Spec, false),
@@ -277,7 +283,7 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
     Legend = maps:get(legend, Spec, <<>>),
     Line = maps:get(line, Spec, <<>>),
     LineColor = maps:get(line_color, Spec, <<>>),
-    Offset = maps:get(offset, Spec, true),
+    Offset = maps:get(offset, Spec, 0),
     Origin = maps:get(origin, Spec, auto),
     Padding = maps:get(padding, Spec, <<>>),
     PieHeight = maps:get(pie_height, Spec, 20),
@@ -294,15 +300,14 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
     YAxis = maps:get(y_axis, Spec, <<>>),
     XValue = maps:get(x_value, Spec, <<>>),
     YValue = maps:get(y_value, Spec, <<>>),
-    JSON = #{
-        % Common configuration
-        id => ChartId,
-        view => <<"chart">>,
-        type => ChartType,
-        nkCount => 0,
-        nkIntervalTime => NKIntervalTime,
-        nkIntervalFunction => #{
-            nkParseFunction => <<"
+    NKIntervalFunction = case Dynamic of
+        false ->
+            <<"
+                function(chartId) {
+                }
+            ">>;
+        true ->
+            <<"
                 function(chartId) {
                     //var chart = $$('", ChartId/binary, "');
                     var chart = $$(chartId);
@@ -327,6 +332,16 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
                     }
                 }
             ">>
+    end,
+    JSON = #{
+        % Common configuration
+        id => ChartId,
+        view => <<"chart">>,
+        type => ChartType,
+        nkCount => 0,
+        nkIntervalTime => NKIntervalTime,
+        nkIntervalFunction => #{
+            nkParseFunction => NKIntervalFunction
         },
         url => <<"wsChartProxy->">>,
         ready => #{
@@ -430,9 +445,10 @@ add_series(ChartType, [#{value:=Value}=Chart | Charts], Series) ->
     Type = maps:get(type, Chart, <<>>),
     Tooltip = maps:get(tooltip, Chart, <<>>),
     Item = maps:get(item, Chart, <<>>),
+    Line = maps:get(line, Chart, <<>>),
     S = case Type of
         <<>> ->
-            filter_unused_properties(#{value => Value, color => Color, tooltip => Tooltip, item => Item});
+            filter_unused_properties(#{value => Value, color => Color, tooltip => Tooltip, item => Item, line => Line});
         _ ->
             case are_compatible_charts(ChartType, Type) of
                 true ->
@@ -450,7 +466,7 @@ add_series(ChartType, [_|Charts], Series) ->
 filter_properties_by_chart_type(Type, JSON) ->
     % Get useful properties by chart type (common and specific)
     Specific = get_properties_by_chart_type(Type),
-    WhiteList = [id, view, type, nkCount, nkIntervalTime, nkIntervalFunction, url, ready, series, alpha, borderColor, borderless, dynamic, eventRadius, fixOverflow, label, legend, padding, removedMissed, tooltip, value | Specific],
+    WhiteList = [id, view, type, nkCount, nkIntervalTime, nkIntervalFunction, url, ready, series, alpha, borderColor, borderless, data, dynamic, eventRadius, fixOverflow, label, legend, padding, removedMissed, tooltip, value | Specific],
     % Filter useful properties
     JSON2 = maps:with(WhiteList, JSON),
     % Filter unused properties

@@ -525,13 +525,36 @@
                             data = [];
                             count = 0;
                         }
-                        webix.ajax.$callback(view, callback, "", {
-                            //total_count: 10, // Both, total_count and pos, cause an error if the
-                            pos: 0,         // data is not complete (pos > 0 || total_count > data.length)
-                            data: data
-                        }, -1);
-                        console.log(view.config.nkCount, data);
-                        view.config.nkCount++;
+                        if (view.config.id === "activity_stats_line_chart") {
+                            ncClient.sendMessageAsync('objects/admin.session/get_chart_data', {
+                                element_id: view.config.id
+                            }).then(function(response) {
+                                webix.ajax.$callback(view, callback, "", {
+                                    //total_count: 10, // Both, total_count and pos, cause an error if the
+                                    pos: 0,         // data is not complete (pos > 0 || total_count > data.length)
+                                    data: response.data.data
+                                }, -1);
+                                if (response.data && response.data.elements) {
+                                    updateView(response.data.elements);
+                                }
+                            }).catch(function(response) {
+                                console.log("Error at load chart data: ", view, response);
+                                webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
+                                webix.ajax.$callback(view, callback, "", {
+                                    //total_count: 10, // Both, total_count and pos, cause an error if the
+                                    pos: 0,         // data is not complete (pos > 0 || total_count > data.length)
+                                    data: []
+                                }, -1);
+                            });
+                        } else {
+                            webix.ajax.$callback(view, callback, "", {
+                                //total_count: 10, // Both, total_count and pos, cause an error if the
+                                pos: 0,         // data is not complete (pos > 0 || total_count > data.length)
+                                data: data
+                            }, -1);
+                            console.log(view.config.nkCount, data);
+                            view.config.nkCount++;
+                        }
                     },
                     save: function (view, update, dp, callback) {
                         //your saving pattern for single records ... 
