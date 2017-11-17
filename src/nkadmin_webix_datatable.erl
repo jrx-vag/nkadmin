@@ -57,11 +57,13 @@
 -type spec() ::
     #{
         table_id => binary(),           %% Mandatory
+        header => binary(),
         filters => [binary()],
         base_domain => binary(),
         left_split => integer(),
         right_split => integer(),
         on_click => [on_click()],
+        is_subtable => boolean(),
         columns => [column()]
     }.
 

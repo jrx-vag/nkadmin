@@ -460,6 +460,108 @@
                     //prop1:value1,
                     //method1:function(){ ...
                 };
+                // Define a custom proxy for charts
+                webix.proxy.wsChartProxy = {
+                    $proxy: true,
+                    load: function (view, callback, details) {
+                        console.log("wsChartProxy: ", "view:", view, "callback:", callback, "details:", details);
+                        // your loading pattern logic
+
+                        var chart = $$(view.config.id);
+                        var chartType = view.config.type;
+                        var count = view.config.nkCount ? view.config.nkCount : 0;
+
+                        var needsMoreData = false;
+                        switch(chartType) {
+                            case "pie":
+                            case "pie3D":
+                            case "donut":
+                            case "bar":
+                            case "barH":
+                            case "stackedBar":
+                            case "stackedBarH":
+                            case "radar":
+                            case "scatter":
+                                needsMoreData = true;
+                                break;
+                            default:
+                                needsMoreData = false;
+                        }
+
+                        var needsSeries = false;
+                        switch(chartType) {
+                            case "area":
+                            case "stackedArea":
+                            case "splineArea":
+                            case "bar":
+                            case "barH":
+                            case "stackedBar":
+                            case "stackedBarH":
+                            case "radar":
+                            case "scatter":
+                                needsSeries = true;
+                                break;
+                            default:
+                                needsSeries = false;
+                        }
+
+                        var data = [
+                            {"year": Math.random()*10, "sales": Math.random() * 100, "sales2": Math.random() * 100, "sales3": Math.random() * 100}
+                        ];
+                        
+                        if (needsMoreData) {
+                            data.push({"year": Math.random()*10, "sales": Math.random() * 100, "sales2": Math.random() * 100, "sales3": Math.random() * 100});
+                            data.push({"year": Math.random()*10, "sales": Math.random() * 100, "sales2": Math.random() * 100, "sales3": Math.random() * 100});
+                            data.push({"year": Math.random()*10, "sales": Math.random() * 100, "sales2": Math.random() * 100, "sales3": Math.random() * 100});
+                        }
+                        if (chart && !isChartTypeDynamic(chartType)) {
+                            chart.clearAll();
+                        }
+                        if (view.config.dynamic
+                            && isChartTypeDynamic(chartType)) {
+                            for (var i = 0; i < data.length; i++) {
+                                chart.add(data[i]);
+                            }
+                            data = [];
+                            count = 0;
+                        }
+                        ncClient.sendMessageAsync('objects/admin.session/get_chart_data', {
+                            element_id: view.config.id
+                        }).then(function(response) {
+                            webix.ajax.$callback(view, callback, "", {
+                                //total_count: 10, // Both, total_count and pos, cause an error if the
+                                pos: 0,         // data is not complete (pos > 0 || total_count > data.length)
+                                data: response.data.data
+                            }, -1);
+                            if (response.data && response.data.elements) {
+                                updateView(response.data.elements);
+                            }
+                        }).catch(function(response) {
+                            console.log("Error at load chart data: ", view, response);
+                            webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
+                            webix.ajax.$callback(view, callback, "", {
+                                //total_count: 10, // Both, total_count and pos, cause an error if the
+                                pos: 0,         // data is not complete (pos > 0 || total_count > data.length)
+                                //data: []
+                                data: data
+                            }, -1);
+                        });
+                    },
+                    save: function (view, update, dp, callback) {
+                        //your saving pattern for single records ... 
+                        console.log('wsChartProxy default save: ', 'view', view, 'update', update, 'dp', dp, 'callback', callback);
+                    },
+                    // This result function it's not needed (by commenting it, we managed to send multiple updates for the same row)
+                    result: function (state, view, dp, text, data, loader) {
+                        //your logic of server-side response processing ... 
+                        console.log('wsChartProxy default result: ', 'state', state, 'view', view, 'dp', dp, 'text', text, 'data', data, 'loader', loader);
+                        //dp.processResult(state, data, details);
+                        dp.processResult(state, data);
+                    }
+                    //other custom properties and methods
+                    //prop1:value1,
+                    //method1:function(){ ...
+                };
                 updateView(data.elements);
     /*            
                 $$("sidebar").unselectAll();
@@ -1012,6 +1114,8 @@
 
         function updateDetail(elem) {
             console.log("updateDetail: ", elem);
+            // First, we clear the body to previously remove components with the same ID as the new ones
+            clearBody();
             if (elem && elem.value && elem.value.class === 'webix_ui' && elem.value.value) {
                 console.log("Parsing JSON: ", JSON.stringify(elem.value.value));
                 parseJSONFunctions(elem.value.value);
@@ -1019,8 +1123,6 @@
                 replaceBody(elem.value.value);
                 console.log("Detail updated!", elem.value.value);
             } else if (elem && elem.value && isEmpty(elem.value)) {
-                console.log("Clear body");
-                clearBody();
                 console.log("Clear tree selection");
                 // unselect all elements from all trees
                 unselectAll();
@@ -1216,8 +1318,8 @@
                 try {
                     webix.ui(newJson, parent, component);
                 } catch(e) {
-                    console.log("ERROR in replaceComponentWithParent: component ID ", componentId, parentId, newJson);
-                    throw(e);
+                    console.log("ERROR in replaceComponentWithParent: component ID ", componentId, parentId, newJson, JSON.stringify(newJson));
+//                    throw(e);
                 }
             } else {
                 console.log("ERROR in replaceComponentWithParent: component ID " + componentId + " or parent ID " + parentId + " not found");
@@ -2100,7 +2202,8 @@
                         && json[child] && typeof json[child] === "object") {
                             if (json[child].hasOwnProperty("nkParseFunction")) {
                                 value = json[child]["nkParseFunction"];
-                                if (value && typeof value === "string" && value.trim().startsWith("function")) {
+                                if (value && typeof value === "string" && 
+                                    (value.trim().startsWith("function") || value.trim().startsWith("webix.once"))) {
                                     console.log("Substituting object with its evaluated javascript code: '" + value + "'");
                                     json[child] = eval('(' + value + ')');
                                 } else {
@@ -2145,6 +2248,21 @@
                 }
             }
             return true;
+        }
+
+        function isChartTypeDynamic(chartType) {
+            isDynamic = false;
+            if (chartType) {
+                switch(chartType) {
+                    case "line":
+                    case "spline":
+                    case "area":
+                    case "stackedArea":
+                    case "splineArea":
+                        isDynamic = true;
+                }
+            }
+            return isDynamic;
         }
 
         return {
