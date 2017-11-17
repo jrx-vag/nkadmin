@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_webix_chart).
--export([chart/2]).
+-export([chart/2, is_horizontal/1, parse_number_template/0, parse_number_template/1]).
 
 -include("nkadmin.hrl").
 
@@ -139,11 +139,13 @@
 
 -type tooltip() :: boolean() | binary() | template().
 
+-type chart_type() :: pie | pie3D | donut | line | spline | area | stackedArea | splineArea | bar | barH | stackedBar | stackedBarH | radar | scatter.
+
 -type chart_spec() ::
     #{
         %% Common
         chart_id => binary(),                               %% Mandatory
-        chart_type => pie | pie3D | donut | line | spline | area | stackedArea | splineArea | bar | barH | stackedBar | stackedBarH | radar | scatter,  %% Mandatory
+        chart_type => chart_type(),                         %% Mandatory
         nk_charts => [binary()],                            %% Mandatory
         nk_interval_time => integer(),                      %% default: 5000
         min_height => integer(),
@@ -427,6 +429,63 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
     end,
     filter_properties_by_chart_type(ChartType, JSON2).
 
+
+%% @doc
+-spec is_horizontal(chart_type()) ->
+    boolean().
+
+is_horizontal(<<"barH">>) ->
+    true;
+is_horizontal(<<"stackedBarH">>) ->
+    true;
+is_horizontal(_ChartType) ->
+    false.
+
+
+%% @doc
+-spec parse_number_template() ->
+    map().
+
+parse_number_template() ->
+    #{
+        nkParseFunction => <<"
+            function(obj) {
+                if (obj >= 1000000)  {
+                    return (obj/1000000 + 'M');
+                } else if (obj >= 1000)  {
+                    return (obj/1000 + 'K');
+                }
+                return obj;
+            }
+        ">>
+    }.
+
+
+%% @doc
+-spec parse_number_template(binary()) ->
+    map().
+    
+parse_number_template(Value) ->
+    #{
+        nkParseFunction => <<"
+            function(obj) {
+                var field = '", Value/binary, "';
+                var value;
+                if (obj && obj[field]) {
+                    value = obj[field];
+                    if (value >= 1000000) {
+                        return value/1000000 + 'M';
+                    } else if (value >= 1000) {
+                        return value/1000 + 'K';
+                    } else {
+                        return value;
+                    }
+                }
+                return obj;
+            }
+        ">>
+    }.
+    
 
 add_series(<<"pie">>, _, _) ->
     [];
