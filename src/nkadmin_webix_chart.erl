@@ -19,7 +19,8 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_webix_chart).
--export([chart/2, is_horizontal/1, parse_number_template/0, parse_number_template/1]).
+-export([chart/2, is_horizontal/1,
+        parse_number_template/0, parse_number_template/1, parse_number_template/2, parse_color_template/1]).
 
 -include("nkadmin.hrl").
 
@@ -154,6 +155,7 @@
         is_subchart => boolean(),
         header => header(),
         charts => [chart()],
+        color => binary(),
         alpha => binary(),                                  %% default: 1.0
         border_color => hex_color(),
         borderless => boolean(),                            %% default: false
@@ -266,6 +268,7 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
     BorderColor = maps:get(border_color, Spec, <<>>),
     Borderless = maps:get(borderless, Spec, false),
     Cant = maps:get(cant, Spec, <<"0.5">>),
+    Color = maps:get(color, Spec, <<>>),
     Data = maps:get(data, Spec, []),
     DisableLines = maps:get(disable_lines, Spec, false),
     Dynamic = maps:get(dynamic, Spec, false),
@@ -390,6 +393,7 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
         borderless => Borderless,
         cant => Cant,
         cellWidth => CellWidth,
+        color => Color,
         data => Data,
         disableLines => DisableLines,
         dynamic => Dynamic,
@@ -441,12 +445,19 @@ is_horizontal(<<"stackedBarH">>) ->
 is_horizontal(_ChartType) ->
     false.
 
-
 %% @doc
 -spec parse_number_template() ->
     map().
 
 parse_number_template() ->
+    parse_number_template(<<>>).
+
+
+%% @doc
+-spec parse_number_template(binary()) ->
+    map().
+
+parse_number_template(Default) ->
     #{
         nkParseFunction => <<"
             function(obj) {
@@ -454,6 +465,8 @@ parse_number_template() ->
                     return (obj/1000000 + 'M');
                 } else if (obj >= 1000)  {
                     return (obj/1000 + 'K');
+                } else if (obj == 0) {
+                    return '", Default/binary, "'
                 }
                 return obj;
             }
@@ -462,10 +475,10 @@ parse_number_template() ->
 
 
 %% @doc
--spec parse_number_template(binary()) ->
+-spec parse_number_template(binary(), binary()) ->
     map().
     
-parse_number_template(Value) ->
+parse_number_template(Value, Default) ->
     #{
         nkParseFunction => <<"
             function(obj) {
@@ -477,11 +490,31 @@ parse_number_template(Value) ->
                         return value/1000000 + 'M';
                     } else if (value >= 1000) {
                         return value/1000 + 'K';
+                    } else if (value == 0) {
+                        return '", Default/binary, "'
                     } else {
                         return value;
                     }
                 }
                 return obj;
+            }
+        ">>
+    }.
+    
+
+%% @doc
+-spec parse_color_template(binary()) ->
+    map().
+        
+parse_color_template(Value) ->
+    #{
+        nkParseFunction => <<"
+            function(obj) {
+                var field = '", Value/binary, "';
+                if (obj && obj[field]) {
+                    return obj[field];
+                }
+                return 'black';
             }
         ">>
     }.
@@ -525,7 +558,7 @@ add_series(ChartType, [_|Charts], Series) ->
 filter_properties_by_chart_type(Type, JSON) ->
     % Get useful properties by chart type (common and specific)
     Specific = get_properties_by_chart_type(Type),
-    WhiteList = [id, view, type, nkCount, nkIntervalTime, nkIntervalFunction, url, ready, series, alpha, borderColor, borderless, data, dynamic, eventRadius, fixOverflow, label, legend, padding, removedMissed, tooltip, value | Specific],
+    WhiteList = [id, view, type, nkCount, nkIntervalTime, nkIntervalFunction, url, ready, series, alpha, borderColor, borderless, color, data, dynamic, eventRadius, fixOverflow, label, legend, padding, removedMissed, tooltip, value | Specific],
     % Filter useful properties
     JSON2 = maps:with(WhiteList, JSON),
     % Filter unused properties
