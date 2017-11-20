@@ -20,7 +20,7 @@
 
 -module(nkadmin_webix_chart).
 -export([chart/2, is_horizontal/1,
-        parse_number_template/0, parse_number_template/1, parse_number_template/2, parse_color_template/1]).
+        parse_number_template/0, parse_number_template/1, parse_number_template/2, parse_color_template/1, parse_date_template/1, parse_date_template/2]).
 
 -include("nkadmin.hrl").
 
@@ -518,7 +518,32 @@ parse_color_template(Value) ->
             }
         ">>
     }.
-    
+
+
+%% @doc
+-spec parse_date_template(binary()) ->
+    map().
+
+parse_date_template(Value) ->
+    parse_date_template(Value, <<"{}">>).
+
+%% @doc
+-spec parse_date_template(binary(), map()) ->
+    map().
+            
+parse_date_template(Value, Opts) ->
+    #{
+        nkParseFunction => <<"
+            function(obj) {
+                var field = '", Value/binary, "';
+                if (obj && obj[field]) {
+                    return (new Date(obj[field])).toLocaleString('en-US', ", Opts/binary, ");
+                }
+                return obj;
+            }
+        ">>
+    }.    
+
 
 add_series(<<"pie">>, _, _) ->
     [];
