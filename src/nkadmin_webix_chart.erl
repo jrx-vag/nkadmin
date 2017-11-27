@@ -195,7 +195,12 @@
         x_axis => x_axis(),                                 %% (line, bar, area, radar, scatter)
         x_value => binary(),                                %% (scatter)
         y_axis => y_axis(),                                 %% (line, bar, area, radar, scatter)
-        y_value => binary()                                 %% (scatter)
+        y_value => binary(),                                %% (scatter)
+        %% List charts specific
+        autoheight => boolean(),                            %% (list)
+        select => boolean(),                                %% (list)
+        template => binary() | template(),                  %% (list)
+        width => integer()                                  %% (list)
     }.
 
 
@@ -226,7 +231,7 @@ chart(#{chart_id:=ChartId}=Spec, Session) ->
             [
                 #{
                     template => HeaderText,
-                    height => 30,
+                    height => 50,
                     padding => 0,
                     css => HeaderCss
                 },
@@ -263,6 +268,7 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
     Alpha = maps:get(alpha, Spec, <<"1.0">>),
     Animate = maps:get(animate, Spec, true),
     AnimateDuration = maps:get(animate_duration, Spec, 400),
+    Autoheight = maps:get(autoheight, Spec, true),
     BarWidth = maps:get(bar_width, Spec, 30),
     Border = maps:get(border, Spec, false),
     BorderColor = maps:get(border_color, Spec, <<>>),
@@ -296,48 +302,18 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
     Radius = maps:get(radius, Spec, 0),
     RemovedMissed = maps:get(remove_missed, Spec, false),
     Scale = maps:get(scale, Spec, linear),
+    Select = maps:get(select, Spec, false),
     Shadow = maps:get(shadow, Spec, true),
+    Template = maps:get(template, Spec, <<"missing template">>),
     Tooltip = maps:get(tooltip, Spec, <<>>),
     Value = maps:get(value, Spec, <<>>),
+    Width = maps:get(width, Spec, <<>>),
     X = maps:get(x, Spec, <<>>),
     Y = maps:get(y, Spec, <<>>),
     XAxis = maps:get(x_axis, Spec, <<>>),
     YAxis = maps:get(y_axis, Spec, <<>>),
     XValue = maps:get(x_value, Spec, <<>>),
     YValue = maps:get(y_value, Spec, <<>>),
-    NKIntervalFunction = case Dynamic of
-        false ->
-            <<"
-                function(chartId) {
-                }
-            ">>;
-        true ->
-            <<"
-                function(chartId) {
-                    //var chart = $$('", ChartId/binary, "');
-                    var chart = $$(chartId);
-                    //console.log('nkIntervalFunction', chartId, chart);
-                    if (chart) {
-                        if (chart.nkTimer) {
-                            // Clear this inteval
-                            //console.log('nkIntervalFunction clearInterval', chart);
-                            clearInterval(chart.nkTimer);
-                            chart.nkTimer = null;
-                        }
-                        chart.load('wsChartProxy->', function(text, data, http_request) {
-                            // Data loaded
-                            //var chart = $$('", ChartId/binary, "');
-                            var chart = $$(chartId);
-                            if (chart && chart.config && chart.config.dynamic) {
-                                // Set next interval
-                                //console.log('nkIntervalFunction setNextInterval');
-                                chart.nkTimer = setInterval(function() { chart.config.nkIntervalFunction(chart) }, chart.config.nkIntervalTime);
-                            }
-                        });
-                    }
-                }
-            ">>
-    end,
     JSON = #{
         % Common configuration
         id => ChartId,
@@ -345,48 +321,14 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
         type => ChartType,
         nkCount => 0,
         nkIntervalTime => NKIntervalTime,
-        nkIntervalFunction => #{
-            nkParseFunction => NKIntervalFunction
-        },
+        nkIntervalFunction => get_nkinterval_function(Spec),
         url => <<"wsChartProxy->">>,
-        ready => #{
-            nkParseFunction => <<"
-                function() {
-                    // Set interval
-                    //var chart = $$('", ChartId/binary, "');
-                    var chart = $$(this.config.id);
-                    var chartId = this.config.id;
-                    if (this !== chart) {
-                        if (chart) {
-                            chartId = chart.config.id;
-                        }
-                        chart = this;
-                    }
-                    //console.log('onReady test'+'ing', this.config.id, this === $$(this.config.id), chartId);
-                    if (chart) {
-                        if (chart.config.dynamic) {
-                            // Setting first interval timer
-                            chart.nkTimer = setInterval(function() { chart.config.nkIntervalFunction(chart.config.id) }, chart.config.nkIntervalTime);
-                        } else {
-                            chart.config.nkIntervalFunction(chart.config.id);
-                        }
-                        // And a function to clear that interval on destruct
-                        chart.attachEvent('onDestruct', function() {
-                            //console.log('onDestruct test'+'ing', this.config.id, this, this.nkTimer);
-                            if (this.nkTimer) {
-                                clearInterval(this.nkTimer);
-                                this.nkTimer = null;
-                                //console.log('timer cleared', this.nkTimer);
-                            }
-                        })
-                    }
-                }
-            ">>
-        },
+        ready => get_ready(Spec),
         % Specific properties
         alpha => Alpha,
         animate => Animate,
         animateDuration => AnimateDuration,
+        autoheight => Autoheight,
         barWidth => BarWidth,
         border => Border,
         borderColor => BorderColor,
@@ -415,9 +357,12 @@ make_charts(#{chart_id:=ChartId, chart_type:=ChartType}=Spec, _Session) ->
         radius => Radius,
         removedMissed => RemovedMissed,
         scale => Scale,
+        select => Select,
         shadow => Shadow,
+        template => Template,
         tooltip => Tooltip,
         value => Value,
+        width => Width,
         x => X,
         y => Y,
         xAxis => XAxis,
@@ -444,6 +389,86 @@ is_horizontal(<<"stackedBarH">>) ->
     true;
 is_horizontal(_ChartType) ->
     false.
+
+
+-spec get_nkinterval_function(chart_type()) ->
+    map().
+
+get_nkinterval_function(#{chart_id:=ChartId}=Spec) ->
+    Dynamic = maps:get(dynamic, Spec, false),
+    Function = case Dynamic of
+    false ->
+        <<"
+            function(chartId) {
+            }
+        ">>;
+    true ->
+        <<"
+            function(chartId) {
+                //var chart = $$('", ChartId/binary, "');
+                var chart = $$(chartId);
+                //console.log('nkIntervalFunction', chartId, chart);
+                if (chart) {
+                    if (chart.nkTimer) {
+                        // Clear this inteval
+                        //console.log('nkIntervalFunction clearInterval', chart);
+                        clearInterval(chart.nkTimer);
+                        chart.nkTimer = null;
+                    }
+                    chart.load('wsChartProxy->', function(text, data, http_request) {
+                        // Data loaded
+                        //var chart = $$('", ChartId/binary, "');
+                        var chart = $$(chartId);
+                        if (chart && chart.config && chart.config.dynamic) {
+                            // Set next interval
+                            //console.log('nkIntervalFunction setNextInterval');
+                            chart.nkTimer = setInterval(function() { chart.config.nkIntervalFunction(chart) }, chart.config.nkIntervalTime);
+                        }
+                    });
+                }
+            }
+        ">>
+    end,
+    #{
+        nkParseFunction => Function
+    }.
+
+
+get_ready(#{chart_id:=ChartId}) ->
+    #{
+        nkParseFunction => <<"
+            function() {
+                // Set interval
+                //var chart = $$('", ChartId/binary, "');
+                var chart = $$(this.config.id);
+                var chartId = this.config.id;
+                if (this !== chart) {
+                    if (chart) {
+                        chartId = chart.config.id;
+                    }
+                    chart = this;
+                }
+                //console.log('onReady test'+'ing', this.config.id, this === $$(this.config.id), chartId);
+                if (chart) {
+                    if (chart.config.dynamic) {
+                        // Setting first interval timer
+                        chart.nkTimer = setInterval(function() { chart.config.nkIntervalFunction(chart.config.id) }, chart.config.nkIntervalTime);
+                    } else {
+                        chart.config.nkIntervalFunction(chart.config.id);
+                    }
+                    // And a function to clear that interval on destruct
+                    chart.attachEvent('onDestruct', function() {
+                        //console.log('onDestruct test'+'ing', this.config.id, this, this.nkTimer);
+                        if (this.nkTimer) {
+                            clearInterval(this.nkTimer);
+                            this.nkTimer = null;
+                            //console.log('timer cleared', this.nkTimer);
+                        }
+                    })
+                }
+            }
+        ">>
+    }.
 
 %% @doc
 -spec parse_number_template() ->
@@ -580,6 +605,18 @@ add_series(ChartType, [_|Charts], Series) ->
     add_series(ChartType, Charts, Series).
 
 
+
+filter_properties_by_chart_type(<<"list">>, JSON) ->
+    Specific = get_properties_by_chart_type(<<"list">>),
+    WhiteList = [id, nkCount, nkIntervalTime, nkIntervalFunction, data, dynamic, url, ready | Specific],
+    % Filter useful properties
+    JSON2 = maps:with(WhiteList, JSON),
+    JSON3 = JSON2#{
+        view => <<"list">>
+    },
+    % Filter unused properties
+    filter_unused_properties(JSON3);
+
 filter_properties_by_chart_type(Type, JSON) ->
     % Get useful properties by chart type (common and specific)
     Specific = get_properties_by_chart_type(Type),
@@ -590,6 +627,9 @@ filter_properties_by_chart_type(Type, JSON) ->
     filter_unused_properties(JSON2).
 
 
+
+get_properties_by_chart_type(<<"list">>) ->
+    [autoheight, select, template, width];
 
 get_properties_by_chart_type(<<"line">>) ->
     [animate, animateDuration, cellWidth, item, line, offset, origin, scale, series, xAxis, yAxis];

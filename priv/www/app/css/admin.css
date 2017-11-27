@@ -655,6 +655,19 @@ _toolbar-title {
 	padding-left: 3px;
 }
 
+.chart_header .webix_template {
+	font-size: x-large;
+}
+
+.chart_list_rank {
+	color: #475b71;
+	font-size: large;
+}
+
+.chart_list_number {
+	float: right;
+}
+
 /******************************************/
 
 /*************** PROFILE ******************/
