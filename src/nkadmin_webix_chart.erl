@@ -231,7 +231,7 @@ chart(#{chart_id:=ChartId}=Spec, Session) ->
             [
                 #{
                     template => HeaderText,
-                    height => 30,
+                    height => 50,
                     padding => 0,
                     css => HeaderCss
                 },
