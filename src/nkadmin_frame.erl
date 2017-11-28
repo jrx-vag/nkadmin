@@ -114,7 +114,6 @@ frame_domain(#admin_session{domain_id=DomainId}=Session) ->
                     value => #{icon => Icon}
                 }
             ],
-            % Session2 = nkadmin_util:add_object_tag(DomainId, nkadmin_frame_domain, Session),
             {ok, Items, Session};
         {error, Error} ->
             {error, Error}

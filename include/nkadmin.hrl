@@ -27,11 +27,10 @@
 
 
 -record(admin_session, {
-    srv_id :: nkservice:id(),
     session_id :: nkdomain:obj_id(),
-    http_auth_id :: binary(),
     domain_id :: nkdomain:obj_id(),
-    domain_path :: nkdomain:path(),
+    base_path :: nkdomain:path(),
+    srv_id :: nkservice:id(),
     user_id :: nkdomain:obj_id(),
     language :: binary(),
     url = <<>> :: binary(),
@@ -42,7 +41,8 @@
     object_tags = #{} :: #{ObjId::nkdomain:obj_id() => [Tag::term]},
     key_data = #{} :: #{Key::binary() => term()}, % Map client keys to data
     special_urls = #{} :: #{Url::binary() => Key::binary()}, % Special urls like "/alerts"
-    reg_pids = #{} :: #{pid()=>[domain|nkdomain:obj_id()]}
+    reg_pids = #{} :: #{pid()=>[domain|nkdomain:obj_id()]},
+    http_auth_id :: binary()
 }).
 
 

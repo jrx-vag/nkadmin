@@ -49,7 +49,12 @@ plugin_config(#{nkadmin:=NkAdmin}=Config, _Service) ->
             Priv = list_to_binary(code:priv_dir(nkadmin)),
             WebPath = <<Priv/binary, "/www">>,
             WebOpts = maps:get(webserver_opts, NkAdmin, #{}),
-            WebObj = #{id => <<"nkadmin">>, url=>WebUrl, opts=>WebOpts, file_path=>WebPath},
+            WebObj = #{
+                id => <<"nkadmin">>,
+                url => WebUrl,
+                opts => WebOpts,
+                file_path => WebPath
+            },
             nkservice_util:add_config_obj(nkservice_webserver, WebObj, Config);
         _ ->
             Config
@@ -57,7 +62,11 @@ plugin_config(#{nkadmin:=NkAdmin}=Config, _Service) ->
     Config3 = case NkAdmin of
         #{api_url:=ApiUrl} ->
             ApiOpts = maps:get(api_opts, NkAdmin, #{}),
-            ApiObj = #{id => <<"nkadmin">>, url=>ApiUrl, opts=>ApiOpts},
+            ApiObj = #{
+                id => <<"nkadmin">>,
+                url => ApiUrl,
+                opts=>ApiOpts
+            },
             nkservice_util:add_config_obj(nkapi_server, ApiObj, Config2);
         _ ->
             Config2
