@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_util).
--export([i18n/2, menu_item/4, make_id/1]).
+-export([i18n/2, menu_category/3, menu_group/3, menu_entry/3, make_id/1]).
 -export([get_key_data/2, set_key_data/3, remove_key_data/2]).
 -export([update_detail/4, update_url/2]).
 -export([get_special_url/2, set_special_url/3, remove_special_url/2]).
@@ -31,46 +31,49 @@
 %% Types
 %% ===================================================================
 
--type menu_type() ::  menuCategory | menuGroup | menuEntry.
-
--type menu_value() :: #{
-    label => binary(),
-    icon => atom() | binary(),
-    tooltip => binary(),
-    items => list()
-}.
-
 
 %% ===================================================================
 %% Updates management
 %% ===================================================================
 
 
-
 %% @doc
--spec menu_item(atom()|binary(), menu_type(), menu_value(), nkadmin_session_obj:session()) ->
+-spec menu_category(atom()|binary(), nkadmin:update_value(), nkadmin_session_obj:session()) ->
     map().
 
-menu_item(Id, menuCategory, #{items:=_}=Value, Session) ->
+menu_category(Id, #{items:=_}=Value, Session) ->
     #{
         id => Id,
         class => menuCategory,
         value => add_label(Id, Value, Session)
-    };
+    }.
 
-menu_item(Id, menuGroup, #{items:=_}=Value, Session) ->
+%% @doc
+-spec menu_group(atom()|binary(), nkadmin:update_value(), nkadmin_session_obj:session()) ->
+    map().
+
+menu_group(Id, #{items:=_}=Value, Session) ->
     #{
         id => Id,
         class => menuGroup,
         value => add_label(Id, Value, Session)
-    };
+    }.
 
-menu_item(Id, menuEntry, Value, Session) ->
+
+%% @doc
+-spec menu_entry(atom()|binary(), nkadmin:update_value(), nkadmin_session_obj:session()) ->
+    map().
+
+
+menu_entry(Id, Value, Session) ->
     #{
         id => Id,
         class => menuEntry,
         value => add_label(Id, Value, Session)
     }.
+
+
+
 
 
 %% @doc

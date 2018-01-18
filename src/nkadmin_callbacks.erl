@@ -55,7 +55,7 @@ error(_)   		                 -> continue.
 
 %% @doc Must return the frame elements
 -spec admin_get_frame(session()) ->
-    {ok, map(), session()} | {error, term(), session()}.
+    {ok, nkadmin:update(), session()} | {error, term(), session()}.
 
 admin_get_frame(Session) ->
     nkadmin_frame:get_frame(Session).
@@ -63,11 +63,10 @@ admin_get_frame(Session) ->
 
 %% @doc Must return the tree elements
 -spec admin_get_tree(session()) ->
-    {ok, map(), session()} | {error, term(), session()}.
+    {ok, nkadmin:update(), session()} | {error, term(), session()}.
 
 admin_get_tree(Session) ->
     nkadmin_tree:get_tree(Session).
-
 
 
 %% @doc Called when a registered event is received
@@ -104,9 +103,8 @@ admin_get_data(_ElementIdParts, _Spec, Session) ->
 
 
 %% @doc Called from nkadmin_tree to get the list of categories
-%% Must return  a map with the position (lower first)
 -spec admin_tree_categories(map(), session()) ->
-    {ok, map(), session()}.
+    {ok, #{Key::binary() => Weigth::integer()}, session()}.
 
 admin_tree_categories(Map, Session) ->
     {ok, Map, Session}.
@@ -114,7 +112,7 @@ admin_tree_categories(Map, Session) ->
 
 %% @doc Called from nkadmin_tree to get the data of a category
 -spec admin_tree_get_category(binary(), session()) ->
-    {ok, map(), session()} | {error, term()}.
+    {ok, nkdomain:update(), session()} | {error, term()}.
 
 admin_tree_get_category(_Category, Session) ->
     {ok, #{}, Session}.

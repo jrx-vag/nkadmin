@@ -94,7 +94,8 @@ element_action(_ElementIdParts, _Id, _Value, _Updates, _Session) ->
 %% @private
 frame_domain(#admin_session{domain_id=DomainId}=Session) ->
     case nkdomain:get_name(DomainId) of
-        {ok, #{name:=DomName, description:=Description}=Obj} ->
+        {ok, #{name:=DomName}=Obj} ->
+            Description = maps:get(description, Obj, <<>>),
             Icon = maps:get(icon_id, Obj, <<>>),
             case DomName =:= <<>> of
                 true ->
@@ -142,16 +143,16 @@ frame_user(#admin_session{user_id=UserId}=Session) ->
                     value => #{
                         icon => 'fa-user',
                         items => [
-                            nkadmin_util:menu_item(admin_frame_user_menu_account, menuEntry, #{icon=>'fa-gear'}, Session),
+                            nkadmin_util:menu_entry(admin_frame_user_menu_account, #{icon=>'fa-gear'}, Session),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_item(admin_frame_user_menu_messages, menuEntry, #{icon=>'fa-comments'}, Session),
+                            nkadmin_util:menu_entry(admin_frame_user_menu_messages, #{icon=>'fa-comments'}, Session),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_item(logout, menuEntry, #{icon=>'fa-sign-out'}, Session)
+                            nkadmin_util:menu_entry(logout, #{icon=>'fa-sign-out'}, Session)
                         ]
                     }
                 }
             ],
-            % Session2 = nkadmin_util:add_object_tag(UserId, nkadmin_frame_user, Session),
+            % Session2 = nkadmin_util:add_object_tag(UserId, admin_frame_user, Session),
             {ok, Items, Session};
         {error, Error} ->
             {error, Error}
