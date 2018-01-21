@@ -147,7 +147,6 @@ button(#{type:=delete}, FormId) ->
     };
 
 button(#{type:=save}, FormId) ->
-    lager:error("NKLOG FID ~p", [FormId]),
     #{
         id => <<"user_save_button">>,
         view => <<"button">>,
@@ -159,17 +158,17 @@ button(#{type:=save}, FormId) ->
         disabled => false,
         hidden => false,
         click => #{
-            nkParseFunction => js_fun_save(FormId)
+            nkParseFunction => js_fun_action_form(FormId, <<"save">>)
         }
     }.
 
 
 
 %% @private
-body(#{form_id:=FormId}=Spec, Session) ->
+body(Spec, Session) ->
     #{
-        id => FormId,
-        header => <<"USER DETAILS">>,
+        id => <<"form_body">>,
+        %% header => <<"USER DETAILS">>,
         type => <<"clean">>,
         gravity => 2.0,
         height => <<"100%">>,
@@ -208,9 +207,9 @@ body(#{form_id:=FormId}=Spec, Session) ->
 
 
 %% @private
-body_form(#{groups:=Groups}, _Session) ->
+body_form(#{form_id:=FormId, groups:=Groups}, _Session) ->
     #{
-        id => <<"form1">>,
+        id => FormId,
         view => <<"form">>,
         height => <<"100%">>,
         scroll => <<"y">>,
@@ -298,10 +297,9 @@ body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Option
         options => Options
     };
 
-body_form_row(#{type:=date, id:=Id, label:=Label, value:=Value}) ->
+body_form_row(#{type:=date, label:=Label, value:=Value}) ->
     #{
         view => <<"text">>,
-        %%id => Id,
         label => Label,
         labelWidth => 150,
         labelAlign => <<"left">>,
@@ -344,7 +342,6 @@ js_fun_action(FormId, Action) -> <<"
                 function(response) {
                     console.log('Action ", Action/binary, " button clicked OK: ', response);
                     if (response.data && response.data.elements) {
-                        // Update view
                         updateView(response.data.elements);
                     }
                 }).catch(
@@ -358,42 +355,43 @@ js_fun_action(FormId, Action) -> <<"
 
 
 %% @private
-js_fun_save(FormId) -> <<"
+js_fun_action_form(FormId, Action) -> <<"
     function() {
-        console.log('FORM: ", FormId/binary, "');
-
-
-    $$('form1').getValues(function(obj){
-        console.log('VALUES: ' + obj.getValue());
-    });
+        var values = $$(\"", FormId/binary, "\").getValues({disabled:false});
+        ncClient.sendMessageAsync(
+            \"objects/admin.session/element_action\",
+            {
+                element_id: \"", FormId/binary, "\",
+                action: \"", Action/binary, "\",
+                value: values
+            }).then(
+                function(response) {
+                    console.log('Action ", Action/binary, " button clicked OK: ', response);
+                    if (response.data && response.data.elements) {
+                        updateView(response.data.elements);
+                    }
+                }).catch(
+                    function(response) {
+                        console.log('Action ", Action/binary, " error: ', response);
+                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error
+                });
+        });
     }
 ">>.
-%%        var domain = $$(\"form_domain\").getValue();
-%%        var username = $$(\"form_username\").getValue();
-%%        var email = $$(\"form_email\").getValue();
-%%        var password = $$(\"form_password\").getValue();
-%%        var name = $$(\"form_name\").getValue();
-%%        var surname = $$(\"form_surname\").getValue();
-%%        var phone_t = $$(\"form_phone_t\").getValue();
-%%        var address_t = $$(\"form_address_t\").getValue();
+
+
+
+%%function() {
+%%//var values = $$(\"", FormId/binary, "\").getValues({disabled:false});
 %%        ncClient.sendMessageAsync(
 %%            \"objects/admin.session/element_action\",
 %%            {
 %%                element_id: \"", FormId/binary, "\",
 %%                action: \"save\",
-%%                value: {
-%%                    domain: domain,
-%%                    username: username,
-%%                    email: email,
-%%                    password: password,
-%%                    name: name,
-%%                    surname: surname,
-%%                    phone_t: phone_t,
-%%                    address_t: address_t
-%%                }
+%%                value: \"values\"
 %%            }).then(
 %%                function(response) {
-%%                    console.log('Save button clicked OK: ', response);
+%%                    console.log('Form action ", Action/binary, " button clicked OK: ', response);
 %%                    if (response.data && response.data.elements) {
 %%                        // Update view
 %%                        updateView(response.data.elements);
@@ -401,11 +399,10 @@ js_fun_save(FormId) -> <<"
 %%                }).catch(
 %%                    function(response) {
 %%                        console.log('Error at save button clicked: ', response);
-%%                                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
+%%                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error });
 %%                });
+%%        });
 %%    }
-%%">>.
-
 
 %%i18n(<<"&nbsp;">>, _Session) -> <<>>;
 %%i18n(Key, Session) -> nkadmin_util:i18n(Key, Session).
