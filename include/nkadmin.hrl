@@ -26,6 +26,16 @@
 %% ===================================================================
 
 
+%-define(ADMIN_SESSION(Key, Val, Session), Session#{Key => Val}).
+
+-define(DOMAIN_ADMIN_SESSION, <<"admin.session">>).
+
+
+
+%% ===================================================================
+%% Records
+%% ===================================================================
+
 -record(admin_session, {
     session_id :: nkdomain:obj_id(),
     domain_id :: nkdomain:obj_id(),
@@ -42,22 +52,21 @@
     key_data = #{} :: #{Key::binary() => term()}, % Map client keys to data
     special_urls = #{} :: #{Url::binary() => Key::binary()}, % Special urls like "/alerts"
     reg_pids = #{} :: #{pid()=>[domain|nkdomain:obj_id()]},
-    http_auth_id :: binary()
+    http_auth_id :: binary(),
+    extra_filters = [] :: [extra_filter()]
 }).
 
 
-%-define(ADMIN_SESSION(Key, Val, Session), Session#{Key => Val}).
-
--define(DOMAIN_ADMIN_SESSION, <<"admin.session">>).
-
-
 
 %% ===================================================================
-%% Records
+%% Types
 %% ===================================================================
 
+-type filter() ::
+    { Field::binary(), Op::atom(), Val::binary() }.
 
-
+-type extra_filter() ::
+    { Op::atom(), Filter::filter()} | filter().
 
 -endif.
 
