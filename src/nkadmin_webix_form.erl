@@ -101,7 +101,9 @@ buttons(#{buttons:=Buttons, form_id:=FormId}) ->
 
 
 %% @private
-button(#{type:=disable}, FormId) ->
+button(#{type:=disable}=Button, FormId) ->
+    Disabled = maps:get(disabled, Button, false),
+    IsDisabled = webix_bool(Disabled),
     #{
         id => <<"user_disable_button">>,
         view => <<"button">>,
@@ -111,12 +113,15 @@ button(#{type:=disable}, FormId) ->
         css => <<"webix_img_btn__centered">>,
         align => <<"center">>,
         %%hidden => (Enabled == <<"false">>),
+        disabled => IsDisabled,
         click => #{
             nkParseFunction => js_fun_action(FormId, <<"disable">>)
         }
     };
 
-button(#{type:=enable}, FormId) ->
+button(#{type:=enable}=Button, FormId) ->
+    Disabled = maps:get(disabled, Button, false),
+    IsDisabled = webix_bool(Disabled),
     #{
         id => <<"user_enable_button">>,
         view => <<"button">>,
@@ -126,12 +131,15 @@ button(#{type:=enable}, FormId) ->
         css => <<"webix_img_btn__centered">>,
         align => <<"center">>,
         %%hidden => (Enabled == <<"true">>),
+        disabled => IsDisabled,
         click => #{
             nkParseFunction => js_fun_action(FormId, <<"enable">>)
         }
     };
 
-button(#{type:=delete}, FormId) ->
+button(#{type:=delete}=Button, FormId) ->
+    Disabled = maps:get(disabled, Button, false),
+    IsDisabled = webix_bool(Disabled),
     #{
         id => <<"user_delete_button">>,
         view => <<"button">>,
@@ -141,12 +149,15 @@ button(#{type:=delete}, FormId) ->
         css => <<"webix_img_btn__centered">>,
         align => <<"center">>,
         hidden => false,
+        disabled => IsDisabled,
         click => #{
             nkParseFunction => js_fun_action(FormId, <<"delete">>)
         }
     };
 
-button(#{type:=save}, FormId) ->
+button(#{type:=save}=Button, FormId) ->
+    Disabled = maps:get(disabled, Button, false),
+    IsDisabled = webix_bool(Disabled),
     #{
         id => <<"user_save_button">>,
         view => <<"button">>,
@@ -155,7 +166,7 @@ button(#{type:=save}, FormId) ->
         icon => <<"floppy-o">>,
         css => <<"webix_img_btn__centered">>,
         align => <<"center">>,
-        disabled => false,
+        disabled => IsDisabled,
         hidden => false,
         click => #{
             nkParseFunction => js_fun_action_form(FormId, <<"save">>)
@@ -379,6 +390,15 @@ js_fun_action_form(FormId, Action) -> <<"
     }
 ">>.
 
+
+webix_bool(<<"false">>) ->
+    false;
+
+webix_bool(<<"true">>) ->
+    true;
+
+webix_bool(Boolean) ->
+    Boolean.
 
 
 %%function() {

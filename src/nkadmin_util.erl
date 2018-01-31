@@ -89,14 +89,10 @@ update_detail(Path, Detail, Updates, Session) ->
 
 %% @doc
 update_path(Path, Updates, #admin_session{base_path=Base}=Session) ->
-    Path2 = case Base of
-        <<"/">>  -> Path;
-        _ -> <<Base/binary, Path/binary>>
-    end,
     Data = #{
         class => breadcrumbs,
         id => breadcrumbs,
-        value => #{items => get_parts(Path2)}
+        value => #{items => get_parts(Path)}
     },
     {[Data|Updates], Session#admin_session{url=Path}}.
 

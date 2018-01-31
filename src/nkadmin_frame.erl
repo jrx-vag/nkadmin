@@ -107,7 +107,7 @@ frame_domain(#admin_session{domain_id=DomainId}=Session) ->
                 #{
                     id => admin_frame_domain_name,
                     class => frameDomainName,
-                    value => #{label => DomName2, css => DomName2}
+                    value => #{label => DomName2, css => nkdomain_util:name(DomName2)}
                 },
                 #{
                     id => admin_frame_domain_icon,
