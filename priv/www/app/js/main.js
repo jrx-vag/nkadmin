@@ -23,6 +23,7 @@
         var wsError = "";
         var loggedOut = false;
         var userId = null;
+        var domainId = null;
         var sessionId = null;
         var adminSessionId = null;
         var treeIds = [];
@@ -141,6 +142,7 @@
 
                 // Save user obj_id
                 userId = data.obj_id;
+                domainId = data.domain_id;             
                 sessionId = data.session_id;
                 console.log("userId: ", userId, "sessionId: ", sessionId);
 
@@ -2068,7 +2070,7 @@
                                             var response = JSON.parse(xhr.responseText);
                                             console.log('new file_id: ', response.obj_id);
                                             ncClient.sendMessageAsync('objects/domain/update', {
-                                                id: 'root',
+                                                id: domainId,
                                                 icon_id: response.obj_id
                                             }).then(function(response) {
                                                 // Force page reload
@@ -2165,7 +2167,11 @@
     					"cancel": "No",
     					"callback": function(response) {
     						if(response) {
-    							//doLogout();
+                                if (window.localStorage) {
+                                    localStorage.removeItem(lsNcLogin);
+                                    localStorage.removeItem(lsNcPwd);
+                                }                
+                                //doLogout();
                                 doDestroy();
     						}
     					}
