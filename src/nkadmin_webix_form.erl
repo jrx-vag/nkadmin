@@ -308,6 +308,21 @@ body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Option
         options => Options
     };
 
+body_form_row(#{type:=multiselect, id:=Id, label:=Label, value:=Value, options:=Options}) ->
+    #{
+        view => <<"multiselect">>,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        placeholder => placeholder(Label),
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        value => Value,
+        disabled => false, % true/false
+        hidden => false, % true/false
+        options => Options
+    };
+
 body_form_row(#{type:=date, label:=Label, value:=Value}) ->
     #{
         view => <<"text">>,
