@@ -103,7 +103,7 @@ buttons(#{buttons:=Buttons, form_id:=FormId}) ->
 %% @private
 button(#{type:=disable}=Button, FormId) ->
     Disabled = maps:get(disabled, Button, false),
-    IsDisabled = webix_bool(Disabled),
+    IsDisabled = nkadmin_util:webix_bool(Disabled),
     #{
         id => <<"user_disable_button">>,
         view => <<"button">>,
@@ -121,7 +121,7 @@ button(#{type:=disable}=Button, FormId) ->
 
 button(#{type:=enable}=Button, FormId) ->
     Disabled = maps:get(disabled, Button, false),
-    IsDisabled = webix_bool(Disabled),
+    IsDisabled = nkadmin_util:webix_bool(Disabled),
     #{
         id => <<"user_enable_button">>,
         view => <<"button">>,
@@ -139,7 +139,7 @@ button(#{type:=enable}=Button, FormId) ->
 
 button(#{type:=delete}=Button, FormId) ->
     Disabled = maps:get(disabled, Button, false),
-    IsDisabled = webix_bool(Disabled),
+    IsDisabled = nkadmin_util:webix_bool(Disabled),
     #{
         id => <<"user_delete_button">>,
         view => <<"button">>,
@@ -157,7 +157,7 @@ button(#{type:=delete}=Button, FormId) ->
 
 button(#{type:=save}=Button, FormId) ->
     Disabled = maps:get(disabled, Button, false),
-    IsDisabled = webix_bool(Disabled),
+    IsDisabled = nkadmin_util:webix_bool(Disabled),
     #{
         id => <<"user_save_button">>,
         view => <<"button">>,
@@ -218,8 +218,14 @@ body(Spec, Session) ->
 
 
 %% @private
-body_form(#{form_id:=FormId, groups:=Groups}, _Session) ->
-    #{
+body_form(#{form_id:=FormId, groups:=Groups}=Spec, _Session) ->
+    Base = case Spec of
+        #{visible_batch := VisibleBatch} ->
+            #{visibleBatch => VisibleBatch};
+        _ ->
+            #{}
+    end,
+    Base#{
         id => FormId,
         view => <<"form">>,
         height => <<"100%">>,
@@ -233,23 +239,29 @@ body_form(#{form_id:=FormId, groups:=Groups}, _Session) ->
 
 
 %% @private
-body_form_group(#{header:=Header, values:=Values}) ->
-    #{
+body_form_group(#{header:=Header, values:=Values}=Group) ->
+    Hidden = maps:get(hidden, Group, false),
+    Disabled = maps:get(disabled, Group, false),
+    Base = maps:with([id, batch], Group),
+    Base#{
         minWidth => 300,
         rows => [
             #{
                 template => Header,
                 type => <<"section">>,
-                hidden => false
+                hidden => nkadmin_util:webix_bool(Hidden),
+                disabled => nkadmin_util:webix_bool(Disabled)
             } |
-            [body_form_row(Row) || Row <- Values]
+            [body_form_row(Row#{global_hidden => Hidden, global_disabled => Disabled}) || Row <- Values]
         ]
     }.
 
 
 %% @private
 body_form_row(#{type:=text, id:=Id, label:=Label, value:=Value}=Spec) ->
-    #{
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
         view => <<"text">>,
         %%id => Id,
         name => Id,
@@ -257,17 +269,19 @@ body_form_row(#{type:=text, id:=Id, label:=Label, value:=Value}=Spec) ->
         placeholder => placeholder(Label),
         labelWidth => 150,
         labelAlign => <<"left">>,
-        value => Value,
-        disabled => not maps:get(editable, Spec, false)
+        value => Value
     };
 
-body_form_row(#{type:=html, id:=Id, label:=Label, value:=Value}) ->
+body_form_row(#{type:=html, id:=Id, label:=Label, value:=Value}=Spec) ->
+    Base = get_base_form_row(Spec),
+    HiddenValue = maps:get(hidden, Base, false),
     #{
         cols => [
             #{
                 view => <<"label">>,
                 label => Label,
                 width => 150,
+                hidden => HiddenValue,
                 disabled => true
             },
             #{
@@ -275,13 +289,16 @@ body_form_row(#{type:=html, id:=Id, label:=Label, value:=Value}) ->
                 id => Id,
                 template => Value, %nkdomain_admin_util:obj_id_url(CreatedBy),
                 borderless => true,
-                autoheight => true
+                autoheight => true,
+                hidden => HiddenValue
             }
         ]
     };
 
-body_form_row(#{type:=password, id:=Id, label:=Label}) ->
-    #{
+body_form_row(#{type:=password, id:=Id, label:=Label}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
         view => <<"text">>,
         %%id => Id,
         name => Id,
@@ -293,8 +310,10 @@ body_form_row(#{type:=password, id:=Id, label:=Label}) ->
         type => <<"password">>
     };
 
-body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Options}) ->
-    #{
+body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
         view => <<"combo">>,
         %%id => Id,
         name => Id,
@@ -303,14 +322,61 @@ body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Option
         labelWidth => 150,
         labelAlign => <<"left">>,
         value => Value,
-        disabled => false, % true/false
-        hidden => false, % true/false
         options => Options
     };
 
-body_form_row(#{type:=date, label:=Label, value:=Value}) ->
-    #{
+body_form_row(#{type:=suggest, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
         view => <<"text">>,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        placeholder => placeholder(Label),
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        value => Value,
+        suggest => Options
+    };
+
+body_form_row(#{type:=multiselect, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
+        view => <<"multiselect">>,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        placeholder => placeholder(Label),
+        button => true,
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        value => Value,
+        options => Options
+    };
+
+body_form_row(#{type:=multicombo, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
+        view => <<"multicombo">>,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        placeholder => placeholder(Label),
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        value => Value,
+        options => Options
+    };
+
+body_form_row(#{type:=date, id:=Id, label:=Label, value:=Value}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base#{
+        view => <<"text">>,
+        %%id => Id,
+        name => Id,
         label => Label,
         labelWidth => 150,
         labelAlign => <<"left">>,
@@ -321,6 +387,22 @@ body_form_row(#{type:=date, label:=Label, value:=Value}) ->
             }
         },
         disabled => true
+    };
+
+body_form_row(#{type:=checkbox, id:=Id, label:=Label, value:=Value}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
+        view => <<"checkbox">>,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        checkValue => true,
+        uncheckValue => false,
+        required => false,
+        value => nkadmin_util:webix_bool(Value)
     }.
 
 
@@ -368,37 +450,51 @@ js_fun_action(FormId, Action) -> <<"
 %% @private
 js_fun_action_form(FormId, Action) -> <<"
     function() {
-        var values = $$(\"", FormId/binary, "\").getValues({disabled:false});
-        ncClient.sendMessageAsync(
-            \"objects/admin.session/element_action\",
-            {
-                element_id: \"", FormId/binary, "\",
-                action: \"", Action/binary, "\",
-                value: values
-            }).then(
-                function(response) {
-                    console.log('Action ", Action/binary, " button clicked OK: ', response);
-                    if (response.data && response.data.elements) {
-                        updateView(response.data.elements);
-                    }
-                }).catch(
+        var form = $$(\"", FormId/binary, "\");
+        if (form && form.validate()) {
+            var values = form.getValues({disabled:true, hidden:true});
+            ncClient.sendMessageAsync(
+                \"objects/admin.session/element_action\",
+                {
+                    element_id: \"", FormId/binary, "\",
+                    action: \"", Action/binary, "\",
+                    value: values
+                }).then(
                     function(response) {
-                        console.log('Action ", Action/binary, " error: ', response);
-                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error
-                });
-        });
+                        console.log('Action ", Action/binary, " button clicked OK: ', response);
+                        if (response.data && response.data.elements) {
+                            updateView(response.data.elements);
+                        }
+                    }).catch(
+                        function(response) {
+                            console.log('Action ", Action/binary, " error: ', response);
+                            webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error
+                    });
+            });
+        }
     }
 ">>.
 
 
-webix_bool(<<"false">>) ->
-    false;
+%% @private
+get_base_form_row(Spec) ->
+    Hidden = maps:get(hidden, Spec, false),
+    GlobalHidden = maps:get(global_hidden, Spec, false),
+    HiddenValue = nkadmin_util:webix_bool(GlobalHidden or Hidden),
+    Disabled = not maps:get(editable, Spec, false),
+    GlobalDisabled = maps:get(global_disabled, Spec, false),
+    DisabledValue = nkadmin_util:webix_bool(GlobalDisabled or Disabled),
+    Required = maps:get(required, Spec, false),
+    #{
+        required => Required,
+        hidden => HiddenValue,
+        disabled => DisabledValue
+    }.
 
-webix_bool(<<"true">>) ->
-    true;
 
-webix_bool(Boolean) ->
-    Boolean.
+%% @private
+get_form_listeners() ->
+    [onChange].
 
 
 %%function() {

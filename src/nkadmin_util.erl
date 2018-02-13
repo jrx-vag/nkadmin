@@ -24,6 +24,7 @@
 -export([update_detail/4, update_url/2]).
 -export([get_special_url/2, set_special_url/3, remove_special_url/2]).
 -export([get_object_tags/2, add_object_tag/3, remove_object_tag/3]).
+-export([webix_bool/1, add_listeners/3]).
 
 -include("nkadmin.hrl").
 
@@ -211,6 +212,61 @@ get_parts(Path) ->
     case binary:split(to_bin(Path), <<"/">>, [global]) of
         [<<>>, <<>>] -> [<<"/">>];
         [<<>>|Rest] -> [<<"/">>|Rest]
+    end.
+
+
+%% ===================================================================
+%% Util
+%% ===================================================================
+
+
+%% @private
+webix_bool(<<"false">>) ->
+    false;
+
+webix_bool(<<"true">>) ->
+    true;
+
+webix_bool(true) ->
+    true;
+
+webix_bool(false) ->
+    false;
+
+webix_bool(Unknown) ->
+    lager:warning("nkadmin_util: unknown boolean value passed to webix_bool: ~p", [Unknown]),
+    false.
+
+
+%% @private
+add_listeners([], _Spec, Map) ->
+    Map;
+
+add_listeners(Listeners, Spec, Map) ->
+    add_listeners(Listeners, #{}, Spec, Map).
+
+
+add_listeners([], Listeners, _Spec, Map) ->
+    case maps:size(Listeners) of
+        0 ->
+            Map;
+        _ ->
+            Map#{
+                on => Listeners
+            }
+    end;
+
+add_listeners([L|Ls], Listeners, Spec, Map) ->
+    case Spec of
+        #{L := F} ->
+            Listeners2 = Listeners#{
+                L => #{
+                    nkParseFunction => F
+                }
+            },
+            add_listeners(Ls, Listeners2, Spec, Map);
+        _ ->
+            add_listeners(Ls, Listeners, Spec, Map)
     end.
 
 
