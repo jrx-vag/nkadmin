@@ -272,17 +272,39 @@ body_form_row(#{type:=text, id:=Id, label:=Label, value:=Value}=Spec) ->
         value => Value
     };
 
+%% @private
+body_form_row(#{type:=number_edit, id:=Id, label:=Label, value:=Value}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    IsFloat = maps:get(is_float, Spec, false),
+    AllowNegatives = maps:get(allow_negatives, Spec, false),
+    Base2#{
+        view => <<"numberEdit">>,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        placeholder => placeholder(Label),
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        inputAlign => <<"left">>,
+        value => Value,
+        isFloat => IsFloat,
+        allowNegatives => AllowNegatives
+    };
+
 body_form_row(#{type:=html, id:=Id, label:=Label, value:=Value}=Spec) ->
     Base = get_base_form_row(Spec),
     HiddenValue = maps:get(hidden, Base, false),
+    Batch = maps:get(batch, Base, <<>>),
     #{
+        batch => Batch,
+        hidden => HiddenValue,
         cols => [
             #{
                 view => <<"label">>,
                 label => Label,
                 width => 150,
-                hidden => HiddenValue,
-                disabled => true
+                hidden => HiddenValue
             },
             #{
                 view => <<"template">>,
@@ -381,12 +403,13 @@ body_form_row(#{type:=date, id:=Id, label:=Label, value:=Value}=Spec) ->
         labelWidth => 150,
         labelAlign => <<"left">>,
         value => Value,
+        disabled => false,
+        readonly => true,
         on => #{
             onBeforeRender => #{
                 nkParseFunction => js_fun_date()
             }
-        },
-        disabled => true
+        }
     };
 
 body_form_row(#{type:=checkbox, id:=Id, label:=Label, value:=Value}=Spec) ->
@@ -485,7 +508,14 @@ get_base_form_row(Spec) ->
     GlobalDisabled = maps:get(global_disabled, Spec, false),
     DisabledValue = nkadmin_util:webix_bool(GlobalDisabled or Disabled),
     Required = maps:get(required, Spec, false),
-    #{
+    Batch = maps:get(batch, Spec, <<>>),
+    Base = case Batch of
+        <<>> ->
+            #{};
+        _ ->
+            #{batch => Batch}
+    end,
+    Base#{
         required => Required,
         hidden => HiddenValue,
         disabled => DisabledValue
