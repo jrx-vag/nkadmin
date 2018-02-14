@@ -1,7 +1,7 @@
 (function(){
 	
 	logic = (function(){
-        var host = "ovh.jaraxa.com";
+        var host = "v.netc.io";
 	    var port = 443;
         var pathname = '/_admin';
         var path = '_api/ws';
@@ -269,6 +269,175 @@
 		            	return "<input type='checkbox' "+(config.checked?"checked='1'":"")+">"; 
 		            }
                 }, webix.ui.datafilter.masterCheckbox);
+
+                // Define a custom number input
+                var numberAllowed = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 35, 36, 37, 38, 39, 40, 7, 8, 9, 27, 13, 46];
+                function processNumber(e, config, code) {
+                    e = (e || event);
+                    code = (code || (e.which || e.keyCode));
+                    if (numberAllowed.indexOf(code) > -1) {
+                        return true;
+                    }
+                    if (e.ctrlKey || e.shiftKey || e.metaKey) {
+                        return true;
+                    }
+                    if (code === 109 && config.allowNegatives/*-*/) {
+                        var value = e.target.value;
+                        if (value === "") {
+                            value = "-";
+                        } else if (value[0] === "-") {
+                            value = value.substr(1);
+                        } else {
+                            value = "-" + value;
+                        }
+                        e.target.value = value;
+                    } else if (code === 110 || code === 190 || code === 188/*Decimal*/) {
+                        if (config.isFloat === false) {
+                            return webix.html.preventEvent(e);
+                        }
+                        var selStart = e.target.selectionStart;
+                        var selEnd = e.target.selectionEnd;
+                        var dotIndex = e.target.value.indexOf(".");
+                        if (dotIndex > -1 && (dotIndex < selStart || dotIndex > selEnd)) {
+                            return webix.html.preventEvent(e);
+                        }
+                        if (e.target.value === "") {
+                            e.target.value = ".";
+                        } else {
+                            var $start = e.target.value.substring(0, selStart), $end = e.target.value.substring(selEnd);
+                            e.target.value = $start + "." + $end;
+                            e.target.setSelectionRange && e.target.setSelectionRange(selStart + 1, selStart + 1);
+                        }
+                    }
+                    return webix.html.preventEvent(e);
+                };
+                // Define a custom number input
+                webix.protoUI({
+                    name: "numberEdit",
+                    $cssName: "text",
+                    defaults: {
+                        type: "text",
+                        inputAlign: "right",
+                        isFloat: false,
+                        allowNull: false,
+                        allowNegatives: false,
+                        nullValue: 0,
+                        helpText: null
+                    },
+                    $renderIcon: function () {
+                        var config = this._settings || this.config;
+                        var height = config.aheight - 2 * config.inputPadding,
+                            padding = (height - 18) / 2 - 1;
+                        if (config.helpText) {
+                            return "<span style='line-height:" + height + "px;z-index:1;position:absolute;right:4px;padding:0 4px;'>" + config.helpText + "</span>";
+                        }
+                        if (config.icon) {
+                            return "<span style='height:" + (height - padding) + "px;padding-top:" + padding + "px;width:24px;z-index:1;position:absolute;right:4px;' class='webix_input_icon fa-" + config.icon + "'></span>";
+                        }
+                        return "";
+                    },
+                    $init: function (config) {
+                        if (config.isFloat === null || config.isFloat === undefined) {
+                            config.isFloat = this.defaults.isFloat;
+                        }
+                        config.inputAlign = config.inputAlign || this.defaults.inputAlign;
+                        switch (config.format) {
+                            case "p":
+                            case "percent":
+                                config.format = function (value) { return Globalize.numberFormatter({ style: "percent" }).call(this, value) }
+                                break;
+                            case "P":
+                            case "Percent": case "%":
+                                config.format = function (value) { return Globalize.numberFormatter({ style: "percent" }).call(this, value / 100) };
+                                break;
+                        }
+                        if (config.helpText) {
+                            var helpTextWidth = webix.html.getTextSize(config.helpText).width + 8;
+                            config.inputAlign += ";padding-right:" + helpTextWidth + "px";
+                        } else if (config.icon) {
+                            config.inputAlign += ";padding-right:32px";
+                        }
+                        this.attachEvent("onKeyPress", function (code, e) {
+                            return processNumber.call(this, e, config, code);
+                        });
+                        this.attachEvent("onChange", function (n, o) {
+                            alert(config.isFloat);
+                            if ((typeof n !== "number") && n !== o) {
+                                var nv;
+                                if (n === "" || n === null) {
+                                    if (config.allowNull) {
+                                        nv = null;
+                                    } else {
+                                        nv = config.nullValue || 0;
+                                    }
+                                } else {
+                                    if (config.isFloat) {
+                                        nv = parseFloat(n);
+                                    } else {
+                                        nv = parseInt(n);
+                                    }
+                                    if (isNaN(nv)) {
+                                        nv = o;
+                                    }
+                                }
+                                this.blockEvent();
+                                this.setValue(nv);
+                                this.unblockEvent();
+                            }
+                        });
+                    },
+                    _init_onchange: function () {
+                          var config = (this._settings || this.config);
+                        if (!config.readonly) {
+                            webix.event(this.getInputNode(), "blur", this._applyChanges, { bind: this });
+                            webix.event(this.getInputNode(), "focus", this._init_value, { bind: this });
+                        }
+                        if (config.suggest)
+                            webix.$$(config.suggest).linkInput(this);
+                    },
+                    _init_value: function () {
+                        var input = this.getInputNode();
+                        input.value = this.getValue();
+                        setTimeout(function (el) {
+                            var strLength = el.value.length;
+                            if (el.setSelectionRange) {
+                                el.setSelectionRange(0, strLength);
+                            } else if (el.select) {
+                                el.select();
+                            }
+                        }, 1, input);
+                    },
+                    type_setter: function () { return "text"; },
+                    _applyChanges: function () {
+                        var newvalue = this.getInputNode().value;
+                        if (newvalue !== this.getValue())
+                            this.setValue(newvalue);
+                    },
+                    setValue: function (value) {
+                          var config = (this._settings || this.config);
+                        var oldvalue = config.value;
+                        if (oldvalue === value) return false;
+                        config.value = value;
+                        if (this._rendered_input) this.$setValue(value);
+                        this.callEvent("onChange", [value, oldvalue]);
+                    },
+                    getValue: function () {
+                        return (this._settings || this.config).value;
+                    },
+                    _pattern: function (value, isSet) {
+                          var config = (this._settings || this.config);
+                        if (isSet === false) {
+                            return config.value;
+                        }
+                        if (typeof value === "number") {
+                            var format = config.format;
+                            if (typeof format === "function") {
+                                value = format.call(this, value);
+                            }
+                        }
+                        return value;
+                    }
+                }, webix.ui.text);
 
                 // Define a proxy template for data collections updates
                 webix.proxy.wsProxy = {
@@ -2162,7 +2331,7 @@
     			case "logout":
     				webix.confirm({
     					"title": "Logout",
-    					"text": "Are you sure to want to logout?",
+    					"text": "Are you sure you want to logout?",
     					"ok": "Logout",
     					"cancel": "No",
     					"callback": function(response) {
@@ -2170,7 +2339,8 @@
                                 if (window.localStorage) {
                                     localStorage.removeItem(lsNcLogin);
                                     localStorage.removeItem(lsNcPwd);
-                                }                
+                                }
+                                window.location.hash = '';
                                 //doLogout();
                                 doDestroy();
     						}
