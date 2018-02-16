@@ -135,6 +135,7 @@ toolbar(#{table_id:=TableId}=Spec, Session) ->
 toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=_Spec, Session) ->
     #{
         view => <<"layout">>,
+        minWidth => 160,
         cols => [
             #{
                 id => SubdomainsId,
@@ -161,7 +162,7 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=_Spec,
             },
             #{
                 view => <<"label">>,
-                autowidth => true,
+%                autowidth => true,
                 % This label is defined separately to be able to set its width to 'autowidth'
                 label => i18n(domain_show_subdomains, Session)
                 %align => <<"right">>
@@ -172,6 +173,7 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=_Spec,
 toolbar_show_deleted(#{table_id:=TableId, deleted_id:=DeletedId}=_Spec, Session) ->
     #{
         view => <<"layout">>,
+        minWidth => 140,
         cols => [
             #{
                 id => DeletedId,
@@ -198,7 +200,7 @@ toolbar_show_deleted(#{table_id:=TableId, deleted_id:=DeletedId}=_Spec, Session)
             },
             #{
                 view => <<"label">>,
-                autowidth => true,
+%                autowidth => true,
                 % This label is defined separately to be able to set its width to 'autowidth'
                 label => i18n(domain_show_deleted, Session)
                 %align => <<"right">>
@@ -259,7 +261,9 @@ toolbar_refresh(TableId, Session) ->
         id => append_id(TableId, <<"refresh">>),
         type => <<"iconButton">>,
         icon => <<"refresh">>,
-        autowidth => true,
+        %autowidth => true,
+        minWidth => 140,
+        maxWidth => 200,
         label => i18n(domain_refresh, Session),
         click => #{
             nkParseFunction => <<"
@@ -372,7 +376,9 @@ toolbar_new(TableId) ->
         id => append_id(TableId, <<"new">>),
         type => <<"iconButton">>,
         icon => <<"plus">>,
-        autowidth => true,
+        %autowidth => true,
+        minWidth => 140,
+        maxWidth => 200,
         label => <<"New">>,
         click => #{
             nkParseFunction => <<"
