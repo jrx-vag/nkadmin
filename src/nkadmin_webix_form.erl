@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(nkadmin_webix_form).
--export([form/3]).
+-export([form/3, creation_fields/2]).
 
 -include("nkadmin.hrl").
 -include_lib("nkadmin/include/nkadmin.hrl").
@@ -88,6 +88,57 @@ form(Spec, Type, Session) ->
             }
         ]
     }.
+
+
+%% @doc
+-spec creation_fields(nkdomain:obj(), boolean()) ->
+    map().
+
+creation_fields(Obj, IsNew) ->
+    CreatedBy = maps:get(created_by, Obj, <<>>),
+    CreatedTime = maps:get(created_time, Obj, 0),
+    UpdatedBy = maps:get(updated_by, Obj, <<>>),
+    UpdatedTime = maps:get(updated_time, Obj, 0),
+    #{
+        header => <<"CREATION DATA">>,
+        hidden => IsNew,
+        values => [
+            #{
+                id => <<"created_by">>,
+                type => html,
+                label => <<"Created by">>,
+                value => nkdomain_admin_util:obj_id_url(CreatedBy),
+                hidden => CreatedBy =:= <<>>,
+                editable => false
+            },
+            #{
+                id => <<"created_time">>,
+                type => date,
+                label => <<"Created time">>,
+                value => CreatedTime,
+                hidden => CreatedBy =:= <<>>,
+                editable => false
+            },
+            #{
+                id => <<"updated_by">>,
+                type => html,
+                label => <<"Updated by">>,
+                value => nkdomain_admin_util:obj_id_url(UpdatedBy),
+                hidden => UpdatedBy =:= <<>>,
+                editable => false
+            },
+            #{
+                id => <<"updated_time">>,
+                type => date,
+                label => <<"Updated time">>,
+                value => UpdatedTime,
+                hidden => UpdatedBy =:= <<>>,
+                editable => false
+            }
+        ]
+    }.
+
+
 
 
 %% @private
@@ -207,6 +258,9 @@ body(Spec, Session) ->
                             }
                         ]
                     },
+                    #{
+                        view => <<"resizer">>
+                    },
                     body_form(Spec, Session)
                 ];
             _ ->
@@ -261,6 +315,7 @@ body_form_group(#{header:=Header, values:=Values}=Group) ->
 body_form_row(#{type:=text, id:=Id, label:=Label, value:=Value}=Spec) ->
     Base = get_base_form_row(Spec),
     Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Editable = maps:get(editable, Spec, true),
     Base2#{
         view => <<"text">>,
         %%id => Id,
@@ -269,7 +324,9 @@ body_form_row(#{type:=text, id:=Id, label:=Label, value:=Value}=Spec) ->
         placeholder => placeholder(Label),
         labelWidth => 150,
         labelAlign => <<"left">>,
-        value => Value
+        value => Value,
+        readonly => not nkadmin_util:webix_bool(Editable),
+        disabled => false
     };
 
 %% @private
@@ -299,6 +356,7 @@ body_form_row(#{type:=html, id:=Id, label:=Label, value:=Value}=Spec) ->
     #{
         batch => Batch,
         hidden => HiddenValue,
+        css => <<"nk_html_link">>,
         cols => [
             #{
                 view => <<"label">>,
@@ -402,6 +460,7 @@ body_form_row(#{type:=date, id:=Id, label:=Label, value:=Value}=Spec) ->
         label => Label,
         labelWidth => 150,
         labelAlign => <<"left">>,
+        css => <<"nk_read_only_field">>,
         value => Value,
         disabled => false,
         readonly => true,
@@ -515,10 +574,17 @@ get_base_form_row(Spec) ->
         _ ->
             #{batch => Batch}
     end,
-    Base#{
+    Base2 = case Disabled of
+        true ->
+            Base#{css => <<"nk_read_only_field">>};
+        false ->
+            Base
+    end,
+    Base2#{
         required => Required,
         hidden => HiddenValue,
-        disabled => DisabledValue
+        readonly => DisabledValue
+        %disabled => DisabledValue
     }.
 
 
