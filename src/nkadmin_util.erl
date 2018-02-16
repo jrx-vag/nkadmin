@@ -89,7 +89,7 @@ update_detail(Path, Detail, Updates, Session) ->
 
 
 %% @doc
-update_path(Path, Updates, #admin_session{base_path=Base}=Session) ->
+update_path(Path, Updates, #admin_session{base_path=_Base}=Session) ->
     Data = #{
         class => breadcrumbs,
         id => breadcrumbs,
