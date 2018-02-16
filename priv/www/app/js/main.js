@@ -1930,7 +1930,8 @@
 
                         fileReaderWorker.onmessage = function(oEvent) {
                             console.log("File reader worker result: ", oEvent, oEvent.data);
-                            xhr.send(oEvent.data);
+                            xhr.setRequestHeader("Content-Type", oEvent.data.file.type);
+                            xhr.send(oEvent.data.data);
                         };
 
                         fileReaderWorker.postMessage(item.file);

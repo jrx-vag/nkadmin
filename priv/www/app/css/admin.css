@@ -668,6 +668,27 @@ _toolbar-title {
 	float: right;
 }
 
+.nk_html_link {
+	padding-left: 2px;
+}
+
+.nk_html_link .webix_template {
+	padding-left: 0px;
+	padding-right: 0px;
+}
+
+.nk_read_only_field .webix_el_box input {
+	border: 0px;
+}
+
+.nk_read_only_field .webix_el_box .webix_inp_static {
+	border: 0px;
+}
+
+.webix_view.webix_form .webix_multicombo_input {
+	border: 0px;
+}
+
 /******************************************/
 
 /*************** PROFILE ******************/

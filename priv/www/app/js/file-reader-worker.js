@@ -7,9 +7,10 @@ onmessage = function(oEvent) {
     // Closure to capture the file information.
     reader.onload = (function(theFile) {
         return function(e) {
-            console.log("[file-read-worker]: FILE LOADED", e, e.target.result);
+            console.log("[file-read-worker]: FILE LOADED", theFile, e.target.result);
             //rawData = e.target.result;
-            postMessage(e.target.result);
+            e.target.result.file = theFile;
+            postMessage({file: theFile, data: e.target.result});
         };
     })(oEvent.data);
 
