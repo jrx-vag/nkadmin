@@ -20,6 +20,8 @@
 
 -module(nkadmin_webix_form).
 -export([form/3, creation_fields/2]).
+-export([create_upload_onclick/1, create_upload_onclick/2]).
+-export([js_fun_icon_upload_form/2]).
 
 -include("nkadmin.hrl").
 -include_lib("nkadmin/include/nkadmin.hrl").
@@ -34,6 +36,8 @@
         form_id => binary(),           %% Mandatory
         is_enabled => boolean(),
         with_image => binary(),
+        with_css => binary(),
+        with_file_types => [term()],
         groups => [
             #{
                 header => binary(),
@@ -139,6 +143,80 @@ creation_fields(Obj, IsNew) ->
     }.
 
 
+%% @doc
+-spec create_upload_onclick(map()) ->
+    map().
+
+create_upload_onclick(Opts) ->
+    create_upload_onclick(<<>>, Opts).
+
+
+%% @doc
+-spec create_upload_onclick(binary(), map()) ->
+    map().
+
+create_upload_onclick(FormId, Opts) ->
+    Types = maps:get(types, Opts, []),
+    OnSuccess = maps:get(on_success, Opts, <<>>),
+    OnFailure = maps:get(on_failure, Opts, <<>>),
+    OnProgress = maps:get(on_progress, Opts, <<>>),
+    Domain = maps:get(domain, Opts, <<>>),
+    StoreId = maps:get(store_id, Opts, <<>>),
+    DomainField = maps:get(domain_field, Opts, <<>>),
+    StoreIdField = maps:get(store_id_field, Opts, <<>>),
+    Suc = get_js_function(OnSuccess),
+    Fail = get_js_function(OnFailure, <<"function(error, xhr) {
+        console.log('ERROR: while uploading file', error, xhr);
+        webix.message({'type': 'error', 'text': 'ERROR while uploading file'});
+    }">>),
+    Prog = get_js_function(OnProgress), <<"function(item, progress) {
+        console.log('Upload progress: ', item, progress);
+    }">>,
+    Types2 = [<<"'", (nklib_util:to_binary(Type))/binary, "'">> || Type <- Types],
+    Types3 = list_to_binary(lists:join(<<",">>, Types2)),
+    ValidateForm = case FormId of
+        <<>> ->
+            <<>>;
+        _ ->
+            <<" 
+                var form = $$(\"", FormId/binary, "\");
+                if (form && !form.validate()) {
+                    return;
+                }
+            ">>
+    end,
+    <<"function() {
+        var api = $$('uploadAPI');
+        var id = null;
+        if (this.config && this.config.id) {
+            id = this.config.id;
+        }
+        if (api) {
+            // Check if form is valid
+            ", ValidateForm/binary, "
+            api.fileDialog({
+                id: id,
+                types: [", Types3/binary, "],
+                progress: {
+                    type: 'icon'
+                },
+                form: '", FormId/binary, "',
+                domain: '", Domain/binary, "',
+                store_id: '", StoreId/binary, "',
+                domain_field: '", DomainField/binary, "',
+                store_id_field: '", StoreIdField/binary, "',
+                callback: {
+                    success: ", Suc/binary, ",
+                    error: ", Fail/binary, ",
+                    updateProgress: ", Prog/binary, "
+                }
+            });
+        } else {
+            console.log('ERROR: (' + id + ' onClick) uploadAPI not found');
+        }
+    }">>.
+
+
 
 
 %% @private
@@ -227,7 +305,21 @@ button(#{type:=save}=Button, FormId) ->
 
 
 %% @private
-body(Spec, Session) ->
+body(#{form_id:=FormId}=Spec, Session) ->
+    %OnClick = maps:get(with_on_click, Spec, <<"function(){}">>),
+    FileTypes = maps:get(with_file_types, Spec, ["png", "jpg", "gif", "jpeg"]),
+    OnClick = js_fun_icon_upload_form(FormId, #{types => FileTypes}),
+    CSS = maps:get(with_css, Spec, <<>>),
+    CSSOnClick = case CSS of
+        <<>> ->
+            #{};
+        _ ->
+            #{
+                CSS => #{
+                    <<"nkParseFunction">> => OnClick
+                }
+            }
+    end,
     #{
         id => <<"form_body">>,
         %% header => <<"USER DETAILS">>,
@@ -247,14 +339,13 @@ body(Spec, Session) ->
                                 height => 30
                             },
                             #{
-                                view => <<"label">>,
-                                label => Image,
+                                view => <<"template">>,
+                                borderless => true,
+                                template => Image,
                                 width => 200,
-                                height => 150,
-                                align => <<"center">>
-                            },
-                            #{
-                                % SPACER
+                                height => <<"auto">>,
+                                align => <<"center">>,
+                                onClick => CSSOnClick
                             }
                         ]
                     },
@@ -471,6 +562,20 @@ body_form_row(#{type:=date, id:=Id, label:=Label, value:=Value}=Spec) ->
         }
     };
 
+body_form_row(#{type:=button, id:=Id, label:=Label, onClick:=OnClick}=Spec) ->
+    Base = get_base_form_row(Spec),
+    ButtonType = maps:get(button_type, Spec, <<"form">>),
+    Base#{
+        view => <<"button">>,
+        %%id => Id,
+        name => Id,
+        type => ButtonType,
+        label => Label,
+        click => #{
+            <<"nkParseFunction">> => OnClick
+        }
+    };
+
 body_form_row(#{type:=checkbox, id:=Id, label:=Label, value:=Value}=Spec) ->
     Base = get_base_form_row(Spec),
     Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
@@ -513,17 +618,15 @@ js_fun_action(FormId, Action) -> <<"
             {
                 element_id: \"", FormId/binary, "\",
                 action: \"", Action/binary, "\"
-            }).then(
-                function(response) {
-                    console.log('Action ", Action/binary, " button clicked OK: ', response);
-                    if (response.data && response.data.elements) {
-                        updateView(response.data.elements);
-                    }
-                }).catch(
-                    function(response) {
-                        console.log('Action ", Action/binary, " error: ', response);
-                        webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error
-                });
+            }).then(function(response) {
+                console.log('Action ", Action/binary, " button clicked OK: ', response);
+                if (response.data && response.data.elements) {
+                    updateView(response.data.elements);
+                }
+            }).catch(function(response) {
+                console.log('Action ", Action/binary, " error: ', response);
+                webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error
+            });
         });
     }
 ">>.
@@ -541,21 +644,47 @@ js_fun_action_form(FormId, Action) -> <<"
                     element_id: \"", FormId/binary, "\",
                     action: \"", Action/binary, "\",
                     value: values
-                }).then(
-                    function(response) {
-                        console.log('Action ", Action/binary, " button clicked OK: ', response);
-                        if (response.data && response.data.elements) {
-                            updateView(response.data.elements);
-                        }
-                    }).catch(
-                        function(response) {
-                            console.log('Action ", Action/binary, " error: ', response);
-                            webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error
-                    });
-            });
+                }).then(function(response) {
+                    console.log('Action ", Action/binary, " button clicked OK: ', response);
+                    if (response.data && response.data.elements) {
+                        updateView(response.data.elements);
+                    }
+                }).catch(function(response) {
+                    console.log('Action ", Action/binary, " error: ', response);
+                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error});
+                });
         }
     }
 ">>.
+
+
+%% @doc
+js_fun_icon_upload_form(FormId, Opts) ->
+    Action = <<"save">>,
+    Success = <<"function(e, xhr) {
+        var form = $$(\"", FormId/binary, "\");
+        if (form && form.validate()) {
+            var values = form.getValues({disabled:true, hidden:true});
+            var response = JSON.parse(xhr.responseText);
+            values.icon_id = response.obj_id;
+            ncClient.sendMessageAsync(
+                \"objects/admin.session/element_action\",
+                {
+                    element_id: \"", FormId/binary, "\",
+                    action: \"", Action/binary, "\",
+                    value: values
+                }).then(function(response) {
+                    console.log('Action ", Action/binary, " button clicked OK: ', response);
+                    if (response.data && response.data.elements) {
+                        updateView(response.data.elements);
+                    }
+                }).catch(function(response) {
+                    console.log('Action ", Action/binary, " error: ', response);
+                    webix.message({ 'type': 'error', 'text': response.data.code + ' - ' + response.data.error});
+                });
+        }
+    }">>,
+    create_upload_onclick(FormId, Opts#{on_success => Success}).
 
 
 %% @private
@@ -591,6 +720,23 @@ get_base_form_row(Spec) ->
 %% @private
 get_form_listeners() ->
     [onChange].
+
+
+%% @private
+get_js_function(<<>>) ->
+    <<"function() {}">>;
+
+get_js_function(Function) ->
+    Function.
+
+
+%% @private
+get_js_function(<<>>, Default) ->
+    Default;
+
+get_js_function(Function, _Default) ->
+    Function.
+
 
 
 %%function() {
