@@ -1843,11 +1843,19 @@
                         var type = item.type.toLowerCase();
                         var id = null;
                         var component = null;
+                        var form = null;
+                        var formValues = {};
                         var progressConfig = {
                             type: "icon"
                         }
                         if (item && (!item.hasOwnProperty("context") || item.context === null || item.context === undefined)) {
                             item.context = defaultContext;
+                        }
+                        if (item && item.context && item.context.hasOwnProperty("form")) {
+                            form = $$(item.context.form);
+                            if (form) {
+                                formValues = form.getValues({disabled: true, hidden: true});
+                            }
                         }
                         if (item && item.context && item.context.hasOwnProperty("types")) {
                             var i = 0;
@@ -1855,7 +1863,7 @@
                             while (i < types.length && types[i].toLowerCase() !== type) {
                                 i++;
                             }
-                            if (i >= types.length) {
+                            if (types.length > 0 && i >= types.length) {
                                 webix.message("Unsupported file type");
                                 return false;
                             }
@@ -1921,8 +1929,26 @@
                                 component.hideProgress();
                             }
                         }
+
+                        var params = {};
+                        if (item && item.context && item.context.hasOwnProperty("domain") && item.context.domain !== "") {
+                            params.domain = item.context.domain;
+                        }
+                        if (item && item.context && item.context.hasOwnProperty("domain_field") && item.context.domain_field !== "") {
+                            if (form) {
+                                params.domain = formValues[item.context.domain_field];
+                            }
+                        }
+                        if (item && item.context && item.context.hasOwnProperty("store_id") && item.context.store_id !== "") {
+                            params.store_id = item.context.store_id;
+                        }
+                        if (item && item.context && item.context.hasOwnProperty("store_id_field") && item.context.store_id_field !== "") {
+                            if (form) {
+                                params.store_id = formValues[item.context.store_id_field];
+                            }
+                        }
                         
-                        xhr.open("POST", "../_file", true);
+                        xhr.open("POST", "../_file" + formatParams(params), true);
                         xhr.overrideMimeType("text/plain; charset=x-user-defined");
                         xhr.setRequestHeader("X-NetComposer-Auth", logic.getSessionId());
                         
@@ -2229,7 +2255,7 @@
                             var api = $$('uploadAPI');
                             if (api) {
                                 api.fileDialog({
-                                    id: ADMIN_FRAME_DOMAIN_ICON,
+                                    id: this.config.id,
                                     types: ['png', 'jpg'],
                                     progress: {
                                         type: 'icon'
@@ -2440,6 +2466,15 @@
                 }
             }
             return isDynamic;
+        }
+
+        function formatParams(params){
+            return "?" + Object
+                  .keys(params)
+                  .map(function(key){
+                    return key+"="+encodeURIComponent(params[key])
+                  })
+                  .join("&")
         }
 
         return {
