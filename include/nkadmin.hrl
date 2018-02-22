@@ -30,6 +30,8 @@
 
 -define(DOMAIN_ADMIN_SESSION, <<"admin.session">>).
 
+-define(DEFAULT_ADMIN_KEY_PRESS_TIMEOUT, 1000). % 1 second
+-define(DEFAULT_ADMIN_SUGGEST_MAX_SIZE, 10).    % 10 elements
 
 
 %% ===================================================================
