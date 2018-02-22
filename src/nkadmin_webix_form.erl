@@ -481,6 +481,93 @@ body_form_row(#{type:=password, id:=Id, label:=Label}=Spec) ->
         type => <<"password">>
     };
 
+body_form_row(#{type:=View, id:=Id, label:=Label, value:=Value, suggest_type:=Type, suggest_field:=Field}=Spec)
+when View =:= combo orelse View =:= suggest ->
+    Options = maps:get(options, Spec, []),
+    Sort = maps:get(suggest_sort, Spec, #{}),
+    TimeOut = maps:get(suggest_key_press_timeout, Spec, ?DEFAULT_ADMIN_KEY_PRESS_TIMEOUT),
+    Start = maps:get(suggest_start, Spec, 0),
+    End = maps:get(suggest_end, Spec, ?DEFAULT_ADMIN_SUGGEST_MAX_SIZE),
+    StartBin = nklib_util:to_binary(Start),
+    EndBin = nklib_util:to_binary(End),
+    Template = maps:get(suggest_template, Spec, <<>>),
+    SuggestBody = case Template of
+        <<>> ->
+            #{};
+        _ ->
+            #{
+                template => Template
+            }
+    end,
+    View2 = case View of
+        combo ->
+            <<"combo">>;
+        suggest ->
+            <<"text">>
+    end,
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Base2#{
+        view => View2,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        placeholder => placeholder(Label),
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        value => Value,
+        suggest => #{
+            keyPressTimeout => TimeOut,
+            data => Options,
+            body => SuggestBody#{
+                nkOpts => #{
+                    id => nkdomain_admin_util:make_type_view_id(Type, <<"/">>),
+                    field => Field,
+                    sort => Sort
+                },
+                dataFeed => #{
+                    <<"nkParseFunction">> => <<"
+                        function(text) {
+                            suggest = this;
+                            opts = {
+                                filter: {
+                                    '", Field/binary, "': text
+                                },
+                                sort: this.config.nkOpts.sort,
+                                start: ", StartBin/binary, ",
+                                end: ", EndBin/binary, "
+                            };
+                            get_data(this.config.nkOpts.id, opts)
+                            .then(function(response) {
+                                if (suggest) {
+                                    suggest.clearAll();
+                                    suggest.parse(response.data.data);
+                                }
+                            }).catch(function(response) {
+                                console.log('get_data: GOT ERROR: ', response);
+                            });
+                        }
+                    ">>
+                }
+            }
+        },
+        on => #{
+            onItemClick => #{
+                <<"nkParseFunction">> => <<"
+                    function() {
+                        field = $$(this);
+                        if (field && field.config && !field.config.readonly && this.config.suggest) {
+                            suggest = $$(field.config.suggest);
+                            if (suggest) {
+                                suggest.show(this.getInputNode());
+                            }
+                        }
+                    }
+                ">>
+            }
+        }
+    };
+
 body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
     Base = get_base_form_row(Spec),
     Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
@@ -498,7 +585,20 @@ body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Option
 
 body_form_row(#{type:=suggest, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
     Base = get_base_form_row(Spec),
-    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Spec2 = Spec#{
+        onItemClick => <<"
+            function() {
+                field = $$(this);
+                if (field && field.config && !field.config.readonly && this.config.suggest) {
+                    suggest = $$(field.config.suggest);
+                    if (suggest) {
+                        suggest.show(this.getInputNode());
+                    }
+                }
+            }
+        ">>
+    },
+    Base2 = nkadmin_util:add_listeners([onItemClick | get_form_listeners()], Spec2, Base),
     Base2#{
         view => <<"text">>,
         %%id => Id,
