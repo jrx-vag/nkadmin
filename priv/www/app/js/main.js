@@ -281,7 +281,7 @@
                     if (e.ctrlKey || e.shiftKey || e.metaKey) {
                         return true;
                     }
-                    if (code === 109 && config.allowNegatives/*-*/) {
+                    if (config.allowNegatives && code === 109/*-*/) {
                         var value = e.target.value;
                         if (value === "") {
                             value = "-";
@@ -361,7 +361,6 @@
                             return processNumber.call(this, e, config, code);
                         });
                         this.attachEvent("onChange", function (n, o) {
-                            alert(config.isFloat);
                             if ((typeof n !== "number") && n !== o) {
                                 var nv;
                                 if (n === "" || n === null) {
@@ -385,12 +384,14 @@
                                 this.unblockEvent();
                             }
                         });
+                        this.attachEvent("onAfterRender", this._init_onchange);
                     },
                     _init_onchange: function () {
-                          var config = (this._settings || this.config);
+                        var config = (this._settings || this.config);
                         if (!config.readonly) {
                             webix.event(this.getInputNode(), "blur", this._applyChanges, { bind: this });
                             webix.event(this.getInputNode(), "focus", this._init_value, { bind: this });
+                            webix.event(this.getInputNode(), "change", this._applyChanges, { bind:this });
                         }
                         if (config.suggest)
                             webix.$$(config.suggest).linkInput(this);
@@ -414,7 +415,7 @@
                             this.setValue(newvalue);
                     },
                     setValue: function (value) {
-                          var config = (this._settings || this.config);
+                        var config = (this._settings || this.config);
                         var oldvalue = config.value;
                         if (oldvalue === value) return false;
                         config.value = value;
@@ -422,10 +423,10 @@
                         this.callEvent("onChange", [value, oldvalue]);
                     },
                     getValue: function () {
-                        return (this._settings || this.config).value;
+                        return ((this._settings || this.config).value || '');
                     },
                     _pattern: function (value, isSet) {
-                          var config = (this._settings || this.config);
+                        var config = (this._settings || this.config);
                         if (isSet === false) {
                             return config.value;
                         }
@@ -923,7 +924,28 @@
                 webix.message({ "type": "error", "text": response.data.code + " - " + response.data.error });
                 doLogout();
             });
-    	}
+        }
+        
+        function get_data(id, opts) {
+            start = opts && opts.start? opts.start : 0;
+            end = opts && opts.end? opts.end : 10;
+            var query = {
+                element_id: id,
+                //element_id: "domain_detail_chat_messages_table",
+                start: start,
+                end: end,
+            };
+            if (opts) {
+                if (opts.filter) {
+                    query.filter = opts.filter;
+                }
+                if (opts.sort) {
+                    query.sort = opts.sort;
+                }
+            }
+            console.log("get_data: ", query);
+            return ncClient.sendMessageAsync("objects/admin.session/get_data", query);
+        }
 
         /**
          * 'elements' is an array of different classes of UI elements that has been updated:
