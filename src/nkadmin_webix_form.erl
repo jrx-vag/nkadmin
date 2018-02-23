@@ -482,7 +482,7 @@ body_form_row(#{type:=password, id:=Id, label:=Label}=Spec) ->
     };
 
 body_form_row(#{type:=View, id:=Id, label:=Label, value:=Value, suggest_type:=Type, suggest_field:=Field}=Spec)
-when View =:= combo orelse View =:= suggest ->
+when View =:= combo orelse View =:= suggest orelse View =:= multicombo ->
     Options = maps:get(options, Spec, []),
     Sort = maps:get(suggest_sort, Spec, #{}),
     TimeOut = maps:get(suggest_key_press_timeout, Spec, ?DEFAULT_ADMIN_KEY_PRESS_TIMEOUT),
@@ -502,6 +502,8 @@ when View =:= combo orelse View =:= suggest ->
     View2 = case View of
         combo ->
             <<"combo">>;
+        multicombo ->
+            <<"multicombo">>;
         suggest ->
             <<"text">>
     end,
