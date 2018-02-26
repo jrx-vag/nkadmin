@@ -943,7 +943,6 @@
                     query.sort = opts.sort;
                 }
             }
-            console.log("get_data: ", query);
             return ncClient.sendMessageAsync("objects/admin.session/get_data", query);
         }
 
