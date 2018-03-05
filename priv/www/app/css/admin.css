@@ -137,6 +137,15 @@ textarea.webix_invalid {
 	text-align: center;
 }
 
+.webix_el_button button:hover .webix_icon_btn {
+	color: #fff;
+}
+
+.webix_el_button button .webix_icon_btn {
+	padding: 0;
+	color: #fff;
+}
+
 /*****************************************/
 
 /************** FAB BUTTON ***************/
