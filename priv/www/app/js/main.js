@@ -1132,7 +1132,7 @@
             // Create sidebar using the data read
             json = createSidebar(groups);
             console.log("Tree webix: ", JSON.stringify(json));
-            replaceComponent("sidebar", json);
+            replaceComponentWithParent("sidebar", "sidebarParent", json);
             console.log("Tree updated!", json, groups);
         }
 
@@ -2254,7 +2254,7 @@
             }
 
             if (domain_icon !== "") {
-                domain_icon_img = "<img src=" + getFileSrc(domain_icon) + " width='45' height='45'>";
+                domain_icon_img = "<img src=" + getFileSrc(domain_icon) + " width='auto' height='45'>";
             }
 
             return {
@@ -2263,6 +2263,23 @@
                 "height": 70,
                 "css": domain_css,
                 "cols": [{
+                        "view": "button",
+                        "type": "icon",
+                        "icon": "bars",
+                        "width": 50,
+                        "align": "left",
+                        "css": "app_button",
+                        "click": function() {
+                            sidebar = $$("sidebar");
+                            if (sidebar) {
+                                if (sidebar.isVisible()) {
+                                    sidebar.hide();
+                                } else {
+                                    sidebar.show();
+                                }
+                            }
+						}
+				}, {
                     "id": ADMIN_FRAME_DOMAIN_ICON,
                     "view": "template",
                     "padding": 0,
@@ -2328,6 +2345,7 @@
                 "rows": [
                     createFrame(),
                     {
+                        "id": "sidebarParent",
                         "cols": [
                             createSidebar([]),
                             initBreadcrumbsAndBody()
