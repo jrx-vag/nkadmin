@@ -69,7 +69,7 @@ form(Spec, Type, Session) ->
     #{
         id => <<"body">>,
         view => <<"accordion">>,
-        type => <<"clean">>,
+        type => <<"space">>,
         height => <<"100%">>,
         margin => 0,
         borderless => false,
@@ -421,6 +421,26 @@ body_form_row(#{type:=text, id:=Id, label:=Label, value:=Value}=Spec) ->
     };
 
 %% @private
+body_form_row(#{type:=textarea, id:=Id, label:=Label, value:=Value}=Spec) ->
+    Base = get_base_form_row(Spec),
+    Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
+    Editable = maps:get(editable, Spec, true),
+    Height = maps:get(height, Spec, 200),
+    Base2#{
+        view => <<"textarea">>,
+        %%id => Id,
+        name => Id,
+        label => Label,
+        placeholder => placeholder(Label),
+        height => Height,
+        labelWidth => 150,
+        labelAlign => <<"left">>,
+        value => Value,
+        readonly => not nkadmin_util:webix_bool(Editable),
+        disabled => false
+    };
+
+%% @private
 body_form_row(#{type:=number_edit, id:=Id, label:=Label, value:=Value}=Spec) ->
     Base = get_base_form_row(Spec),
     Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
@@ -508,6 +528,7 @@ when View =:= combo orelse View =:= suggest orelse View =:= multicombo ->
             <<"text">>
     end,
     Base = get_base_form_row(Spec),
+    #{readonly := ReadOnly} = Base,
     Base2 = nkadmin_util:add_listeners(get_form_listeners(), Spec, Base),
     Base2#{
         view => View2,
@@ -537,17 +558,20 @@ when View =:= combo orelse View =:= suggest orelse View =:= multicombo ->
                                 },
                                 sort: this.config.nkOpts.sort,
                                 start: ", StartBin/binary, ",
-                                end: ", EndBin/binary, "
+                                end: ", EndBin/binary, ",
+                                readonly: ", (nklib_util:to_binary(ReadOnly))/binary, "
                             };
-                            get_data(this.config.nkOpts.id, opts)
-                            .then(function(response) {
-                                if (suggest) {
-                                    suggest.clearAll();
-                                    suggest.parse(response.data.data);
-                                }
-                            }).catch(function(response) {
-                                console.log('get_data: GOT ERROR: ', response);
-                            });
+                            if (!opts.readonly) {
+                                get_data(this.config.nkOpts.id, opts)
+                                .then(function(response) {
+                                    if (suggest) {
+                                        suggest.clearAll();
+                                        suggest.parse(response.data.data);
+                                    }
+                                }).catch(function(response) {
+                                    console.log('get_data: GOT ERROR: ', response);
+                                });
+                            }
                         }
                     ">>
                 }
@@ -585,7 +609,8 @@ body_form_row(#{type:=combo, id:=Id, label:=Label, value:=Value, options:=Option
         options => Options
     };
 
-body_form_row(#{type:=suggest, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
+body_form_row(#{type:=View, id:=Id, label:=Label, value:=Value, options:=Options}=Spec)
+when View =:= suggest orelse View =:= multisuggest ->
     Base = get_base_form_row(Spec),
     Spec2 = Spec#{
         onItemClick => <<"
@@ -601,7 +626,21 @@ body_form_row(#{type:=suggest, id:=Id, label:=Label, value:=Value, options:=Opti
         ">>
     },
     Base2 = nkadmin_util:add_listeners([onItemClick | get_form_listeners()], Spec2, Base),
-    Base2#{
+    Base3 = case View of
+        suggest ->
+            Base2#{
+                suggest => Options
+            };
+        multisuggest ->
+            Base2#{
+                suggest => #{
+                    view => <<"multisuggest">>,
+                    button => false,
+                    data => Options
+                }
+            }
+    end,
+    Base3#{
         view => <<"text">>,
         %%id => Id,
         name => Id,
@@ -609,8 +648,7 @@ body_form_row(#{type:=suggest, id:=Id, label:=Label, value:=Value, options:=Opti
         placeholder => placeholder(Label),
         labelWidth => 150,
         labelAlign => <<"left">>,
-        value => Value,
-        suggest => Options
+        value => Value
     };
 
 body_form_row(#{type:=multiselect, id:=Id, label:=Label, value:=Value, options:=Options}=Spec) ->
