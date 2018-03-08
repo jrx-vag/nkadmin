@@ -1056,22 +1056,40 @@
             if (tree.isBranch(item.id) && !tree.isBranchOpen(item.id)) {
                 item.style = 'font-weight: bolder';
             }
-            treeRecursiveUpdate2(tree, item, parent_id, 0);
+            var index;
+            try {
+                // This method fails sometimes with "this.pull[t] is undefined"
+                // when an item id doesn't exist
+                index = tree.getBranchIndex(item.id, parent_id);
+            } catch (e) {
+                index = 0;
+            }
+            treeRecursiveUpdate2(tree, item, parent_id, index);
             tree.setState(state);
         }
 
         function treeRecursiveUpdate2(tree, item, parent_id, counter) {
             // Iterate through the items (if it has childs), and add all elements...
             var id = item.id;
-            var index = tree.getIndexById(id);
+            var index;
+            try {
+                // This method fails sometimes with "this.pull[t] is undefined"
+                // when an item id doesn't exist
+                index = tree.getBranchIndex(id, parent_id);
+            } catch (e) {
+                index = -1;
+            }
             if (index === -1) {
                 // Item not found
                 console.log("treeRecursiveUpdate: item not found, adding at: ", counter, "below: ", parent_id);
                 tree.add(item, counter, parent_id);
             } else {
+                // Item found
                 console.log("treeRecursiveUpdate: item found, replacing at: ", index, " below: ", parent_id);
-                tree.remove(id);
-                tree.add(item, index, parent_id);
+                // Updating an item leaves previous childs intact, so it's better to remove it first
+                //tree.updateItem(id, item);
+                tree.remove(id),
+                tree.add(item, counter, parent_id);
             }
             var length = (item.data)? item.data.length : 0;
             for (var i = 0; i < length; i++) {
@@ -2294,7 +2312,7 @@
                             if (api) {
                                 api.fileDialog({
                                     id: this.config.id,
-                                    types: ['png', 'jpg'],
+                                    types: ['png', 'jpg', 'jpeg'],
                                     progress: {
                                         type: 'icon'
                                     },
