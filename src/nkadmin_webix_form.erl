@@ -504,6 +504,8 @@ body_form_row(#{type:=password, id:=Id, label:=Label}=Spec) ->
 body_form_row(#{type:=View, id:=Id, label:=Label, value:=Value, suggest_type:=Type, suggest_field:=Field}=Spec)
 when View =:= combo orelse View =:= suggest orelse View =:= multicombo ->
     Options = maps:get(options, Spec, []),
+    Filters = maps:get(suggest_filters, Spec, #{}),
+    FiltersJSON = nklib_json:encode_pretty(Filters),
     Sort = maps:get(suggest_sort, Spec, #{}),
     TimeOut = maps:get(suggest_key_press_timeout, Spec, ?DEFAULT_ADMIN_KEY_PRESS_TIMEOUT),
     Start = maps:get(suggest_start, Spec, 0),
@@ -552,10 +554,10 @@ when View =:= combo orelse View =:= suggest orelse View =:= multicombo ->
                     <<"nkParseFunction">> => <<"
                         function(text) {
                             suggest = this;
+                            filters = ", FiltersJSON/binary, ";
+                            filters['", Field/binary, "'] = text;
                             opts = {
-                                filter: {
-                                    '", Field/binary, "': text
-                                },
+                                filter: filters,
                                 sort: this.config.nkOpts.sort,
                                 start: ", StartBin/binary, ",
                                 end: ", EndBin/binary, ",
