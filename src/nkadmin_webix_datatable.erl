@@ -941,6 +941,14 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                         if (state !== null) {
                             grid.setState(state);
                         }
+                        // Restoring pager state
+                        var page = webix.storage.local.get(grid.config.id + '_pager');
+                        if (page !== null) {
+                            var pager = grid.getPager();
+                            if (pager) {
+                                pager.select(page);
+                            }
+                        }
                         // Restoring related components state
                         var showSubdomains = $$('", ShowSubdomainsId/binary, "');
                         if (showSubdomains) {
@@ -1356,6 +1364,10 @@ on_destruct() ->
                 // Save state before destroying this component
                 if (this.hasOwnProperty('nkId')) {
                     webix.storage.local.put(this.nkId, this.getState());
+                    var pager = this.getPager();
+                    if (pager && pager.config && pager.config.hasOwnProperty('page')) {
+                        webix.storage.local.put(this.nkId + '_pager', pager.config.page);
+                    }
                 }
             }
         ">>
