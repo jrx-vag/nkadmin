@@ -146,7 +146,7 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=_Spec,
                 on => #{
                     onChange => #{
                         nkParseFunction => <<"
-                            function() {
+                            function(value) {
                                 var grid = $$(\"", TableId/binary, "\");
                                 var pager = grid.getPager();
                                 var page = pager.config.page;
@@ -155,6 +155,8 @@ toolbar_show_subdomains(#{table_id:=TableId, subdomains_id:=SubdomainsId}=_Spec,
                                 //grid.loadNext(number count,number start,function callback,string url,boolean now);
                                 grid.clearAll();
                                 grid.loadNext(grid.config.datafetch, 0, null, grid.config.url, true);
+                                // Saving component new state
+                                webix.storage.local.put(this.config.id, value);
                             }
                         ">>
                     }
@@ -184,7 +186,7 @@ toolbar_show_deleted(#{table_id:=TableId, deleted_id:=DeletedId}=_Spec, Session)
                 on => #{
                     onChange => #{
                         nkParseFunction => <<"
-                            function() {
+                            function(value) {
                                 var grid = $$(\"", TableId/binary, "\");
                                 var pager = grid.getPager();
                                 var page = pager.config.page;
@@ -193,6 +195,8 @@ toolbar_show_deleted(#{table_id:=TableId, deleted_id:=DeletedId}=_Spec, Session)
                                 //grid.loadNext(number count,number start,function callback,string url,boolean now);
                                 grid.clearAll();
                                 grid.loadNext(grid.config.datafetch, 0, null, grid.config.url, true);
+                                // Saving component new state
+                                webix.storage.local.put(this.config.id, value);
                             }
                         ">>
                     }
@@ -312,6 +316,8 @@ toolbar_real_time(TableId, Session) ->
                                         grid.nkClearInterval();
                                         combo.disable();
                                     }
+                                    // Saving component new state
+                                    webix.storage.local.put(this.config.id, value);
                                 }
                             }
                         ">>
@@ -359,6 +365,10 @@ toolbar_real_time(TableId, Session) ->
                                     } else {
                                         grid.nkClearInterval();
                                     }
+                                }
+                                // Saving component new state
+                                if (value) {
+                                    webix.storage.local.put(this.config.id, value);
                                 }
                                 // Hide the combo options
                                 this.blur();
@@ -705,6 +715,8 @@ body_pager() ->
 
 body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
     OnMasterCheckboxClick = on_master_checkbox_click(TableId),
+    ShowSubdomainsId = maps:get(subdomains_id, Spec),
+    ShowDeletedId = maps:get(deleted_id, Spec),
     SelectedId = append_id(TableId, <<"selected">>),
     SelectedLabelId = append_id(SelectedId, <<"label">>),
     RealTimeButtonId = append_id(TableId, <<"real_time">>),
@@ -722,7 +734,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         css => <<"nk_datatable">>,
         select => <<"row">>,
         %        multiselect => true,
-        dragColumn => true,
+        dragColumn => <<"order">>,
         resizeColumn => true,
         editable => true,
         editaction => <<"dblclick">>,
@@ -738,6 +750,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         export => true,
         url => <<"wsProxy->">>,
         save => <<"wsProxy->">>,
+        datathrottle => 500,
         scheme => #{
             <<"$change">> => #{
                 nkParseFunction => <<"
@@ -760,6 +773,22 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                     webix.extend(this, webix.ProgressBar);
                     var grid = $$('", TableId/binary, "');
                     if (grid) {
+                        grid.nkId = grid.config.id;
+                        grid.nkSaveState = function() {
+                            var grid = $$('", TableId/binary, "');
+                            if (grid && grid.config && grid.config.id) {
+                                var state = grid.getState();
+                                webix.storage.local.put(grid.config.id, state);
+                            }
+                        }
+                        // Saving default state
+                        webix.storage.local.put(grid.config.id + '_default', grid.getState());
+                        grid.nkResetState = function() {
+                            var defState = webix.storage.local.get(grid.config.id + '_default');
+                            if (defState !== null) {
+                                grid.setState(defState);
+                            }
+                        }
                         var masterCheckbox = grid.getHeaderContent('checkbox');
                         if (masterCheckbox) {
                             // attach an event to customMasterCheckbox;
@@ -907,15 +936,51 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
                                 console.log('Interval cleared!', grid.nkInterval);
                             }
                         }
+                        // Restoring datatable state
+                        var state = webix.storage.local.get(grid.config.id);
+                        if (state !== null) {
+                            grid.setState(state);
+                        }
+                        // Restoring pager state
+                        var page = webix.storage.local.get(grid.config.id + '_pager');
+                        if (page !== null) {
+                            var pager = grid.getPager();
+                            if (pager) {
+                                pager.select(page);
+                            }
+                        }
+                        // Restoring related components state
+                        var showSubdomains = $$('", ShowSubdomainsId/binary, "');
+                        if (showSubdomains) {
+                            var stateSubdomains = webix.storage.local.get('", ShowSubdomainsId/binary, "');
+                            if (stateSubdomains !== null) {
+                                showSubdomains.setValue(stateSubdomains);
+                            }
+                        }
+                        var showDeleted = $$('", ShowDeletedId/binary, "');
+                        if (showDeleted) {
+                            var stateDeleted = webix.storage.local.get('", ShowDeletedId/binary, "');
+                            if (stateDeleted !== null) {
+                                showDeleted.setValue(stateDeleted);
+                            }
+                        }
                         var realTimeCheckbox = $$('", RealTimeCheckboxId/binary, "');
                         var realTimeCombo = $$('", RealTimeComboId/binary, "');
                         if (realTimeCheckbox && realTimeCombo) {
+                            var stateRealTimeCheck = webix.storage.local.get('", RealTimeCheckboxId/binary, "');
+                            if (stateRealTimeCheck !== null) {
+                                realTimeCheckbox.setValue(stateRealTimeCheck);
+                            }
+                            var stateRealTimeCombo = webix.storage.local.get('", RealTimeComboId/binary, "');
+                            if (stateRealTimeCombo !== null && stateRealTimeCombo > 1000) {
+                                realTimeCombo.setValue(stateRealTimeCombo);
+                            }
                             if (realTimeCheckbox.getValue()) {
                                 grid.nkSetInterval(realTimeCombo.getValue());
                             } else {
                                 realTimeCombo.disable();
                             }
-                        }
+                        }                        
                     }
                 }
             ">>
@@ -937,8 +1002,8 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
         },
         on => #{
             <<"onBeforeLoad">> => on_before_load(),
-            <<"onDestruct">> => on_destruct(),
             <<"onCheck">> => on_check(TableId),
+            <<"onDestruct">> => on_destruct(),
             <<"data->onStoreUpdated">> => on_store_updated()
         }
     },
@@ -1295,6 +1360,14 @@ on_destruct() ->
                     console.log('OnDestruct: Found an interval');
                     clearInterval(this.nkInterval);
                     console.log('OnDestruct: Interval cleared');
+                }
+                // Save state before destroying this component
+                if (this.hasOwnProperty('nkId')) {
+                    webix.storage.local.put(this.nkId, this.getState());
+                    var pager = this.getPager();
+                    if (pager && pager.config && pager.config.hasOwnProperty('page')) {
+                        webix.storage.local.put(this.nkId + '_pager', pager.config.page);
+                    }
                 }
             }
         ">>
