@@ -103,7 +103,12 @@ datatable(#{table_id:=TableId}=Spec, Session) ->
                         #{
                             rows => [
                                 body_data(TableId, Spec, Session),
-                                body_pager()
+                                #{
+                                    cols => [
+                                        body_pager(),
+                                        toolbar_reset(TableId)
+                                    ]
+                                }
                             ]
                         }
                     ]
@@ -696,6 +701,29 @@ toolbar_enable(TableId, Session) ->
                     }
                 ">>
             }
+        }
+    }.
+
+toolbar_reset(TableId) ->
+    #{
+        view => <<"button">>,
+        id => append_id(TableId, <<"reset">>),
+        type => <<"iconButton">>,
+        icon => <<"undo">>,
+        autowidth => true,
+        minWidth => 140,
+        maxWidth => 200,
+        label => <<"Reset">>,
+        click => #{
+            nkParseFunction => <<"
+                function() {
+                    console.log('Reset button clicked');
+                    var grid = $$('", TableId/binary, "');
+                    if (grid && grid.hasOwnProperty('nkResetState')) {
+                        grid.nkResetState();
+                    }
+                }
+            ">>
         }
     }.
 
