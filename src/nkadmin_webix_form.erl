@@ -707,12 +707,21 @@ body_form_row(#{type:=date, id:=Id, label:=Label, value:=Value}=Spec) ->
 body_form_row(#{type:=button, id:=Id, label:=Label, onClick:=OnClick}=Spec) ->
     Base = get_base_form_row(Spec),
     ButtonType = maps:get(button_type, Spec, <<"form">>),
-    Base#{
+    ButtonIcon = maps:get(button_icon, Spec, <<>>),
+    Value = maps:get(value, Spec, false),
+    Base2 = case ButtonIcon of
+        <<>> ->
+            Base;
+        _ ->
+            Base#{icon => ButtonIcon}
+    end,
+    Base2#{
         view => <<"button">>,
         %%id => Id,
         name => Id,
         type => ButtonType,
         label => Label,
+        value => Value,
         click => #{
             <<"nkParseFunction">> => OnClick
         }
