@@ -388,10 +388,11 @@ body_form_group(#{header:=Header, values:=Values}=Group) ->
     Hidden = maps:get(hidden, Group, false),
     Disabled = maps:get(disabled, Group, false),
     Base = maps:with([id, batch], Group),
+    HeaderBase = maps:with([batch], Group),
     Base#{
         minWidth => 300,
         rows => [
-            #{
+            HeaderBase#{
                 template => Header,
                 type => <<"section">>,
                 hidden => nkadmin_util:webix_bool(Hidden),
