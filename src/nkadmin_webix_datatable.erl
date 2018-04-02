@@ -1029,6 +1029,7 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
             }
         },
         on => #{
+            <<"onBeforeColumnDrag">> => on_before_column_drag(),
             <<"onBeforeLoad">> => on_before_load(),
             <<"onCheck">> => on_check(TableId),
             <<"onDestruct">> => on_destruct(),
@@ -1313,6 +1314,20 @@ on_click(_TableId, Id, silent_checkbox, _OnClick, Acc) ->
         }
     }.
 
+
+%% @private
+on_before_column_drag() ->
+    #{
+        nkParseFunction => <<"
+            function(sourceId, event) {
+      	        if (event && event.target && event.target.tagName === 'SELECT') {
+                    // This prevents column order changes when selecting a filter option
+      		        return false;
+                }
+                return true;
+            }
+        ">>
+    }.
 
 %% @private
 on_before_load() ->
