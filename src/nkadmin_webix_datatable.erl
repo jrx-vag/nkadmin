@@ -30,7 +30,7 @@
 -type column() ::
     #{
         id => binary(),
-        type => pos | text | date | {icon, binary()} | {fixed_icon, binary()},
+        type => pos | text | checkbox | date | {icon, binary()} | {fixed_icon, binary()},
         name => binary(),                   % For i18n
         options => filter_options(),
         header_colspan => integer(),
@@ -783,9 +783,13 @@ body_data(TableId, Spec, #admin_session{domain_id=DomainId}=Session) ->
             <<"$change">> => #{
                 nkParseFunction => <<"
                     function(item) {
-                        if (item.enabled === null
+                        if ((item.enabled === null
                             || item.enabled === undefined
-                            || item.enabled === true) {
+                            || item.enabled === true)
+                        && (item.tags === null
+                            || item.tags === undefined
+                            || !Array.isArray(item.tags)
+                            || !item.tags.includes('deactivated'))) {
                             item.$css = 'enabled_row';
                         } else {
                             item.$css = 'disabled_row';
