@@ -2346,7 +2346,7 @@
                     "id": ADMIN_FRAME_DOMAIN_NAME,
                     "view": "label",
                     "autowidth": true,
-                    "css": domain_css + "_toolbar-title",
+                    "css": domain_css + "_toolbar-title, " + ADMIN_FRAME_DOMAIN_NAME,
                     "click": homeLabelClick,
                     "label": domain_name
                 },

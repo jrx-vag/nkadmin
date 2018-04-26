@@ -205,6 +205,10 @@ textarea.webix_invalid {
 	cursor: pointer;
 }
 
+.admin_frame_domain_name {
+	cursor: pointer;
+}
+
 .netcomposer {
 	color: #FFF;
 	background: #303E4D;

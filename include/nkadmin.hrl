@@ -33,6 +33,14 @@
 -define(DEFAULT_ADMIN_KEY_PRESS_TIMEOUT, 1000). % 1 second
 -define(DEFAULT_ADMIN_SUGGEST_MAX_SIZE, 10).    % 10 elements
 
+-define(ID_ADMIN_FRAME_DOMAIN_ICON, <<"admin_frame_domain_icon">>).
+-define(ID_ADMIN_FRAME_DOMAIN_NAME, <<"admin_frame_domain_name">>).
+-define(ID_ADMIN_FRAME_USER_NAME, <<"admin_frame_user_name">>).
+-define(ID_ADMIN_FRAME_USER_ICON, <<"admin_frame_user_icon">>).
+-define(ID_ADMIN_FRAME_USER_MENU, <<"admin_frame_user_menu">>).
+-define(ID_ADMIN_FRAME_USER_MENU_ACCOUNT, <<"admin_frame_user_menu_account">>).
+-define(ID_ADMIN_FRAME_USER_MENU_MESSAGES, <<"admin_frame_user_menu_messages">>).
+
 
 %% ===================================================================
 %% Records
