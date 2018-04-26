@@ -105,12 +105,12 @@ frame_domain(#admin_session{domain_id=DomainId}=Session) ->
             end,
             Items = [
                 #{
-                    id => admin_frame_domain_name,
+                    id => ?ID_ADMIN_FRAME_DOMAIN_NAME,
                     class => frameDomainName,
                     value => #{label => DomName2, css => nkdomain_util:name(DomName2)}
                 },
                 #{
-                    id => admin_frame_domain_icon,
+                    id => ?ID_ADMIN_FRAME_DOMAIN_ICON,
                     class => frameDomainIcon,
                     value => #{icon => Icon}
                 }
@@ -128,24 +128,24 @@ frame_user(#admin_session{user_id=UserId}=Session) ->
             UserIconId = maps:get(icon_id, Obj, <<>>),
             Items = [
                 #{
-                    id => admin_frame_user_name,
+                    id => ?ID_ADMIN_FRAME_USER_NAME,
                     class => frameUserName,
                     value => #{label => <<UserName/binary, " ", UserSurname/binary>>}
                 },
                 #{
-                    id => admin_frame_user_icon,
+                    id => ?ID_ADMIN_FRAME_USER_ICON,
                     class => frameUserIcon,
                     value => #{icon_id => UserIconId}
                 },
                 #{
-                    id => admin_frame_user_menu,
+                    id => ?ID_ADMIN_FRAME_USER_MENU,
                     class => frameUserMenu,
                     value => #{
                         icon => 'fa-user',
                         items => [
-                            nkadmin_util:menu_entry(admin_frame_user_menu_account, #{icon=>'fa-gear'}, Session),
+                            nkadmin_util:menu_entry(?ID_ADMIN_FRAME_USER_MENU_ACCOUNT, #{icon=>'fa-gear'}, Session),
                             #{class => frameUserMenuSeparator},
-                            nkadmin_util:menu_entry(admin_frame_user_menu_messages, #{icon=>'fa-comments'}, Session),
+                            nkadmin_util:menu_entry(?ID_ADMIN_FRAME_USER_MENU_MESSAGES, #{icon=>'fa-comments'}, Session),
                             #{class => frameUserMenuSeparator},
                             nkadmin_util:menu_entry(logout, #{icon=>'fa-sign-out'}, Session)
                         ]
